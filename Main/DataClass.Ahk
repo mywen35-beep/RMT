@@ -259,7 +259,7 @@ class MainConfig {
 
         ; ========== 屏幕截图 ==========
         this.ScreenShotType := 3        ; 截图方式 (1=微软截图, 2=RMT截图, 3=SC截图)
-        this.SearchImageType := 1       ; 搜图模型 (1=OpenCV, 2=RMT搜图)，新建搜图指令默认值
+        this.SearchImageType := 1       ; 图片识别模型 (1=OpenCV, 2=RMT搜图)，搜图指令统一使用该值
         this.CheckForeground := false   ; 是否仅前台窗口运行宏
 
         ; ========== 字体/语言 ==========
@@ -1102,7 +1102,7 @@ class MoveData {
     }
 }
 
-; 设置-系统-搜图模型：1 OpenCV  2 RMT搜图；新建搜图指令默认用该值
+; 设置-系统-图片识别模型：1 OpenCV  2 RMT搜图；搜图指令统一使用该值
 SearchImageDefaultType() {
     v := 1
     try {
@@ -1270,14 +1270,14 @@ class OutputData {
 class FileIOData {
     __New() {
         this.SerialStr := ""
-        this.OperType := "读取Excel"    ;1读取Excel 2写入Excel 3读取文本文件 4写入文本文件
+        this.OperType := "读取文件"     ;读取Excel 写入Excel 读取文件 写入文件（旧值：读取文本文件/写入文本文件）
         this.Encoding := "UTF-8"        ;文本文件编码格式
         this.FilePath := ""
 
         ;读取Excel      "单元格", "指定行", "指定列", "指定区域-行", "指定区域-列"
         ;写入Excel      单元格    行号自增  列号自增  指定区域-行    指定区域-列
-        ;读取文本文件   读取全部内容, 逐行读取, 指定行
-        ;写入文本文件   "覆盖写入", "追加写入", "追加写入-行", "指定行", "行号自增"
+        ;读取文件       读取全部内容, 逐行读取, 指定行
+        ;写入文件       "覆盖写入", "追加写入", "追加写入-行", "指定行", "行号自增"
         this.OperMode := "单元格"
         this.NameOrSerial := 1
         this.RowVar := 1

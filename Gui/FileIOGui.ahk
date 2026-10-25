@@ -20,20 +20,24 @@ class FileIOGui {
         this.SerialStr := ""
         this.ContentEditGui := ""
         this._contentEditClosed := true
+        this.CmdKey := "文件读写"
+        textModes := GetLangArr(["读取全部内容", "逐行读取", "指定行"])
+        writeModes := GetLangArr(["覆盖写入", "追加写入", "追加写入-行", "指定行", "行号自增"])
         this.OperModeMap := Map(
             GetLang("读取Excel"),
             GetLangArr(["单元格", "指定行", "指定列", "指定区域-行", "指定区域-列"]),
             GetLang("写入Excel"),
             GetLangArr(["单元格", "行号自增", "列号自增", "指定区域-行", "指定区域-列"]),
-            GetLang("读取文本文件"),
-            GetLangArr(["读取全部内容", "逐行读取", "指定行"]),
-            GetLang("写入文本文件"),
-            GetLangArr(["覆盖写入", "追加写入", "追加写入-行", "指定行", "行号自增"])
+            GetLang("读取文件"), textModes,
+            GetLang("写入文件"), writeModes,
+            GetLang("读取文本文件"), textModes,
+            GetLang("写入文本文件"), writeModes
         )
     }
 
     ShowGui(cmd) {
         global MySoftData
+        this._ApplyCmdKeyFromCmd(cmd)
         if (IsObject(this.ui) && !this._closed)
             this._CloseWindow()
         this._BuildAndShow()
@@ -83,7 +87,7 @@ class FileIOGui {
     _BuildAndShow() {
         global MySoftData
         this._closed := false
-        title := this.ParentTile GetLang("文件读写编辑器")
+        title := this.ParentTile GetLang(this.CmdKey == "Excel" ? "Excel编辑器" : "文件读写编辑器")
         this._title := title
         titleHeight := XAMLHost.CmdTitleBarHeight()
 
@@ -108,7 +112,7 @@ class FileIOGui {
         ; 行1：操作类型 + 文件编码
         body.Add("TextBlock").Grid_Row(1).Grid_Column(0).Text(GetLang("操作类型:")).VerticalAlignment("Center")
         ot := body.Add("ComboBox").Grid_Row(1).Grid_Column(1).Name("OperTypeCombo").Height(26).MinHeight(26).VerticalAlignment("Center")
-        for t in GetLangArr(["读取Excel", "写入Excel", "读取文本文件", "写入文本文件"])
+        for t in this._OperTypes()
             ot.Add("ComboBoxItem").Content(t)
         encRow := body.Add("Grid").Name("EncodingRow").Grid_Row(1).Grid_Column(3).Grid_ColumnSpan(2).Visibility("Collapsed")
         encRow.Cols("96", "*")
@@ -194,7 +198,7 @@ class FileIOGui {
         this.ui.OnEvent("Window", "Closing", ObjBindMethod(this, "OnWindowClosing"))
         this.ui.OnEvent("Window", "LoadedHwnd", ObjBindMethod(this, "OnWindowLoad"))
         this.ui.OnEvent("BtnClosePanel", "Click", ObjBindMethod(this, "OnCancelClick"))
-        BindCmdEditorChrome(this.ui, "#指令手册/17-文件读写", ObjBindMethod(this, "TriggerMacro"))
+        BindCmdEditorChrome(this.ui, this.CmdKey == "Excel" ? "#指令手册/Excel" : "#指令手册/17-文件读写", ObjBindMethod(this, "TriggerMacro"))
         this.ui.OnEvent("OperTypeCombo", "SelectionChanged", ObjBindMethod(this, "OnRefreshType"))
         this.ui.OnEvent("OperModeCombo", "SelectionChanged", ObjBindMethod(this, "OnRefreshOperMode"))
         this.ui.OnEvent("BtnSelectFile", "Click", ObjBindMethod(this, "OnSelectPathBtnClick"))
@@ -270,16 +274,49 @@ class FileIOGui {
     _TypeText() => IsObject(this.ui) ? this.ui.Query("OperTypeCombo") : ""
     _ModeText() => IsObject(this.ui) ? this.ui.Query("OperModeCombo") : ""
 
+    _ApplyCmdKeyFromCmd(cmd) {
+        if (cmd == "")
+            return
+        param := StrSplit(cmd, "_")[1]
+        SplitSerialTextAndNumbers(param, &textOnly, &dummy)
+        key := GetLangKey(textOnly)
+        if (key == "Excel")
+            this.CmdKey := "Excel"
+        else if (key == "文件读写")
+            this.CmdKey := "文件读写"
+    }
+
+    _OperTypes() {
+        extra := IsObject(this.Data) ? this.Data.OperType : ""
+        return FileIOOperTypes(this.CmdKey == "Excel" ? "excel" : "file", extra)
+    }
+
+    _EnsureDefaultOper() {
+        if (this.CmdKey == "Excel") {
+            if (!FileIOIsExcelType(this.Data.OperType)) {
+                this.Data.OperType := "读取Excel"
+                this.Data.OperMode := "单元格"
+            }
+        } else if (!FileIOIsTextType(this.Data.OperType)) {
+            this.Data.OperType := "读取文件"
+            this.Data.OperMode := "读取全部内容"
+        }
+    }
+
     Init(cmd) {
+        this._ApplyCmdKeyFromCmd(cmd)
         cmdArr := cmd != "" ? StrSplit(cmd, "_") : []
-        this.SerialStr := cmdArr.Length >= 1 ? cmdArr[1] : GetCMDSerialStr("文件读写")
+        this.SerialStr := cmdArr.Length >= 1 ? cmdArr[1] : GetCMDSerialStr(this.CmdKey)
         this._ComboPush("RemarkCon", "Text", cmdArr.Length >= 2 ? cmdArr[2] : "")
         this.Data := GetMacroCMDData(this.SerialStr)
+        CompatEnsureFileIOData(this.Data)
+        if (cmd == "")
+            this._EnsureDefaultOper()
         this.DLAllVarArr := GetGuiVarArr(1)
         this.DLVarArr := GetGuiVarArr(2)
         this.DLArrayArr := GetGuiArrNameArr()
 
-        this._SetDDL("OperTypeCombo", GetLangArr(["读取Excel", "写入Excel", "读取文本文件", "写入文本文件"]), GetLang(this.Data.OperType))
+        this._SetDDL("OperTypeCombo", this._OperTypes(), GetLang(this.Data.OperType))
         this._SetDDL("EncodingCombo", GetLangArr(MySoftData.FileEncodingArr), GetShowEncoding(this.Data.Encoding))
         this._SetCombo("FilePathCombo", GetGuiVarArr(2), this.Data.FilePath)
         this._ComboPush("ContentCon", "Text", GetLangStr(this.Data.Content, 1))
@@ -322,10 +359,10 @@ class FileIOGui {
             CurType := this._TypeText()
             CurMode := this._ModeText()
         }
-        IsRead := CurType == GetLang("读取Excel") || CurType == GetLang("读取文本文件")
+        IsRead := FileIOIsReadType(CurType)
         IsWrite := !IsRead
-        IsExcel := CurType == GetLang("读取Excel") || CurType == GetLang("写入Excel")
-        IsText := CurType == GetLang("读取文本文件") || CurType == GetLang("写入文本文件")
+        IsExcel := FileIOIsExcelType(CurType)
+        IsText := FileIOIsTextType(CurType)
 
         IsExcelRange := IsExcel && (CurMode == GetLang("指定行") || CurMode == GetLang("指定列") || CurMode == GetLang("指定区域-行") || CurMode == GetLang("指定区域-列"))
         IsTextRange := IsText && CurMode == GetLang("逐行读取")
@@ -357,10 +394,8 @@ class FileIOGui {
 
     OnSelectPathBtnClick(state := "", ctrl := "", event := "") {
         CurType := this._TypeText()
-        IsExcel := CurType == GetLang("读取Excel") || CurType == GetLang("写入Excel")
-        IsText := CurType == GetLang("读取文本文件") || CurType == GetLang("写入文本文件")
+        IsExcel := FileIOIsExcelType(CurType)
         SymbolStr := IsExcel ? "Excel Files(*.xlsx; *.xls)" : ""
-        SymbolStr := IsText ? "Text Files(*.txt)" : SymbolStr
         path := FileSelect(1, , GetLang("选择输入的源文件"), SymbolStr)
         if (path != "")
             this.ui.Update("FilePathCombo", "Text", path)
@@ -528,7 +563,7 @@ class FileIOGui {
 
         CurType := this._TypeText()
         CurMode := this._ModeText()
-        IsRead := CurType == GetLang("读取Excel") || CurType == GetLang("读取文本文件")
+        IsRead := FileIOIsReadType(CurType)
         HasExcelRegion := IsRead && (CurMode == GetLang("指定区域-行") || CurMode == GetLang("指定区域-列"))
         if (HasExcelRegion) {
             err := CheckExcelRegionBounds(this.ui.Query("RowCombo"), this.ui.Query("ColCombo"), this.ui.Query("RowEndCombo"), this.ui.Query("ColEndCombo"))
@@ -546,7 +581,7 @@ class FileIOGui {
         OnTriggerSepcialItemMacro(CommandStr)
 
         CurType := this._TypeText()
-        IsRead := CurType == GetLang("读取Excel") || CurType == GetLang("读取文本文件")
+        IsRead := FileIOIsReadType(CurType)
         if (IsRead) {
             Res := ""
             if (this.Data.SaveType == "变量" && MySoftData.VariableMap.Has(this.Data.SaveName))
@@ -574,7 +609,7 @@ class FileIOGui {
     }
 
     SaveData() {
-        this.Data.OperType := GetLangKey(this._TypeText())
+        this.Data.OperType := FileIONormType(this._TypeText())
         this.Data.Encoding := GetSoftEncoding(this.ui.Query("EncodingCombo"))
         this.Data.FilePath := this.ui.Query("FilePathCombo")
         this.Data.OperMode := GetLangKey(this._ModeText())

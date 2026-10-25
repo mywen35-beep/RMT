@@ -27,7 +27,7 @@ class TriggerKeyGui {
         this.ModifyKeyMap := Map("LAlt", "<!", "RAlt", ">!", "Alt", "!", "LWin", "<#", "RWin", ">#", "Win", "#",
             "LCtrl", "<^", "RCtrl", ">^", "Ctrl", "^", "LShift", "<+", "RShift", ">+", "Shift", "+")
 
-        this.SelectColor := "#19C930"
+        this.SelectColor := "{DynamicResource ActionBg}"
         this.UnSelectColor := "{DynamicResource InputBg}"
     }
 
@@ -79,11 +79,11 @@ class TriggerKeyGui {
         }
 
         if (isSelected) {
-            this.ui.Update(con, "Background", this.UnSelectColor)
+            this._SetKeyBtnState(con, key, false)
             this.CheckedArr.RemoveAt(arrayIndex)
         }
         else {
-            this.ui.Update(con, "Background", this.SelectColor)
+            this._SetKeyBtnState(con, key, true)
             if (isModifyKey) {
                 this.CheckedArr.InsertAt(isNormalIndex, key)
             }
@@ -98,7 +98,7 @@ class TriggerKeyGui {
     ClearCheckedArr() {
         for index, value in this.CheckedArr {
             if (this.ConMap.Has(value))
-                this.ui.Update(this.ConMap[value], "Background", this.UnSelectColor)
+                this._SetKeyBtnState(this.ConMap[value], value, false)
         }
         this.CheckedArr := []
         this.Refresh()
@@ -202,19 +202,19 @@ class TriggerKeyGui {
                 }
             }
             for key, name in this.ConMap
-                this.ui.Update(name, "Background", this.UnSelectColor)
+                this._SetKeyBtnState(name, key, false)
         }
         else {
             for key, name in this.ConMap {
                 if (StrCompare(key, Trim(triggerKey), false) == 0)
                     this.CheckedArr.Push(key)
-                this.ui.Update(name, "Background", this.UnSelectColor)
+                this._SetKeyBtnState(name, key, false)
             }
         }
 
         for index, value in this.CheckedArr {
             if (this.ConMap.Has(value))
-                this.ui.Update(this.ConMap[value], "Background", this.SelectColor)
+                this._SetKeyBtnState(this.ConMap[value], value, true)
         }
 
         this.ShowSaveBtn := !this.IsToolEdit
@@ -486,6 +486,14 @@ class TriggerKeyGui {
             .SetProp("Canvas.Left", String(x)).SetProp("Canvas.Top", String(y))
     }
 
+    _SetKeyBtnState(con, key, selected) {
+        this.ui.Update(con, "Background", selected ? this.SelectColor : this.UnSelectColor)
+        this.ui.Update(con, "BorderBrush", selected ? "{DynamicResource ActionStroke}" : "{DynamicResource InputStroke}")
+        this.ui.Update(con, "Tag", selected ? "1" : "0")
+        if (this._btnTxtMap.Has(key))
+            this.ui.Update(this._btnTxtMap[key], "Foreground", selected ? "{DynamicResource ActionText}" : "{DynamicResource TextMain}")
+    }
+
     _PlaceKey(value, display, x, y, width) {
         global MySoftData
         this._keySeq += 1
@@ -493,10 +501,11 @@ class TriggerKeyGui {
         txtName := name "_Txt"
         btn := this._keyGrid.Add("Button").Name(name).Width(width).Height(25)
             .SetProp("Canvas.Left", String(x)).SetProp("Canvas.Top", String(y))
-            .Cursor("Hand").Padding("2,1")
+            .Cursor("Hand").Padding("2,1").Tag("0")
             .HorizontalContentAlignment("Stretch").VerticalContentAlignment("Stretch")
             .Background("{DynamicResource InputBg}").Foreground("{DynamicResource TextMain}")
             .BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
+        btn.InjectResources(FrontInfoGui._KeyPickBtnStyle())
         ; Viewbox DownOnly：字号上限为当前 11，超出按钮宽度时自适应缩小
         vb := btn.Add("Viewbox").Stretch("Uniform").StretchDirection("DownOnly")
             .HorizontalAlignment("Center").VerticalAlignment("Center")

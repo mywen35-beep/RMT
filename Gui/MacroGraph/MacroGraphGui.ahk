@@ -52,7 +52,7 @@ class MacroGraphGui {
 
         ; 若梦兔全部指令（§20 改名：移动→鼠标移动、移动Pro→鼠标移动Pro、新增 增量移动）
         this.CmdList := GetLangArr(["间隔", "时间", "按键", "手柄", "搜索", "搜索Pro", "搜索Combo", "鼠标移动", "鼠标移动Pro", "增量移动", "输入", "输出", "循环", "宏操作",
-            "变量", "变量提取", "如果", "如果Pro", "运算", "运行", "运行Pro", "文件读写", "文本处理", "数组", "RMT指令", "后台鼠标",
+            "变量", "变量提取", "如果", "如果Pro", "运算", "运行", "运行Pro", "文件读写", "Excel", "文本处理", "数组", "RMT指令", "后台鼠标",
             "后台按键", "窗口管理", "按键检测", "手柄检测", "等待", "等待确定", "注释", "抓图"])
 
         ; 各指令对应图标（顺序与 CmdList 一一对应，复用 MacroEditGui 的图标资源）
@@ -64,7 +64,7 @@ class MacroGraphGui {
             "Images\Soft\Var.png", "Images\Soft\Extract.png",
             "Images\Soft\If.png", "Images\Soft\IfPro.png",
             "Images\Soft\Operation.png", "Images\Soft\Run.png", "Images\Soft\Run.png",
-            "Images\Soft\FileIO.png", "Images\Soft\TextOps.png",
+            "Images\Soft\FileIO.png", "Images\Soft\FileIO.png", "Images\Soft\TextOps.png",
             "Images\Soft\Arr.png", "Images\Soft\rabit.png",
             "Images\Soft\Mouse.png", "Images\Soft\Key.png",
             "Images\Soft\WindowManage.png", "Images\Soft\KeyCheck.png", "Images\Soft\KeyCheck.png",
@@ -541,6 +541,10 @@ class MacroGraphGui {
                     break
                 data := cls()
                 data.SerialStr := serial
+                if (key == "Excel") {
+                    data.OperType := "读取Excel"
+                    data.OperMode := "单元格"
+                }
                 SaveMacroCMDData(data)
                 cmd := (key == "注释") ? this._CommentCmdFromData(data) : serial
                 return this._MakeNode(cmd)

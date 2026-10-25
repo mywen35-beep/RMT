@@ -241,7 +241,7 @@ class MacroGraphDataMixin {
     ; 形式化 INI 指令的 cmdKey 列表（与 AssetUtil 中 CMD 映射一致；阶段5 含新配置化 间隔/按键/移动/RMT指令）
     ; §20 改名：加「鼠标移动/增量移动」新键（旧「移动」键保留兼容旧图）
     _FormalIniCmdKeys() {
-        return ["宏操作", "变量", "变量提取", "如果", "如果Pro", "运算", "运行", "运行Pro", "文件读写", "文本处理", "数组",
+        return ["宏操作", "变量", "变量提取", "如果", "如果Pro", "运算", "运行", "运行Pro", "文件读写", "Excel", "文本处理", "数组",
             "后台鼠标", "后台按键", "窗口管理", "按键检测", "手柄检测", "注释", "抓图", "循环",
             "间隔", "按键", "移动", "鼠标移动", "增量移动", "RMT指令", "等待确定", "倒计时", "时间"]
     }
@@ -270,6 +270,7 @@ class MacroGraphDataMixin {
                 "运行", RunData,
                 "运行Pro", RunData,
                 "文件读写", FileIOData,
+                "Excel", FileIOData,
                 "文本处理", TextOpsData,
                 "数组", ArrayData,
                 "后台鼠标", BGMouseData,
@@ -493,7 +494,7 @@ class MacroGraphDataMixin {
                 else
                     d["runSave" A_Index] := (A_Index == 1 ? "ExitCode" : (A_Index == 2 ? "StdOut" : "StdErr"))
             }
-        } else if (cmdKey == "文件读写") {
+        } else if (cmdKey == "文件读写" || cmdKey == "Excel") {
             d.operType := data.OperType
             d.operMode := data.OperMode
             d.encoding := data.Encoding

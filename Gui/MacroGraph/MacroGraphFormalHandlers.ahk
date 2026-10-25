@@ -377,8 +377,9 @@ class MacroGraphFormalHandlersMixin {
 
     ; 文件读写：结果是否仅能为「变量」（其余皆为「数组」），与编辑器 RefreshConVisable 一致。
     _FIOResOnlyVar(operType, operMode) {
+        operType := FileIONormType(operType)
         return (operType == "读取Excel" && operMode == "单元格")
-            || (operType == "读取文本文件" && (operMode == "读取全部内容" || operMode == "指定行"))
+            || (operType == "读取文件" && (operMode == "读取全部内容" || operMode == "指定行"))
     }
 
     ; 在模式列表中查找某模式键的索引（0 基），未找到返回 -1。
@@ -393,9 +394,10 @@ class MacroGraphFormalHandlersMixin {
 
     ; 实时读取文件读写节点当前界面上「类型/模式/保存名」的真实值（直接向 WPF 进程查询，不用事件快照、不读数据缓存）。
     _FIOReadLive(id) {
-        operTypes := GetLangArr(["读取Excel", "写入Excel", "读取文本文件", "写入文本文件"])
+        d := this._FormalDFromId(id)
+        operTypes := this._FIOOperTypes(d)
         otTxt := this._ComboText("FIOTypeCmb_" id, unset, operTypes)
-        ot := otTxt != "" ? GetLangKey(otTxt) : ""
+        ot := otTxt != "" ? FileIONormType(otTxt) : ""
         modeItems := ot != "" ? this._FormalFileIOOperModes(ot) : []
         omTxt := this._ComboText("FIOModeCmb_" id, unset, modeItems)
         om := omTxt != "" ? GetLangKey(omTxt) : ""
@@ -428,7 +430,7 @@ class MacroGraphFormalHandlersMixin {
         ; 持久化（仅存储，不参与上面的刷新判断）
         data := this._FormalIniData(id)
         if (data != "") {
-            data.OperType := ot
+            data.OperType := FileIONormType(ot)
             data.OperMode := om
             data.SaveType := this._FIOResOnlyVar(ot, om) ? "变量" : "数组"
             SaveMacroCMDData(data)
@@ -450,7 +452,7 @@ class MacroGraphFormalHandlersMixin {
         ; 持久化
         data := this._FormalIniData(id)
         if (data != "") {
-            data.OperType := ot
+            data.OperType := FileIONormType(ot)
             data.OperMode := om
             data.SaveType := this._FIOResOnlyVar(ot, om) ? "变量" : "数组"
             SaveMacroCMDData(data)
@@ -1291,13 +1293,14 @@ class MacroGraphFormalHandlersMixin {
             return
         if (ot == "" || om == "") {
             d := this._FormalDFromId(id)
-            ot := d.HasOwnProp("operType") ? d.operType : "读取Excel"
-            om := d.HasOwnProp("operMode") ? d.operMode : "单元格"
+            ot := FileIONormType(d.HasOwnProp("operType") ? d.operType : "读取文件")
+            om := d.HasOwnProp("operMode") ? d.operMode : FileIODefaultMode(ot)
         }
-        IsRead := ot == "读取Excel" || ot == "读取文本文件"
+        ot := FileIONormType(ot)
+        IsRead := FileIOIsReadType(ot)
         IsWrite := !IsRead
-        IsExcel := ot == "读取Excel" || ot == "写入Excel"
-        IsText := ot == "读取文本文件" || ot == "写入文本文件"
+        IsExcel := FileIOIsExcelType(ot)
+        IsText := FileIOIsTextType(ot)
         IsExcelRange := IsExcel && (om == "指定行" || om == "指定列" || om == "指定区域-行" || om == "指定区域-列")
         HasTextRow := IsText && (om == "指定行" || om == "逐行读取" || om == "行号自增")
         HasRegion := IsRead && (om == "指定区域-行" || om == "指定区域-列")
@@ -1886,7 +1889,7 @@ class MacroGraphFormalHandlersMixin {
             this._RefreshFormalOperationVisibility(id)
         else if (d.type == GetLang("运行Pro"))
             this._RefreshFormalRunVisibility(id)
-        else if (d.type == GetLang("文件读写"))
+        else if (this._IsFileIOType(d.type))
             this._RefreshFormalFileIOVisibility(id)
         else if (d.type == GetLang("文本处理"))
             this._RefreshFormalTextOpsVisibility(id)
@@ -1927,7 +1930,7 @@ class MacroGraphFormalHandlersMixin {
             this._RefreshVariableInline(id, d)
             return true
         }
-        if (d.type == GetLang("文件读写")) {
+        if (this._IsFileIOType(d.type)) {
             this._RefreshFileIOInline(id, d)
             return true
         }
@@ -2156,10 +2159,10 @@ class MacroGraphFormalHandlersMixin {
 
     _RefreshFileIOInline(id, d) {
         encodings := GetLangArr(["UTF-8", "UTF-16", "GBK", "ANSI"])
-        operTypes := GetLangArr(["读取Excel", "写入Excel", "读取文本文件", "写入文本文件"])
+        operTypes := this._FIOOperTypes(d)
         enc := d.HasOwnProp("encoding") ? d.encoding : "UTF-8"
-        ot := d.HasOwnProp("operType") ? d.operType : "读取Excel"
-        om := d.HasOwnProp("operMode") ? d.operMode : "单元格"
+        ot := FileIONormType(d.HasOwnProp("operType") ? d.operType : "读取文件")
+        om := d.HasOwnProp("operMode") ? d.operMode : FileIODefaultMode(ot)
         modeItems := this._FormalFileIOOperModes(ot)
         ; 更新控件值
         this.ui.Update("FIOTypeCmb_" id, "SelectedIndex", this._IndexInLangArr(operTypes, GetLang(ot)))
@@ -2171,7 +2174,7 @@ class MacroGraphFormalHandlersMixin {
         this.ui.Update("FIOSheet_" id, "Text", d.HasOwnProp("NameOrSerial") ? d.NameOrSerial : 1)
         this.ui.Update("FIOEncCmb_" id, "SelectedIndex", this._IndexInLangArr(encodings, GetLang(enc)))
         ; 保存类型自动固定：读取Excel+单元格/读取文本+全部/指定行 → 变量；其他 → 数组
-        IsResOnlyVar := (ot == "读取Excel" && om == "单元格") || (ot == "读取文本文件" && (om == "读取全部内容" || om == "指定行"))
+        IsResOnlyVar := this._FIOResOnlyVar(ot, om)
         autoSaveType := IsResOnlyVar ? GetLang("变量") : GetLang("数组")
         this.ui.Update("FIOSaveType_" id, "Text", autoSaveType)
         ; 更新保存名选项列表
@@ -2282,8 +2285,8 @@ class MacroGraphFormalHandlersMixin {
                 p := SubStr(p, 1, 28) "..."
             return p
         }
-        if (d.type == GetLang("文件读写"))
-            return GetLang(d.HasOwnProp("operType") ? d.operType : "读取Excel") " / " GetLang(d.HasOwnProp("operMode") ? d.operMode : "单元格")
+        if (this._IsFileIOType(d.type))
+            return GetLang(FileIONormType(d.HasOwnProp("operType") ? d.operType : "读取文件")) " / " GetLang(d.HasOwnProp("operMode") ? d.operMode : FileIODefaultMode(d.HasOwnProp("operType") ? d.operType : "读取文件"))
         if (d.type == GetLang("文本处理"))
             return GetLang(d.HasOwnProp("textOpsType") ? d.textOpsType : "文本分割")
         if (d.type == GetLang("数组"))

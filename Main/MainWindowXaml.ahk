@@ -773,7 +773,7 @@ class MainWin {
         this.ui.OnEvent("BtnReload", "Click", MenuReload)
         if (!A_IsCompiled)
             this.ui.OnEvent("BtnGMUI", "Click", (*) => this.ui.Update("Window", "GMUIOpen", ""))
-        this.ui.OnEvent("BtnHelp", "Click", (*) => OnOpenHelpDoc())
+        this.ui.OnEvent("BtnHelp", "Click", (*) => OnOpenRmtDoc())
         this.ui.OnEvent("BtnSave", "Click", OnSaveSetting)
 
         this._vl := VirtualListHost(this.ui)
@@ -5522,7 +5522,7 @@ class MainWin {
                     . tog(GetLang("模态子窗口"), "ChkModalSubGui", MainSoftData.IsModalSubGui, GetLang("打开指令编辑等子窗口时禁用主窗口")), "0", "", "soft")
                 . card(GetLang("显示页签"), "&#xE8A5;", tabsBody, "0,18,0,0", "", "tabs")
                 , card(GetLang("通用"), "&#xE713;", cmb(GetLang("截图工具"), "CmbScreenShot", GetLangArr(["微软截图", "RMT截图", "SC截图"]), MainSoftData.ScreenShotType)
-                    . cmb(GetLang("搜图模型"), "CmbSearchImage", GetLangArr(["OpenCV", "RMT搜图"]), MainSoftData.SearchImageType)
+                    . cmb(GetLang("图片识别模型"), "CmbSearchImage", GetLangArr(["OpenCV", "RMT搜图"]), MainSoftData.SearchImageType)
                     . num(GetLang("多线程数"), "EditMutiThreadNum", MainSoftData.MutiThreadNum, GetLang("-1：动态多线程；0：单线程；n：固定线程数（推荐 3~5）"))
                     . num(GetLang("网络宏端口"), "EditNetPort", MainSoftData.NetworkPort, GetLang("网络宏端口 1-65535，默认 16888；仅监听本机回环地址。"))
                     . cmb(GetLang("指令备注生成"), "CmbRemarkAuto", GetLangArr(["不生成", "自动生成", "覆盖生成"]), MainSoftData.RemarkAutoType), "0", "", "general")

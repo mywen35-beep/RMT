@@ -188,6 +188,7 @@ ExecuteMacroCmdOnce(tableItem, cmdStr, index, graphNode := "") {
         "输入", OnInput,
         "等待确定", OnWaitConfirm,
         "文件读写", OnFileIO,
+        "Excel", OnFileIO,
         "窗口管理", OnWindowManage,
         "按键检测", OnKeyCheck,
         "手柄检测", OnJoyCheck,
@@ -1841,20 +1842,20 @@ OnFileIO(tableItem, cmd, index) {
     Data := GetMacroCMDData(paramArr[1])
 
     FilePath := GetReplaceVarText(tableItem, index, Data.FilePath)
-    isExcel := Data.OperType == "读取Excel" || Data.OperType == "写入Excel"
-    filter := isExcel ? "Excel Files (*.xlsx)" : "Text Files (*.txt)"
+    isExcel := FileIOIsExcelType(Data.OperType)
+    filter := isExcel ? "Excel Files (*.xlsx; *.xls)" : ""
     if (!ValidateCmdPath(&Data, "FilePath", GetLang("选择文件"), filter, tableItem, index))
         return
     FilePath := Data.FilePath
 
-    switch Data.OperType {
+    switch FileIONormType(Data.OperType) {
         case "读取Excel":
             ReadExcel(Data, tableItem, index)
         case "写入Excel":
             WriteExcel(Data, tableItem, index)
-        case "读取文本文件":
+        case "读取文件":
             ReadTextFile(Data, tableItem, index)
-        case "写入文本文件":
+        case "写入文件":
             WriteTextFile(Data, tableItem, index)
     }
 }

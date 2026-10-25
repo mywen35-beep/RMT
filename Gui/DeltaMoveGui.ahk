@@ -144,7 +144,7 @@ class DeltaMoveGui {
         this.ui.OnEvent("Window", "Closing", ObjBindMethod(this, "OnWindowClosing"))
         this.ui.OnEvent("Window", "LoadedHwnd", ObjBindMethod(this, "OnWindowLoad"))
         this.ui.OnEvent("BtnClosePanel", "Click", ObjBindMethod(this, "OnCancelClick"))
-        BindCmdEditorChrome(this.ui, "#指令手册/6-移动Pro", ObjBindMethod(this, "TriggerMacro"), "!l")
+        BindCmdEditorChrome(this.ui, "#指令手册/增量移动", ObjBindMethod(this, "TriggerMacro"), "!l")
         this.ui.OnEvent("BtnOk", "Click", ObjBindMethod(this, "OnSureBtnClick"))
     }
 

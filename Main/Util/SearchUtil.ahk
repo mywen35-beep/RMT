@@ -235,7 +235,7 @@ SearchAdaptiveOn(Data) {
 }
 
 SearchImage(Data, X1, Y1, X2, Y2, ImagePath, &ResX, &ResY) {
-    if (Data.SearchImageType == 1) {
+    if (SearchImageDefaultType() == 1) {
         ocvReason := OpenCvEnsure()
         if (ocvReason != "") {
             ShowOpenCvInstallPrompt(ocvReason)

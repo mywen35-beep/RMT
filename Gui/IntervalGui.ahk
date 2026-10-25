@@ -120,7 +120,7 @@ class IntervalGui {
         this.ui.OnEvent("Window", "Closing", ObjBindMethod(this, "OnWindowClosing"))
         this.ui.OnEvent("Window", "LoadedHwnd", ObjBindMethod(this, "OnWindowLoad"))
         this.ui.OnEvent("BtnClosePanel", "Click", ObjBindMethod(this, "OnCancelClick"))
-        BindCmdEditorChrome(this.ui, "#æä»¤æå/1-é´é")
+        BindCmdEditorChrome(this.ui, "#指令手册/1-间隔")
         this.ui.OnEvent("TypeCombo", "SelectionChanged", ObjBindMethod(this, "OnTypeChange"))
         this.ui.OnEvent("BtnOk", "Click", ObjBindMethod(this, "OnClickSureBtn"))
     }

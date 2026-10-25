@@ -251,7 +251,7 @@ BindCmdEditorChrome(ui, helpRoute := "", playAction := "", playHotkey := "!l", t
     helpRoute := Trim(helpRoute)
     if (helpRoute != "")
         hash := (SubStr(helpRoute, 1, 1) == "#") ? helpRoute : "#" helpRoute
-    ui.OnEvent("BtnCmdHelp", "Click", (*) => OnOpenHelpDoc(hash))
+    ui.OnEvent("BtnCmdHelp", "Click", (*) => OnOpenRmtDoc(hash))
     ui.OnEvent("BtnCmdVideo", "Click", (*) => MyMsgBoxContent(GetLang("指令介绍视频制作中，敬请期待。")))
     if (playAction != "") {
         try ui.Update("BtnCmdPlay", "Visibility", "Visible")
@@ -327,6 +327,7 @@ CmdEditorTitleIcon(title) {
             ["提取文本", "Images\Soft\Extract.png"],
             ["文本处理", "Images\Soft\TextOps.png"],
             ["文件读写", "Images\Soft\FileIO.png"],
+            ["Excel", "Images\Soft\FileIO.png"],
             ["窗口管理", "Images\Soft\WindowManage.png"],
             ["按键检测", "Images\Soft\KeyCheck.png"],
             ["手柄检测", "Images\Soft\KeyCheck.png"],
@@ -390,6 +391,45 @@ AddHotkeyBadge(parent, hotkey, tip := "") {
     cap.Add("TextBlock").Text(disp).FontSize(11).FontWeight("SemiBold")
         .VerticalAlignment("Center").HorizontalAlignment("Center").Foreground("{DynamicResource TextMain}")
     return cap
+}
+
+; 侧栏「RMT文档」/指令编辑器「手册」：打开程序目录 index.html 并定位章节
+; pageHash 形如 "#指令手册/2-按键"，留空则打开文档首页
+; 不能直接 Run(file:///...#hash)：Windows ShellExecute 会丢掉 fragment，浏览器只打开首页
+OnOpenRmtDoc(pageHash := "") {
+    p := A_WorkingDir "\index.html"
+    if (!FileExist(p)) {
+        MsgBox(GetLang("未找到帮助文档，请检查程序目录下的 index.html 是否完整。"), GetLang("提示"))
+        return
+    }
+    hash := Trim(pageHash)
+    if (hash != "" && SubStr(hash, 1, 1) != "#")
+        hash := "#" hash
+    route := Trim(hash, " `t#")
+    uri := FileToFileUri(p)
+    if (uri == "") {
+        uri := StrReplace(p, "\", "/")
+        if (RegExMatch(uri, "i)^[a-z]:"))
+            uri := "file:///" uri
+    }
+    target := uri
+    if (route != "") {
+        enc := UriEncode(route)
+        target := uri "?r=" enc "#" enc
+    }
+    exe := FindChromiumBrowser()
+    if (exe != "") {
+        try {
+            Run('"' exe '" "' target '"')
+            return
+        }
+    }
+    jump := A_Temp "\RmtDocJump.html"
+    js := StrReplace(StrReplace(target, "\", "\\"), "'", "\'")
+    html := "<!DOCTYPE html><html><head><meta charset='utf-8'></head><body><script>location.replace('" js "');</script></body></html>"
+    try FileDelete(jump)
+    FileAppend(html, jump, "UTF-8")
+    Run(jump)
 }
 
 ; 打开帮助文档；文件不存在时给出提示而不是抛 Run 错误

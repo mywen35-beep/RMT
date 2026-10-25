@@ -437,7 +437,6 @@ class SearchComboGui {
         typeItems := ""
         for tt in GetLangArr(["屏幕图片", "屏幕颜色", "屏幕文本", "窗口图片", "窗口颜色", "窗口文本"])
             typeItems .= '<ComboBoxItem Content="' tt '"/>'
-        modelItems := '<ComboBoxItem Content="OpenCV"/><ComboBoxItem Content="' GetLang("RMT识图") '"/>'
         delIcon := Chr(0xE74D)
 
         lastN := this.TargetList.Length
@@ -512,10 +511,6 @@ class SearchComboGui {
             . '<TextBox Name="' this._TN(n, "Similar") '" Grid.Row="0" Grid.Column="6" Height="28" MinHeight="28" MinWidth="80"'
             . ' HorizontalAlignment="Stretch" VerticalContentAlignment="Center" Padding="2,0" TextAlignment="Center" FontSize="' fs '"'
             . ' Foreground="{DynamicResource InputText}" Background="{DynamicResource InputBg}" BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1"/>'
-            . '<TextBlock Name="' this._TN(n, "ImageTypeTip") '" Grid.Row="1" Grid.Column="4" Text="' GetLang("识别模型：") '"'
-            . ' VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="{DynamicResource TextMain}" FontSize="' fs '"/>'
-            . '<ComboBox Name="' this._TN(n, "ImageType") '" Grid.Row="1" Grid.Column="6" Height="28" MinHeight="28" MinWidth="80"'
-            . ' HorizontalAlignment="Stretch" VerticalAlignment="Center" VerticalContentAlignment="Center" FontSize="' fs '">' modelItems '</ComboBox>'
             . '</Grid>'
             . '<Border Name="' this._TN(n, "ImagePreviewHost") '" Grid.Row="2" Grid.Column="4" Width="64" Height="64" MinWidth="64" MinHeight="64" MaxWidth="64" MaxHeight="64"'
             . ' HorizontalAlignment="Left" VerticalAlignment="Center" ClipToBounds="True"'
@@ -622,8 +617,6 @@ class SearchComboGui {
 
     _BindTargetCard(n) {
         this._Bind(this._TN(n, "Type"), "SelectionChanged", ObjBindMethod(this, "OnTargetTypeChanged", n))
-        ; 识别模型切换时刷新「自适应」按钮的显隐
-        this._Bind(this._TN(n, "ImageType"), "SelectionChanged", ObjBindMethod(this, "OnTargetTypeChanged", n))
         this._Bind(this._TN(n, "DelBtn"), "Click", ObjBindMethod(this, "OnDelTarget", n))
         if (n > 1)
             this._Bind(this._TN(n, "UpBtn"), "Click", ObjBindMethod(this, "OnMoveTarget", n, -1))
@@ -678,7 +671,6 @@ class SearchComboGui {
         this._SetCombo(this._TN(n, "StartPosY"), this.DLVariableArr, t.StartPosY)
         this._SetCombo(this._TN(n, "EndPosX"), this.DLVariableArr, t.EndPosX)
         this._SetCombo(this._TN(n, "EndPosY"), this.DLVariableArr, t.EndPosY)
-        this.ui.Update(this._TN(n, "ImageType"), "SelectedIndex", String((t.SearchImageType ? t.SearchImageType : 1) - 1))
         this._SyncAdaptiveBtn(n, ObjHasOwnProp(t, "Adaptive") ? t.Adaptive : 0)
         this._SetImage(n, t.SearchImagePath)
         this._SetCombo(this._TN(n, "ImagePath"), this.DLVariableArr, t.SearchImagePath)
@@ -783,12 +775,9 @@ class SearchComboGui {
         this.ui.Update(tn "WinInfoRow", "Visibility", isWin ? "Visible" : "Hidden")
         this.ui.Update(tn "ImagePathTip", "Visibility", isImage ? "Visible" : "Hidden")
         this.ui.Update(tn "ImagePathRow", "Visibility", isImage ? "Visible" : "Hidden")
-        this.ui.Update(tn "ImageTypeTip", "Visibility", isImage ? "Visible" : "Hidden")
-        this.ui.Update(tn "ImageType", "Visibility", isImage ? "Visible" : "Hidden")
         this.ui.Update(tn "ImagePreviewHost", "Visibility", isImage ? "Visible" : "Hidden")
         ; 自适应只对 OpenCV 识别有效，RMT识图 那条路没有缩放能力
-        modelIdx := this.ui.Query(tn "ImageType>SelectedIndex")
-        isOcv := isImage && (!IsNumber(modelIdx) || Integer(modelIdx) <= 0)
+        isOcv := isImage && SearchImageDefaultType() == 1
         this.ui.Update(tn "AdaptiveBtn", "Visibility", isOcv ? "Visible" : "Hidden")
         this.ui.Update(tn "ColorTipLabel", "Visibility", isColor ? "Visible" : "Hidden")
         this.ui.Update(tn "ColorRow", "Visibility", isColor ? "Visible" : "Hidden")
@@ -1227,7 +1216,7 @@ class SearchComboGui {
                 SearchImagePath: this.ui.Query(tn "ImagePath"),
                 Similar: this.ui.Query(tn "Similar"),
                 OCRType: 1,   ; v6 统一多语言模型，不再区分
-                SearchImageType: Integer(this.ui.Query(tn "ImageType>SelectedIndex")) + 1,
+                SearchImageType: SearchImageDefaultType(),
                 Adaptive: ObjHasOwnProp(this.TargetList[n], "Adaptive") ? this.TargetList[n].Adaptive : 0,
                 Remark: this.ui.Query(tn "Remark"),
                 StartPosX: this.ui.Query(tn "StartPosX"),

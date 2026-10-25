@@ -25,6 +25,8 @@ class TimeGui {
         global MySoftData
         if (IsObject(this.ui) && !this._closed)
             this._CloseWindow()
+        cmdArr := cmd != "" ? SplitCommand(cmd) : []
+        this.SerialStr := cmdArr.Length >= 1 ? cmdArr[1] : GetCMDSerialStr("时间")
         this._BuildAndShow()
         if (this.OwnerHwnd != "" && MainSoftData.IsModalSubGui) {
             try SafeGuiFromHwnd(this.OwnerHwnd).Opt("+Disabled")

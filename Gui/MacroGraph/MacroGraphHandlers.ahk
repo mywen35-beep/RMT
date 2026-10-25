@@ -85,7 +85,7 @@ class MacroGraphHandlersMixin {
                 loop 3
                     keys.Push("RunSave" A_Index "_" id)
             }
-        } else if (type == GetLang("文件读写"))
+        } else if (this._IsFileIOType(type))
             keys := ["FIORow_" id, "FIOCol_" id, "FIORowEnd_" id, "FIOColEnd_" id, "FIOTxtRow_" id, "FIOSave_" id, "FIOArr_" id, "FIOSheet_" id]
         else if (type == GetLang("文本处理"))
             keys := ["TxtName_" id, "TxtArgsName_" id, "TxtSave_" id]
@@ -1600,7 +1600,7 @@ class MacroGraphHandlersMixin {
                 this._OnFormalOperation(id, state, "", "Flush")
             else if (t == GetLang("运行") || t == GetLang("运行Pro"))
                 this._OnFormalRun(id, state, "", "Flush")
-            else if (t == GetLang("文件读写"))
+            else if (this._IsFileIOType(t))
                 this._OnFIOField(id, state, "", "Flush")
             else if (t == GetLang("文本处理"))
                 this._OnFormalTextOps(id, state, "", "Flush")

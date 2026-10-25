@@ -1,9 +1,71 @@
 ﻿#Requires AutoHotkey v2.0
 
+FileIONormType(t) {
+    t := GetLangKey(t)
+    if (t == "读取文本文件")
+        return "读取文件"
+    if (t == "写入文本文件")
+        return "写入文件"
+    return t
+}
+
+FileIOIsExcelType(t) {
+    t := FileIONormType(t)
+    return t == "读取Excel" || t == "写入Excel"
+}
+
+FileIOIsTextType(t) {
+    t := FileIONormType(t)
+    return t == "读取文件" || t == "写入文件"
+}
+
+FileIOIsReadType(t) {
+    t := FileIONormType(t)
+    return t == "读取Excel" || t == "读取文件"
+}
+
+FileIOTypeInList(t, arr) {
+    t := FileIONormType(t)
+    for x in arr {
+        if (FileIONormType(x) == t)
+            return true
+    }
+    return false
+}
+
+FileIOOperTypes(kind, extraType := "") {
+    types := kind == "excel" ? ["读取Excel", "写入Excel"] : ["读取文件", "写入文件"]
+    extra := FileIONormType(extraType)
+    if (extra != "" && !FileIOTypeInList(extra, types))
+        types := ["读取Excel", "写入Excel", "读取文件", "写入文件"]
+    return GetLangArr(types)
+}
+
+FileIODefaultMode(operType) {
+    switch FileIONormType(operType) {
+        case "读取Excel", "写入Excel":
+            return "单元格"
+        case "读取文件":
+            return "读取全部内容"
+        case "写入文件":
+            return "覆盖写入"
+        default:
+            return "单元格"
+    }
+}
+
+CompatEnsureFileIOData(Data) {
+    if (Data == "" || !IsObject(Data) || !ObjHasOwnProp(Data, "OperType"))
+        return false
+    old := Data.OperType
+    Data.OperType := FileIONormType(old)
+    return Data.OperType != old
+}
+
 SetFileIOGlobalData(Data) {
-    CurType := Data.OperType
+    CurType := FileIONormType(Data.OperType)
     CurMode := Data.OperMode
-    IsRead := CurType == "读取Excel" || CurType == "读取文本文件"
+    IsRead := FileIOIsReadType(CurType)
     IsExcelRange := CurMode == "指定区域-行" || CurMode == "指定区域-列"
     IsVar := IsRead && !IsExcelRange
     IsArr := IsRead && IsExcelRange
