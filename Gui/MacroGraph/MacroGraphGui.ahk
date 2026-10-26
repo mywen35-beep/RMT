@@ -56,19 +56,19 @@ class MacroGraphGui {
             "后台按键", "窗口管理", "按键检测", "手柄检测", "等待", "等待确定", "注释", "抓图"])
 
         ; 各指令对应图标（顺序与 CmdList 一一对应，复用 MacroEditGui 的图标资源）
-        this.CmdIconArr := ["Images\Soft\Interval.png", "Images\Soft\Interval.png", "Images\Soft\Key.png", "Images\Soft\Key.png",
-            "Images\Soft\Search.png", "Images\Soft\SearchPro.png", "Images\Soft\SearchPro.png",
-            "Images\Soft\Move.png", "Images\Soft\MovePro.png", "Images\Soft\Move.png",
+        this.CmdIconArr := ["Images\Soft\Delay.png", "Images\Soft\Time.png", "Images\Soft\Key.png", "Images\Soft\Joy.png",
+            "Images\Soft\Search.png", "Images\Soft\SearchPro.png", "Images\Soft\SearchCombo.png",
+            "Images\Soft\Move.png", "Images\Soft\MovePro.png", "Images\Soft\DeltaMove.png",
             "Images\Soft\Input.png", "Images\Soft\Output.png",
-            "Images\Soft\Loop.png", "Images\Soft\Sub.png",
+            "Images\Soft\Loop.png", "Images\Soft\MacroAction.png",
             "Images\Soft\Var.png", "Images\Soft\Extract.png",
             "Images\Soft\If.png", "Images\Soft\IfPro.png",
-            "Images\Soft\Operation.png", "Images\Soft\Run.png", "Images\Soft\Run.png",
-            "Images\Soft\FileIO.png", "Images\Soft\FileIO.png", "Images\Soft\TextOps.png",
+            "Images\Soft\Operation.png", "Images\Soft\Run.png", "Images\Soft\RunPro.png",
+            "Images\Soft\FileIO.png", "Images\Soft\Excel.png", "Images\Soft\TextOps.png",
             "Images\Soft\Arr.png", "Images\Soft\rabit.png",
-            "Images\Soft\Mouse.png", "Images\Soft\Key.png",
-            "Images\Soft\WindowManage.png", "Images\Soft\KeyCheck.png", "Images\Soft\KeyCheck.png",
-            "Images\Soft\Control.png", "Images\Soft\Control.png",
+            "Images\Soft\Mouse.png", "Images\Soft\BGKey.png",
+            "Images\Soft\WindowManage.png", "Images\Soft\KeyListen.png", "Images\Soft\JoyListen.png",
+            "Images\Soft\Wait.png", "Images\Soft\WaitConfirm.png",
             "Images\Soft\Comment.png", "Images\Soft\ScreenShot.png"]
 
         ; 复用现有子编辑器（双击节点时打开）

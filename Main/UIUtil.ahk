@@ -205,7 +205,14 @@ CustomTrayMenu() {
     A_TrayMenu.Default := GetLang("显示窗口")
     A_IconTip := tipStr  ; 鼠标悬停时显示此内容
     A_IconHidden := 0   ;0(可见) 和 1(隐藏)
-    TraySetIcon("Images\Soft\rabit.ico", , true)
+    UpdateMacroTrayIcon()
+}
+
+; 休眠优先；任一宏运行时显示运行图标，全部结束/暂停后恢复默认图标。
+UpdateMacroTrayIcon() {
+    icon := MainSoftData.IsSuspend ? "IcoPause.ico"
+        : (MySoftData.IsMacroWorking ? "IcoRunning.ico" : "rabit.ico")
+    TraySetIcon("Images\Soft\" icon, , true)
 }
 
 OnTrayStartRecord(*) {
@@ -319,27 +326,27 @@ CmdEditorTitleIcon(title) {
         pairs := [
             ["鼠标移动Pro", "Images\Soft\MovePro.png"],
             ["搜索Pro", "Images\Soft\SearchPro.png"],
-            ["搜索Combo", "Images\Soft\SearchPro.png"],
-            ["组合搜索", "Images\Soft\SearchPro.png"],
-            ["搜索Multi", "Images\Soft\SearchPro.png"],
+            ["搜索Combo", "Images\Soft\SearchCombo.png"],
+            ["组合搜索", "Images\Soft\SearchCombo.png"],
+            ["搜索Multi", "Images\Soft\SearchCombo.png"],
             ["如果Pro", "Images\Soft\IfPro.png"],
             ["变量提取", "Images\Soft\Extract.png"],
             ["提取文本", "Images\Soft\Extract.png"],
             ["文本处理", "Images\Soft\TextOps.png"],
             ["文件读写", "Images\Soft\FileIO.png"],
-            ["Excel", "Images\Soft\FileIO.png"],
+            ["Excel", "Images\Soft\Excel.png"],
             ["窗口管理", "Images\Soft\WindowManage.png"],
-            ["按键检测", "Images\Soft\KeyCheck.png"],
-            ["手柄检测", "Images\Soft\KeyCheck.png"],
+            ["按键检测", "Images\Soft\KeyListen.png"],
+            ["手柄检测", "Images\Soft\JoyListen.png"],
             ["后台鼠标", "Images\Soft\Mouse.png"],
-            ["后台按键", "Images\Soft\Key.png"],
-            ["增量移动", "Images\Soft\Move.png"],
+            ["后台按键", "Images\Soft\BGKey.png"],
+            ["增量移动", "Images\Soft\DeltaMove.png"],
             ["鼠标移动", "Images\Soft\Move.png"],
             ["RMT指令", "Images\Soft\rabit.png"],
-            ["宏操作", "Images\Soft\Sub.png"],
-            ["间隔", "Images\Soft\Interval.png"],
+            ["宏操作", "Images\Soft\MacroAction.png"],
+            ["间隔", "Images\Soft\Delay.png"],
             ["按键", "Images\Soft\Key.png"],
-            ["手柄", "Images\Soft\Key.png"],
+            ["手柄", "Images\Soft\Joy.png"],
             ["搜索", "Images\Soft\Search.png"],
             ["输入", "Images\Soft\Input.png"],
             ["输出", "Images\Soft\Output.png"],
@@ -347,12 +354,12 @@ CmdEditorTitleIcon(title) {
             ["变量", "Images\Soft\Var.png"],
             ["如果", "Images\Soft\If.png"],
             ["运算", "Images\Soft\Operation.png"],
-            ["运行Pro", "Images\Soft\Run.png"],
+            ["运行Pro", "Images\Soft\RunPro.png"],
             ["运行", "Images\Soft\Run.png"],
             ["数组", "Images\Soft\Arr.png"],
-            ["等待确定", "Images\Soft\Control.png"],
-            ["等待", "Images\Soft\Control.png"],
-            ["时间", "Images\Soft\Interval.png"],
+            ["等待确定", "Images\Soft\WaitConfirm.png"],
+            ["等待", "Images\Soft\Wait.png"],
+            ["时间", "Images\Soft\Time.png"],
             ["倒计时", "Images\Soft\Interval.png"],
             ["注释", "Images\Soft\Comment.png"],
             ["抓图", "Images\Soft\ScreenShot.png"]

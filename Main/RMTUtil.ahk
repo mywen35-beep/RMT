@@ -1105,6 +1105,7 @@ RecoverAllDirtyStates() {
     if (MySoftData.MacroRunningCount != 0) {
         MySoftData.MacroRunningCount := 0
         MySoftData.IsMacroWorking := false
+        UpdateMacroTrayIcon()
         MyCMDTipGui.OnToggleMacroWorkState()
     }
 }
@@ -2155,6 +2156,7 @@ UpdateMacroRunningCount(LastState, State) {
     curState := MySoftData.MacroRunningCount > 0
     if (curState != MySoftData.IsMacroWorking) {
         MySoftData.IsMacroWorking := curState
+        UpdateMacroTrayIcon()
         MyCMDTipGui.OnToggleMacroWorkState()
     }
 }

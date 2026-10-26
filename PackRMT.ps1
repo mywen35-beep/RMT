@@ -874,12 +874,17 @@ function New-RMTAssets {
 
     # 生成 ico.zip（Images\Soft 下 SelfCheck.ahk 的 icoFileList）
     $icoList = @(
+        "Wait.png",
+        "BGKey.png", "Delay.png",
+        "IcoRunning.ico", "Joy.png", "DeltaMove.png",
+        "KeyListen.png", "JoyListen.png", "SearchCombo.png", "Excel.png",
+        "Time.png", "WaitConfirm.png", "RunPro.png",
         "Arr.png", "Condition.png", "Control.png", "Extract.png", "False.png",
         "FileIO.png", "GreenColor.png", "IcoPause.ico", "If.png", "IfPro.png",
-        "Input.png", "Interval.png", "Key.png", "KeyCheck.png", "Loop.png",
+        "Input.png", "Interval.png", "Key.png", "Loop.png",
         "LoopBody.png", "LoopCount.png", "Mouse.png", "Move.png", "MovePro.png",
         "Operation.png", "Output.png", "RedColor.png", "Run.png", "Search.png",
-        "SearchPro.png", "Sub.png", "Target.png", "TextOps.png", "True.png",
+        "SearchPro.png", "MacroAction.png", "Target.png", "TextOps.png", "True.png",
         "Var.png", "WeiXin.png", "WindowManage.png", "YellowColor.png",
         "ZhiFuBao.png", "rabit.ico", "rabit.png", "Comment.png", "ScreenShot.png"
     )

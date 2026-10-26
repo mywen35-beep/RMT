@@ -55,12 +55,13 @@ SelfCheckMissingFiles() {
         "MinTool\CountDown.exe", "CountDown.exe",
         "Plugins\AhiDriver\installer\使用说明.txt", "InstallReadme.txt")
 
-    icoFileList := ["Arr.png", "Condition.png", "Control.png", "Extract.png", "False.png",
+    icoFileList := ["Wait.png", "BGKey.png", "Delay.png", "IcoRunning.ico", "Joy.png", "DeltaMove.png", "KeyListen.png", "JoyListen.png", "SearchCombo.png", "Excel.png", "Time.png", "WaitConfirm.png", "RunPro.png",
+        "Arr.png", "Condition.png", "Control.png", "Extract.png", "False.png",
         "FileIO.png", "GreenColor.png", "IcoPause.ico", "If.png", "IfPro.png",
-        "Input.png", "Interval.png", "Key.png", "KeyCheck.png", "Loop.png",
+        "Input.png", "Interval.png", "Key.png", "Loop.png",
         "LoopBody.png", "LoopCount.png", "Mouse.png", "Move.png", "MovePro.png",
         "Operation.png", "Output.png", "RedColor.png", "Run.png", "Search.png",
-        "SearchPro.png", "Sub.png", "Target.png", "TextOps.png", "True.png",
+        "SearchPro.png", "MacroAction.png", "Target.png", "TextOps.png", "True.png",
         "Var.png", "WeiXin.png", "WindowManage.png", "YellowColor.png",
         "ZhiFuBao.png", "AiFaDian.png", "Stripe2.png", "Stripe5.png", "rabit.ico", "rabit.png", "Comment.png", "ScreenShot.png"]
 
