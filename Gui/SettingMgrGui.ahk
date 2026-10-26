@@ -1,4 +1,4 @@
-#Requires AutoHotkey v2.0
+﻿#Requires AutoHotkey v2.0
 
 class SettingMgrGui {
     static instances := Map()
@@ -348,12 +348,12 @@ class SettingMgrGui {
             DirDelete(CurSettingDir, true)
         DirCopy(SelectedFolder, CurSettingDir, 1)
         ; Setting 根下的旧版共用配置（MainSettings.ini / themes.ini）→ TOML
-        try IniImport_ConvertDir(CurSettingDir)
-        catch as e
-            RMTLogSys(RMT_LV_ERROR, "配置导入", Format("Setting 根目录 INI 转换异常：{1}", e.Message))
         try {
+            converted := IniImport_ConvertDir(CurSettingDir)
+            for name, message in converted["Failed"]
+                throw Error(name "：" message)
             loop files, CurSettingDir "\*", "D" {
-                this.OnRepairSetting(A_LoopFilePath)
+                this.OnRepairSetting(A_LoopFilePath, true)
             }
         } catch as e {
             RmtDialog.Info(GetLang("迁移失败: ") e.Message, GetLang("错误"), this.ui.wpfHwnd)
@@ -494,7 +494,7 @@ class SettingMgrGui {
 
         try {
             FolderPackager.UnpackFile(selectedFile, outputFolder)
-            this.OnRepairSetting(outputFolder)
+            this.OnRepairSetting(outputFolder, true)
             if (LoadType != 2) {
                 MainSoftData.SettingArrStr .= "π" fileNameNoExt
                 CfgWrite(MainSoftData.SettingArrStr, SettingFile, SettingSection, "SettingArrStr")
@@ -596,71 +596,15 @@ class SettingMgrGui {
         this.Refresh()
     }
 
-    OnRepairSetting(SettringDir) {
-        SplitPath SettringDir, &fileName, , &fileExt, &fileNameNoExt
-        hasWork := false
-        tStage := A_TickCount
-        ; ① 旧版 INI 配置 → TOML（MacroFile 保持扁平数组键名原样落盘），必须在 Compat* 之前
-        ;    转换失败不能中断导入流程（异常在此吞掉并记日志，Compat* 会按缺文件跳过）
+    OnRepairSetting(SettringDir, strict := false) {
         try {
-            conv := IniImport_ConvertDir(SettringDir)
-            if (conv["Converted"] > 0) {
-                hasWork := true
-                RMTLogSysInfo("配置导入", Format("{1}：INI → TOML 转换 {2} 个", SettringDir, conv["Converted"]))
-            }
-            if (conv["Failed"].Count > 0) {
-                msg := ""
-                for name, err in conv["Failed"]
-                    msg .= (msg == "" ? "" : "`n") name ": " err
-                RMTLogSys(RMT_LV_ERROR, "配置导入", Format("{1} 转换失败：{2}", SettringDir, msg))
-            }
+            return Compat_UpgradeDir(SettringDir)
         } catch as e {
-            RMTLogSys(RMT_LV_ERROR, "配置导入", Format("{1} INI 转换异常：{2}", SettringDir, e.Message))
+            RMTLogSys(RMT_LV_ERROR, "配置导入", SettringDir ": " e.Message)
+            if (strict)
+                throw e
+            return false
         }
-        msConv := A_TickCount - tStage
-        tStage := A_TickCount
-        ; Compat* 逐键改写：包进批处理，把「每键整文件重读写」合并成「一次解析 + 一次落盘」
-        CfgBatchBegin()
-        try {
-            hasWork := CompatCMD(SettringDir "\MacroFile.toml") || hasWork
-            hasWork := CompatSearch(SettringDir "\SearchFile.toml") || hasWork
-            hasWork := CompatSearchPro(SettringDir "\SearchProFile.toml") || hasWork
-            hasWork := CompatMMPro(SettringDir "\MMProFile.toml") || hasWork
-            hasWork := CompatOutput(SettringDir "\OutputFile.toml") || hasWork
-            hasWork := CompatRun(SettringDir "\RunFile.toml") || hasWork
-            hasWork := CompatLoop(SettringDir "\LoopFile.toml") || hasWork
-            hasWork := CompatSubMacro(SettringDir "\SubMacroFile.toml") || hasWork
-            hasWork := CompatVariable(SettringDir "\VariableFile.toml") || hasWork
-            hasWork := CompatExVariable(SettringDir "\ExVariableFile.toml") || hasWork
-            hasWork := CompatCompare(SettringDir "\CompareFile.toml") || hasWork
-            hasWork := CompatComparePro(SettringDir "\CompareProFile.toml") || hasWork
-            hasWork := CompatOperation(SettringDir "\OperationFile.toml") || hasWork
-            hasWork := CompatBGMouse(SettringDir "\BGMouseFile.toml") || hasWork
-            hasWork := CompatBGKey(SettringDir "\BGKeyFile.toml") || hasWork
-            hasWork := CompatTiming(SettringDir "\TimingFile.toml") || hasWork
-            hasWork := CompatMergeTomlKeys(SettringDir "\TimeFile.toml", SettringDir "\TimeDataFile.toml") || hasWork
-            hasWork := CompatTime(SettringDir "\TimeDataFile.toml") || hasWork
-            hasWork := CompatCountDown(SettringDir "\CountDownFile.toml") || hasWork
-        } catch as e {
-            ; 兼容补齐失败不中断导入：异常逃出 XAML 事件处理器会表现为「点了没反应」
-            RMTLogSys(RMT_LV_ERROR, "配置导入", Format("{1} Compat 兼容处理异常：{2}", SettringDir, e.Message))
-        } finally {
-            ; 落盘必须在展开之前：展开走 TomlUtil，直接读磁盘
-            CfgBatchEnd()
-        }
-        msCompat := A_TickCount - tStage
-        tStage := A_TickCount
-        ; ② 扁平数组布局（旧版 INI / 旧分享包）展开为三级段 TOML，须在 Compat* 补齐数组字段之后
-        try {
-            if (IniImport_ExpandFlatMacroFile(SettringDir))
-                hasWork := true
-        } catch as e {
-            RMTLogSys(RMT_LV_ERROR, "配置导入", Format("{1} MacroFile 展开异常：{2}", SettringDir, e.Message))
-        }
-        ; 阶段耗时（配置导入性能观测：旧配置表多/条目多时，一眼看出卡在哪一段）
-        RMTLogSysInfo("配置导入", Format("{1} 阶段耗时：INI转换 {2}ms / Compat {3}ms / 扁平展开 {4}ms",
-            fileNameNoExt, msConv, msCompat, A_TickCount - tStage))
-        return hasWork
     }
 
     CheckIfExistAndValid(FileName) {

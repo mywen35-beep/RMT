@@ -123,12 +123,14 @@ class MergeUtil {
         tkArr := StrSplit(tkArrStr, "π")
         remarkArr := StrSplit(remarkArrStr, "π")
 
+        sourceSerials := StrSplit(CfgRead(macroFile, "UserSettings", symbol "SerialArr", ""), "π")
         allItems := []
         loop modeArr.Length {
             node := MergeTreeNode()
             node.Type := "Item"
             node.TabIndex := tabIndex
             node.ItemIndex := A_Index
+            node.Serial := A_Index <= sourceSerials.Length ? sourceSerials[A_Index] : ""
             node.TriggerKey := (A_Index <= tkArr.Length) ? tkArr[A_Index] : ""
             node.Remark := (A_Index <= remarkArr.Length) ? remarkArr[A_Index] : ""
             node.DisplayName := A_Index ". " node.Remark
@@ -276,6 +278,7 @@ class MergeUtil {
                 item.Type := "Item"
                 item.TabIndex := tabIndex
                 item.ItemIndex := items.Length + 1
+                item.Serial := foldSeg "." mtail
                 item.TriggerKey := TomlUtil_Str(mseg, "TK", "")
                 item.Remark := TomlUtil_Str(mseg, "Remark", "")
                 item.DisplayName := item.Remark
@@ -758,6 +761,23 @@ class MergeUtil {
         }
 
         return { ReplaceMap: serialReplaceMap, ParsedConfigs: parsedConfigs }
+    }
+
+    static RemapMacroTargets(parsedConfigs, macroTargets) {
+        for _, configInfo in parsedConfigs {
+            Data := configInfo["Data"]
+            if (!Data.HasOwnProp("MacroSerial") || !Data.HasOwnProp("MacroType") || Data.MacroType == "当前宏")
+                continue
+            if (macroTargets.Has(Data.MacroSerial)) {
+                target := macroTargets[Data.MacroSerial]
+                Data.MacroSerial := target.ID
+                Data.Index := target.Index
+            } else {
+                ; 未选中的源目标不可回退到当前配置的同名路径或序号。
+                Data.MacroSerial := ""
+                Data.Index := 0
+            }
+        }
     }
 
     static ProcessAndSaveRenamedConfigs(replaceInfo, sourceSettingDir, result) {
@@ -1243,7 +1263,6 @@ class MergeUtil {
         }
 
         if (IsObject(replaceInfo) && IsObject(replaceInfo.ParsedConfigs)) {
-            serialReplaceMap := MergeUtil.ProcessAndSaveRenamedConfigs(replaceInfo, sourceDir, result)
             checkedItems := MergeUtil.ApplySerialReplaceToMacros(checkedItems, serialReplaceMap)
         }
 
@@ -1268,6 +1287,7 @@ class MergeUtil {
         }
 
         totalModuleCount := 0
+        macroTargets := Map()
 
         for tabIndex, items in tabGrouped {
             if (items.Length == 0)
@@ -1308,6 +1328,8 @@ class MergeUtil {
                     newItem.IcoPath := ""
                     newItem.FoldID := fold.ID
                     tableItem.Items.Push(newItem)
+                    if (item.Serial != "")
+                        macroTargets[item.Serial] := { ID: newSerial, Index: tableItem.Items.Length }
                     serialList.Push(newSerial)
                 }
 
@@ -1320,6 +1342,12 @@ class MergeUtil {
             RebuildTableLocator()
 
             result.MergedItems.Set(tabIndex, [])
+        }
+
+        ; 目标路径全部分配后才保存资源，支持跨模块/跨页签与前向引用。
+        if (IsObject(replaceInfo) && IsObject(replaceInfo.ParsedConfigs)) {
+            MergeUtil.RemapMacroTargets(replaceInfo.ParsedConfigs, macroTargets)
+            MergeUtil.ProcessAndSaveRenamedConfigs(replaceInfo, sourceDir, result)
         }
 
         result.ModuleCount := totalModuleCount
@@ -1381,7 +1409,7 @@ class MergeUtil {
         DirCreate(tempDir)
 
         FolderPackager.UnpackFile(rmtFilePath, tempDir)
-        MySettingMgrGui.OnRepairSetting(tempDir)
+        MySettingMgrGui.OnRepairSetting(tempDir, true)
 
         MergeUtil.TempMergeDir := tempDir
         return tempDir

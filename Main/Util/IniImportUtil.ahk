@@ -130,14 +130,15 @@ IniImport_ReadText(path) {
     return (IniImport_TextScore(t16) > IniImport_TextScore(t8)) ? t16 : t8
 }
 
-; 快速判定「这段文本就是一份可用的 ini」：无 NUL / 替换字符，且有段头和键值行
+; AHK 的 Chr(0) 是空字符串，不能用 InStr(text, Chr(0)) 检测 NUL（会恒真）。
+; 快速判定：无替换字符，且有段头和键值行
 IniImport_IsIniText(text) {
-    if (text == "" || InStr(text, Chr(0)) || InStr(text, Chr(0xFFFD)))
+    if (text == "" || InStr(text, Chr(0xFFFD)))
         return false
     return InStr(text, "=") && RegExMatch(text, "m)^\s*\[")
 }
 
-; 文本可信度：段头 [x] +2、键值行 a=b +1、含 NUL / 替换字符 −2
+; 文本可信度：段头 [x] +2、键值行 a=b +1、含替换字符 −2
 IniImport_TextScore(text) {
     if (text == "")
         return -1
@@ -146,7 +147,7 @@ IniImport_TextScore(text) {
         line := Trim(line)
         if (line == "")
             continue
-        if (InStr(line, Chr(0)) || InStr(line, Chr(0xFFFD)))
+        if (InStr(line, Chr(0xFFFD)))
             score -= 2
         else if (SubStr(line, 1, 1) == "[")
             score += 2
@@ -451,10 +452,10 @@ IniImport_ExpandFlatMacroFile(settingDir) {
     sec := IniImport_Section()
     kv := CfgSection(macroPath, sec)   ; 一次解析，后续判键走内存
 
-    ; 扁平标记：任一默认表存在 <symbol>FoldInfo / <symbol>TKArr 键
+    ; 扁平标记：模块信息或 ModeArr；子宏可以没有快捷键。
     flatMark := false
     for def in CreateDefaultTableDefs() {
-        if (IniImport_Kv(kv, def[1] "FoldInfo") != "" || IniImport_Kv(kv, def[1] "TKArr") != "") {
+        if (IniImport_Kv(kv, def[1] "FoldInfo") != "" || IniImport_Kv(kv, def[1] "ModeArr") != "") {
             flatMark := true
             break
         }
@@ -499,9 +500,54 @@ IniImport_ExpandFlatMacroFile(settingDir) {
     ; 只写读到扁平数据的表：其余表（如旧版没有的语音宏/网络宏）不落段，load 时按全新表初始化
     for tb in flatArr
         SaveTableItemInfoTomlCore(root, tb)
+    IniImport_MigrateMacroRefs(settingDir, flatArr, kv)
     IniImport_StripFlatKeys(root)
     TomlUtil_Write(root, macroPath)
     RMTLogSysInfo("配置导入", Format("MacroFile 扁平数组布局已展开为三级段：{1}（落盘 {2}ms，总计 {3}ms）",
         macroPath, A_TickCount - tWrite, A_TickCount - tAll))
     return true
+}
+
+; 在删除旧 SerialArr 前将宏操作引用转为路径身份。优先序列号，保留旧版索引兜底。
+; 映射仅来自导入包，不能使用当前正在运行的配置。
+IniImport_MigrateMacroRefs(settingDir, tables, legacyKv) {
+    path := settingDir "\SubMacroFile.toml"
+    if (!FileExist(path))
+        return
+    bySymbol := Map()
+    for tb in tables
+        bySymbol[tb.Symbol] := tb
+    root := Cfg_Load(path)
+    sec := IniImport_Section()
+    if (!root.Has(sec))
+        return
+    changed := false
+    for key, val in root[sec] {
+        data := CompatParseData(val)
+        if (!IsObject(data) || !data.HasOwnProp("MacroType") || data.MacroType == "当前宏")
+            continue
+        symbol := CompatMacroTypeSymbol(data.MacroType)
+        if (!bySymbol.Has(symbol))
+            continue
+        tb := bySymbol[symbol]
+        idx := data.HasOwnProp("Index") && IsInteger(data.Index) ? Integer(data.Index) : 0
+        serial := data.HasOwnProp("MacroSerial") ? String(data.MacroSerial) : ""
+        oldSerials := IniImport_SplitPi(IniImport_Kv(legacyKv, symbol "SerialArr"))
+        if (serial != "" && serial != "0" && serial != "-1") {
+            for i, oldSerial in oldSerials {
+                if (oldSerial == serial) {
+                    idx := i
+                    break
+                }
+            }
+        }
+        if (idx < 1 || idx > tb.Items.Length)
+            continue
+        data.Index := idx
+        data.MacroSerial := tb.Items[idx].ID
+        root[sec][key] := JSON.stringify(data, 0)
+        changed := true
+    }
+    if (changed)
+        Cfg_WriteRoot(root, path)
 }

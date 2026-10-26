@@ -1,4 +1,4 @@
-#Requires AutoHotkey v2.0
+﻿#Requires AutoHotkey v2.0
 
 class FolderPackager {
     ; ── 解包安全限制（解包来源不可信的包时生效，P0）──
@@ -12,6 +12,10 @@ class FolderPackager {
     static PackFolder(folderPath, outputFile, password := "") {
         if !DirExist(folderPath)
             throw Error(GetLang("文件夹不存在:") folderPath)
+
+        ; 导出前先升级真实内容，再写入版本，不能把旧包仅改标签冒充新版。
+        Compat_UpgradeDir(folderPath)
+        CfgWrite(RMT_VERSION, Compat_VersionFile(folderPath), "RMT", "AppVersion")
 
         ; 获取所有文件列表
         files := this._GetAllFiles(folderPath)
@@ -99,6 +103,12 @@ class FolderPackager {
 
         ; 创建输出文件夹
         DirCreate(outputFolder)
+        ; 覆盖解包无版本旧包时，不继承目标目录残留的新版本标记。
+        versionPath := Compat_VersionFile(outputFolder)
+        if (FileExist(versionPath))
+            FileDelete(versionPath)
+        CfgInvalidate(versionPath)
+
 
         ; 解析并提取文件
         fileCount := 0
@@ -200,7 +210,7 @@ class FolderPackager {
         StrPut("RMPK", header, 4, "cp0")
         ; 时间戳 (8字节)
         NumPut("uint64", A_TickCount, header, 4)
-        ; 版本号 (4字节)
+        ; 容器格式版本 (4字节)，配置版本存放在包内 RmtVersion.toml
         NumPut("uint", 1, header, 12)
         return header
     }

@@ -974,7 +974,7 @@ OnSubMacro(tableItem, cmd, index) {
     Data := GetMacroCMDData(paramArr[1])
     macroIndex := Data.MacroType == "当前宏" ? index : Data.Index
     ; 目标表直接取对象（当前宏 → 本表；其它 → 按 Symbol 定位），身份 = 对象/ID，非位置
-    macroItem := Data.MacroType == "当前宏" ? tableItem : GetTableBySymbol(Data.MacroType)
+    macroItem := Data.MacroType == "当前宏" ? tableItem : GetTableBySymbol(CompatMacroTypeSymbol(Data.MacroType))
     if (!macroItem) {
         GraphPoolLog("宏操作-目标表不存在", Format("type={1} index={2}", Data.MacroType, Data.Index))
         return
@@ -984,6 +984,7 @@ OnSubMacro(tableItem, cmd, index) {
 
     IsAbnormal := !macroItem.Items.Has(macroIndex) || macroItem.Items[macroIndex].ID != Data.MacroSerial
     if (Data.MacroType != "当前宏" && IsAbnormal) {
+        targetItemID := ""
         for i, item in macroItem.Items {
             if (Data.MacroSerial == item.ID) {
                 macroIndex := i
@@ -992,6 +993,9 @@ OnSubMacro(tableItem, cmd, index) {
             }
         }
     }
+
+    if (!targetItemID)
+        return
 
     if (Data.CallType == "插入到当前宏") {   ;插入
         if (!targetItemID)
@@ -1953,10 +1957,12 @@ OnKeyCheck(tableItem, cmd, index) {
 }
 
 OnJoyCheck(tableItem, cmd, index) {
-    OnKeyCheck(tableItem, cmd, index)
+    paramArr := StrSplit(cmd, "_")
+    Data := GetMacroCMDData(paramArr[1])
+    ApplyKeyCheckResult(Data, true)
 }
 
-ApplyKeyCheckResult(Data) {
+ApplyKeyCheckResult(Data, isJoy := false) {
     keyArr := Data.KeyArr
     if (keyArr.Length == 0)
         return
@@ -1976,7 +1982,7 @@ ApplyKeyCheckResult(Data) {
     if (analogKeys.Length > 0) {
         ok := true
         for key in analogKeys {
-            if (!IsCheckKeyPressed(key, "", checkType)) {
+            if (!IsCheckKeyPressed(key, "", checkType, isJoy)) {
                 ok := false
                 break
             }
@@ -1989,7 +1995,7 @@ ApplyKeyCheckResult(Data) {
     isAllPressed := true
     isAnyPressed := false
     for key in digitalKeys {
-        isPressed := IsCheckKeyPressed(key, stateMode)
+        isPressed := IsCheckKeyPressed(key, stateMode, 2, isJoy)
         if (isPressed) {
             isAnyPressed := true
             if (checkType == 2)
@@ -2004,7 +2010,7 @@ ApplyKeyCheckResult(Data) {
     MySetGlobalVariable([varName], [result], false)
 }
 
-IsCheckKeyPressed(key, stateMode, axisCmp := 2) {
+IsCheckKeyPressed(key, stateMode, axisCmp := 2, isJoy := false) {
     global MySoftData
     if (RegExMatch(key, "^(?:JoyAxis)?(L[XY]|R[XY]|LT|RT):(-?[0-9]+)$", &am))
         return IsJoyAxisCompare(am[1], Integer(am[2]), axisCmp)
@@ -2016,13 +2022,13 @@ IsCheckKeyPressed(key, stateMode, axisCmp := 2) {
         "Home", "JoyHome", "Pad", "JoyPad",
         "上", "JoyDpadUp", "下", "JoyDpadDown", "左", "JoyDpadLeft", "右", "JoyDpadRight",
         "无方向", "JoyDpadNone", "无", "JoyDpadNone")
-    inn := shortMap.Has(key) ? shortMap[key] : key
+    inn := isJoy && shortMap.Has(key) ? shortMap[key] : key
 
     if (inn == "JoyDpadNone")
         return IsJoyPovCentered()
 
-    map := IsObject(MySoftData) ? MySoftData.GetJoyToAhkMap() : Map()
-    ahkKey := map.Has(inn) ? map[inn] : inn
+    joyMap := IsObject(MySoftData) ? MySoftData.GetJoyToAhkMap() : Map()
+    ahkKey := joyMap.Has(inn) ? joyMap[inn] : inn
     if (RegExMatch(ahkKey, "^JoyPOV_(\d+)$", &pm))
         return IsJoyPovAt(Integer(pm[1]))
 
