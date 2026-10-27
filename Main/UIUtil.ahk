@@ -344,7 +344,7 @@ CmdEditorTitleIcon(title) {
             ["鼠标移动", "Images\Soft\Move.png"],
             ["RMT指令", "Images\Soft\rabit.png"],
             ["宏操作", "Images\Soft\MacroAction.png"],
-            ["间隔", "Images\Soft\Delay.png"],
+            ["间隔", "Images\Soft\Interval.png"],
             ["按键", "Images\Soft\Key.png"],
             ["手柄", "Images\Soft\Joy.png"],
             ["搜索", "Images\Soft\Search.png"],

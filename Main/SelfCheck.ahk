@@ -55,7 +55,7 @@ SelfCheckMissingFiles() {
         "MinTool\CountDown.exe", "CountDown.exe",
         "Plugins\AhiDriver\installer\使用说明.txt", "InstallReadme.txt")
 
-    icoFileList := ["Wait.png", "BGKey.png", "Delay.png", "IcoRunning.ico", "Joy.png", "DeltaMove.png", "KeyListen.png", "JoyListen.png", "SearchCombo.png", "Excel.png", "Time.png", "WaitConfirm.png", "RunPro.png",
+    icoFileList := ["Wait.png", "BGKey.png", "IcoRunning.ico", "Joy.png", "DeltaMove.png", "KeyListen.png", "JoyListen.png", "SearchCombo.png", "Excel.png", "Time.png", "WaitConfirm.png", "RunPro.png",
         "Arr.png", "Condition.png", "Control.png", "Extract.png", "False.png",
         "FileIO.png", "GreenColor.png", "IcoPause.ico", "If.png", "IfPro.png",
         "Input.png", "Interval.png", "Key.png", "Loop.png",

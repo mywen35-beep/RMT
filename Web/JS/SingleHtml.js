@@ -63,7 +63,7 @@ function imageToBase64(relPath, baseDir = WEB_DIR) {
 
 // 与宏编辑器指令图标一致（SubGuiConfig）
 const COMMAND_ICON_FILES = {
-  "间隔": "Images/Soft/Delay.png",
+  "间隔": "Images/Soft/Interval.png",
   "按键": "Images/Soft/Key.png",
   "手柄": "Images/Soft/Joy.png",
   "搜索": "Images/Soft/Search.png",

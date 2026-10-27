@@ -208,7 +208,7 @@ class MacroEditGui {
         this.CMDStrArr := GetLangArr(["间隔", "时间", "按键", "手柄", "搜索", "搜索Pro", "搜索Combo", "鼠标移动", "鼠标移动Pro", "增量移动", "输入", "输出", "循环", "宏操作", "变量", "变量提取",
             "如果", "如果Pro", "运算", "运行", "运行Pro", "文件读写", "Excel", "文本处理", "数组", "RMT指令", "后台鼠标", "后台按键", "窗口管理", "按键检测", "手柄检测", "等待", "等待确定", "倒计时", "注释", "抓图"])
 
-        this.CMDIconFileArr := ["Images\Soft\Delay.png", "Images\Soft\Time.png", "Images\Soft\Key.png", "Images\Soft\Joy.png",
+        this.CMDIconFileArr := ["Images\Soft\Interval.png", "Images\Soft\Time.png", "Images\Soft\Key.png", "Images\Soft\Joy.png",
             "Images\Soft\Search.png", "Images\Soft\SearchPro.png", "Images\Soft\SearchCombo.png",
             "Images\Soft\Move.png", "Images\Soft\MovePro.png", "Images\Soft\DeltaMove.png",
             "Images\Soft\Input.png", "Images\Soft\Output.png",
@@ -235,7 +235,7 @@ class MacroEditGui {
 
         ; IconN → 图标文件（顺序与原 IL_Add 一致）
         this.IconFileByNumber := Map(
-            "Icon1", "Images\Soft\Delay.png", "Icon2", "Images\Soft\Key.png",
+            "Icon1", "Images\Soft\Interval.png", "Icon2", "Images\Soft\Key.png",
             "Icon3", "Images\Soft\Search.png", "Icon4", "Images\Soft\SearchPro.png",
             "Icon5", "Images\Soft\Move.png", "Icon6", "Images\Soft\MovePro.png",
             "Icon7", "Images\Soft\Output.png", "Icon8", "Images\Soft\Run.png",
@@ -267,7 +267,7 @@ class MacroEditGui {
 
     InitSubGuiConfigs() {
         this.SubGuiConfig := [
-            {class: IntervalGui, name: "间隔", icon: "Images\Soft\Delay.png", propName: "IntervalGui"},
+            {class: IntervalGui, name: "间隔", icon: "Images\Soft\Interval.png", propName: "IntervalGui"},
             {class: KeyGui, name: "按键", icon: "Images\Soft\Key.png", propName: "KeyGui"},
             {class: JoyGui, name: "手柄", icon: "Images\Soft\Joy.png", propName: "JoyGui"},
             {class: SearchGui, name: "搜索", icon: "Images\Soft\Search.png", propName: "SearchGui"},
