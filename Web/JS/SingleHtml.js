@@ -209,6 +209,8 @@ for (const doc of DOC_FILES) {
       const child = { index, title: part.title, route, num: '', cmdName: '', iconHtml: '' };
       if (doc.title === '指令手册') {
         Object.assign(child, getCommandNavParts(part.title));
+        const category = part.md.match(/^所属分类：([^\r\n]+)/m);
+        child.category = category ? category[1].trim() : '';
       }
       children.push(child);
     }
@@ -252,7 +254,13 @@ const navHtml = navGroups.map((g) => {
   if (g.type === 'leaf') {
     return `<button type="button" class="tab" data-index="${g.index}" data-route="${escapeHtml(g.route)}" onclick="showPage(${g.index})"><span class="tab-icon">${g.icon}</span><span class="tab-text">${escapeHtml(g.title)}</span></button>`;
   }
+  let lastCategory = '';
   const kids = g.children.map((c) => {
+    let categoryHtml = '';
+    if (g.title === '指令手册' && c.category && c.category !== lastCategory) {
+      categoryHtml = `<div class="nav-command-category">${escapeHtml(c.category)}</div>\n        `;
+      lastCategory = c.category;
+    }
     // 指令手册：序号 图标 名称；其它分组保持原标题
     let labelHtml = `<span class="tab-text">${escapeHtml(c.title)}</span>`;
     if (g.title === '指令手册' && (c.num || c.iconHtml)) {
@@ -262,7 +270,7 @@ const navHtml = navGroups.map((g) => {
         `<span class="tab-text">${escapeHtml(c.cmdName || c.title)}</span>`
       ].join('');
     }
-    return `<button type="button" class="tab tab-sub${c.iconHtml || c.num ? ' has-cmd-icon' : ''}" data-index="${c.index}" data-route="${escapeHtml(c.route)}" data-group="${escapeHtml(g.title)}" onclick="showPage(${c.index})">${labelHtml}</button>`;
+    return `${categoryHtml}<button type="button" class="tab tab-sub${c.iconHtml || c.num ? ' has-cmd-icon' : ''}" data-index="${c.index}" data-route="${escapeHtml(c.route)}" data-group="${escapeHtml(g.title)}" onclick="showPage(${c.index})">${labelHtml}</button>`;
   }).join('\n        ');
   return `<div class="nav-group" data-group="${escapeHtml(g.title)}">
         <button type="button" class="nav-group-toggle" data-group="${escapeHtml(g.title)}" onclick="toggleNavGroup('${escapeHtml(g.title)}')" aria-expanded="false">
@@ -308,6 +316,8 @@ body{font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif;background:#f5
 .nav-group.open .nav-group-toggle{color:#fff;background:#222b4d}
 .nav-children{display:flex;flex-direction:column;gap:1px;padding:2px 0 6px 0}
 .nav-children[hidden]{display:none!important}
+.nav-command-category{margin:10px 10px 3px;padding:7px 2px 3px;border-top:1px solid #34405e;color:#d7def0;font-size:12px;font-weight:600;letter-spacing:.5px}
+.nav-command-category:first-child{margin-top:2px;border-top:0}
 .tab-sub{padding:7px 10px 7px 28px!important;font-size:12.5px!important;color:#9aa6bf}
 .tab-sub.has-cmd-icon{padding-left:12px!important;gap:6px}
 .tab-sub .tab-text{overflow:hidden;text-overflow:ellipsis}
