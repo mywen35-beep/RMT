@@ -422,6 +422,14 @@ function findPageIndexByRoute(route){
   const key = route.slice(slash + 1);
   idx = PAGE_META.findIndex(p => p.group === group && (p.slug === key || p.title === key));
   if(idx >= 0) return idx;
+  // 指令重排后，编辑器及旧书签里的编号可能过期，优先按完整指令名定位。
+  if(group === '指令手册'){
+    const aliases = {'移动': '鼠标移动', '移动Pro': '鼠标移动Pro', '组合搜索': '搜索Combo', '搜索Multi': '搜索Combo', '倒计时': '时间'};
+    const name = key.replace(/^\\d+[-\\s]+/, '');
+    const command = aliases[name] || name;
+    idx = PAGE_META.findIndex(p => p.group === group && p.title.replace(/^\\d+\\s+/, '') === command);
+    if(idx >= 0) return idx;
+  }
   idx = PAGE_META.findIndex(p => p.group === group && (p.slug.endsWith('-'+key) || p.title.endsWith(key) || p.title.includes(key)));
   if(idx >= 0) return idx;
   idx = PAGE_META.findIndex(p => p.group === group);
