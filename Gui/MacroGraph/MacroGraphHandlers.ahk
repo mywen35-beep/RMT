@@ -1546,7 +1546,17 @@ class MacroGraphHandlersMixin {
         if (!this.cmdNodes.Has(id))
             return
         d := this._Parse(this.cmdNodes[id].CurCMD)
-        if (d.type == GetLang("间隔"))
+        if (d.type == GetLang("跳转")) {
+            if (this._InlineVal(state, "JumpCmb_" id, &value)) {
+                for action in FlowJumpActions() {
+                    if (action == GetLangKey(value)) {
+                        this.cmdNodes[id].CurCMD := "流程跳转_" action
+                        break
+                    }
+                }
+            }
+        }
+        else if (d.type == GetLang("间隔"))
             this._FlushIntervalInline(id, d, state)
         else if (d.type == GetLang("按键"))
             this._FlushKeyInline(id, d, state)

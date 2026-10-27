@@ -38,11 +38,6 @@ class MacroGraphEventsMixin {
         this.ui.OnEvent("Node_" brId, "SelectNode", this._OnBranchClick.Bind(this, searchId, isTrue))
         this.ui.OnEvent("Node_" brId, "CtrlSelectNode", this._OnBranchClick.Bind(this, searchId, isTrue))
         this._BindCtrl("SBExpand_" brId, "Click", this._OnBranchToggleExpand.Bind(this, searchId, isTrue), runtime)
-        if (this._IsIfNodeId(searchId)) {
-            this._TrackCtrl("BrFlowCmb_" brId, runtime)
-            this._BindCtrl("BrFlowCmb_" brId, "SelectionChanged", this._OnBranchFlowControl.Bind(this, searchId, isTrue), runtime)
-            this._BindCtrl("BrFlowCmb_" brId, "DropDownClosed", this._OnBranchFlowControl.Bind(this, searchId, isTrue), runtime)
-        }
         ; 如果/搜索/搜索Pro：内联展开/折叠按钮
         this._BindCtrl("ILExpand_" brId, "Click", this._OnBranchInlineToggle.Bind(this, searchId, isTrue), runtime)
     }
@@ -67,7 +62,12 @@ class MacroGraphEventsMixin {
         this.ui.OnEvent("Node_" id, "DragMove", this._OnNodeDrag.Bind(this, id))
 
         d := this._Parse(node.CurCMD)
-        if (d.type == GetLang("间隔")) {
+        if (d.type == GetLang("跳转")) {
+            this._TrackCtrl("JumpCmb_" id, runtime)
+            this._BindCtrl("JumpCmb_" id, "SelectionChanged", this._OnFlowJump.Bind(this, id), runtime)
+            this._BindCtrl("JumpCmb_" id, "DropDownClosed", this._OnFlowJump.Bind(this, id), runtime)
+        }
+        else if (d.type == GetLang("间隔")) {
             this._TrackCtrl("ITypeCmb_" id, runtime)
             this._TrackCtrl("Time_" id, runtime)
             this._TrackCtrl("Time2_" id, runtime)

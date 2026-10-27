@@ -183,6 +183,7 @@ ExecuteMacroCmdOnce(tableItem, cmdStr, index, graphNode := "") {
         "后台按键", OnBGKey,
         "RMT指令", OnRMTCMD,
         "循环", OnLoop,
+        "流程跳转", OnFlowJump,
         "文本处理", OnTextOps,
         "数组", OnArray,
         "输入", OnInput,
@@ -630,6 +631,27 @@ _ExpandEnvironmentStrings(text) {
     if !DllCall("Kernel32\ExpandEnvironmentStringsW", "Str", text, "Ptr", buf.Ptr, "UInt", cch, "UInt")
         return text
     return StrGet(buf, "UTF-16")
+}
+
+; 无序列号、无配置文件：动作直接保存在命令字符串里。
+FlowJumpActions() {
+    return ["循环-跳过本轮", "循环-跳出", "分支-跳出"]
+}
+
+FlowJumpAction(cmd) {
+    parts := StrSplit(cmd, "_")
+    if (parts.Length != 2 || GetLangKey(parts[1]) != "流程跳转")
+        throw Error("Invalid flow jump command: " cmd)
+    action := GetLangKey(parts[2])
+    for valid in FlowJumpActions() {
+        if (action == valid)
+            return action
+    }
+    throw Error("Invalid flow jump action: " parts[2])
+}
+
+OnFlowJump(tableItem, cmd, index) {
+    HandleControlType(tableItem, index, FlowJumpAction(cmd))
 }
 
 OnCompare(tableItem, cmd, index) {

@@ -37,7 +37,16 @@ class MacroGraphNodeUIMixin {
 
     ; 填充节点 body（内联编辑控件）。静态构建与运行时注入复用同一套生成逻辑。
     _FillNodeBody(id, d, body) {
-        if (d.type == GetLang("间隔")) {
+        if (d.type == GetLang("跳转")) {
+            actions := FlowJumpActions()
+            selected := 0
+            for i, action in actions {
+                if (action == d.jumpAction)
+                    selected := i - 1
+            }
+            this._AddComboRow(body, "JumpRow_" id, "", "JumpCmb_" id, GetLangArr(actions), selected, true)
+        }
+        else if (d.type == GetLang("间隔")) {
             isRandom := d.itype == GetLang("随机")
             ; 间隔类型下拉（固定/随机）—— 标签与下拉同行
             this._AddComboRow(body, "ITypeRow_" id, GetLang("类型："), "ITypeCmb_" id
@@ -572,9 +581,6 @@ class MacroGraphNodeUIMixin {
     }
 
     ; 如果分支流程控制选项
-    _IfFlowTypes() {
-        return GetLangArr(["无", "循环-跳过本轮", "循环-跳出", "分支-跳出"])
-    }
 
     ; 构建单个分支节点的 Border 元素（标题 + 指令条 + 展开按钮 + 端口）。
     ; asFragment=true 时附带 xmlns 命名空间，供运行时 AddXamlItem 注入。
@@ -790,20 +796,6 @@ class MacroGraphNodeUIMixin {
         btn := body.Add("Button").Name("SBExpand_" brId).Content(expanded ? GetLang("收起") : (GetLang("展开") " (" cmds.Length ")")).FontSize(this._MGFontSize(10)).Height("20").Margin("0,4,0,0").Padding("6,0").HorizontalAlignment("Left")
         if (cmds.Length <= this._BranchPreviewCount())
             btn.Visibility("Collapsed")
-        ; 如果分支：流程控制在指令执行之后（CompareGui 语义一致）
-        if (this._IsIfNodeId(searchId)) {
-            flowTypes := this._IfFlowTypes()
-            data := this._BranchParentData(searchId)
-            ct := "无"
-            if (data != "") {
-                raw := isTrue ? (data.HasOwnProp("TrueControlType") ? data.TrueControlType : "无") : (data.HasOwnProp("FalseControlType") ? data.FalseControlType : "无")
-                ct := GetLang(raw)
-            }
-            fidx := this._IndexInLangArr(flowTypes, ct)
-            if (fidx < 0)
-                fidx := this._IndexInLangArr(flowTypes, GetLang(GetLangKey(ct)))
-            this._AddComboRow(body, "BrFlowRow_" brId, GetLang("流程控制："), "BrFlowCmb_" brId, flowTypes, Max(0, fidx), true, true, "58", "120")
-        }
     }
 
     ; 兼容旧名：分支指令行宽度（现改为通栏斑马纹，不再限宽）
@@ -840,23 +832,10 @@ class MacroGraphNodeUIMixin {
         brId := this._BranchId(searchId, isTrue)
         cmds := this._BranchGraphCmds(this._BranchStartSerial(searchId, isTrue))
         expanded := this._branchExpanded.Has(brId) && this._branchExpanded[brId]
-        ; 先重建芯片，再改流程下拉，避免 SelectionChanged 重入时读到半更新列表
+        ; 重建分支指令预览
         this._RebuildBranchChips(brId, cmds, expanded)
         this.ui.Update("SBExpand_" brId, "Visibility", cmds.Length > this._BranchPreviewCount() ? "Visible" : "Collapsed")
         this.ui.Update("SBExpand_" brId, "Content", expanded ? GetLang("收起") : (GetLang("展开") " (" cmds.Length ")"))
-        if (this._IsIfNodeId(searchId)) {
-            flowTypes := this._IfFlowTypes()
-            data := this._BranchParentData(searchId)
-            ct := "无"
-            if (data != "") {
-                raw := isTrue ? (data.HasOwnProp("TrueControlType") ? data.TrueControlType : "无") : (data.HasOwnProp("FalseControlType") ? data.FalseControlType : "无")
-                ct := GetLang(raw)
-            }
-            fidx := this._IndexInLangArr(flowTypes, ct)
-            if (fidx < 0)
-                fidx := this._IndexInLangArr(flowTypes, GetLang(GetLangKey(ct)))
-            this.ui.Update("BrFlowCmb_" brId, "SelectedIndex", Max(0, fidx))
-        }
     }
 
     ; 取分支保存内容（图形开始节点序列码 或 线性宏串）

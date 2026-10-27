@@ -32,6 +32,7 @@
 #include KeyCheckGui.ahk
 #Include JoyCheckGui.ahk
 #Include CommentGui.ahk
+#Include FlowJumpGui.ahk
 #Include MacroEditModel.ahk
 
 class MacroEditGui {
@@ -172,7 +173,7 @@ class MacroEditGui {
             {name: "输入/输出", icon: Chr(0xE8A1), cmds: ["输入", "输出"]},
             {name: "变量/数据", icon: Chr(0xE8EF), cmds: ["变量", "变量提取", "运算", "数组", "文本处理"]},
             {name: "文件", icon: Chr(0xE8A5), cmds: ["文件读写", "Excel"]},
-            {name: "流程控制", icon: Chr(0xE8FD), cmds: ["间隔", "时间", "如果", "如果Pro", "循环", "等待", "等待确定"]},
+            {name: "流程", icon: Chr(0xE8FD), cmds: ["间隔", "循环", "跳转", "如果", "如果Pro", "等待", "等待确定", "时间"]},
             {name: "调控", icon: Chr(0xE713), cmds: ["运行", "运行Pro", "宏操作", "窗口管理", "RMT指令"]},
             {name: "其他", icon: Chr(0xE712), cmds: ["抓图", "注释"]}
         ]
@@ -201,12 +202,13 @@ class MacroEditGui {
         } else
             this.InitSubGui()
         this._BindCountDownToTimeGui()
+        this.SubGuiMap.Set(GetLang("流程跳转"), this.FlowJumpGui)
     }
 
     InitCommandConfigs() {
         ; §20 指令改名：移动→鼠标移动、移动Pro→鼠标移动Pro、新增 增量移动（原游戏视角）
         this.CMDStrArr := GetLangArr(["间隔", "时间", "按键", "手柄", "搜索", "搜索Pro", "搜索Combo", "鼠标移动", "鼠标移动Pro", "增量移动", "输入", "输出", "循环", "宏操作", "变量", "变量提取",
-            "如果", "如果Pro", "运算", "运行", "运行Pro", "文件读写", "Excel", "文本处理", "数组", "RMT指令", "后台鼠标", "后台按键", "窗口管理", "按键检测", "手柄检测", "等待", "等待确定", "倒计时", "注释", "抓图"])
+            "如果", "如果Pro", "运算", "运行", "运行Pro", "文件读写", "Excel", "文本处理", "数组", "RMT指令", "后台鼠标", "后台按键", "窗口管理", "按键检测", "手柄检测", "等待", "等待确定", "倒计时", "注释", "抓图", "跳转"])
 
         this.CMDIconFileArr := ["Images\Soft\Interval.png", "Images\Soft\Time.png", "Images\Soft\Key.png", "Images\Soft\Joy.png",
             "Images\Soft\Search.png", "Images\Soft\SearchPro.png", "Images\Soft\SearchCombo.png",
@@ -221,7 +223,7 @@ class MacroEditGui {
             "Images\Soft\Mouse.png", "Images\Soft\BGKey.png",
             "Images\Soft\WindowManage.png", "Images\Soft\KeyListen.png", "Images\Soft\JoyListen.png",
             "Images\Soft\Wait.png", "Images\Soft\WaitConfirm.png",
-            "Images\Soft\Interval.png", "Images\Soft\Comment.png", "Images\Soft\ScreenShot.png"]
+            "Images\Soft\Interval.png", "Images\Soft\Comment.png", "Images\Soft\ScreenShot.png", "Images\Soft\FlowJump.png"]
 
         this.IconMap := Map(GetLang("间隔"), "Icon1", GetLang("按键"), "Icon2", GetLang("手柄"), "Icon38", GetLang("搜索"), "Icon3",
         GetLang("搜索Pro"), "Icon4", GetLang("搜索Combo"), "Icon39", GetLang("鼠标移动"), "Icon5", GetLang("鼠标移动Pro"), "Icon6", GetLang("增量移动"), "Icon34", GetLang("输出"), "Icon7",
@@ -230,7 +232,7 @@ class MacroEditGui {
         GetLang("RMT指令"), "Icon16", GetLang("后台鼠标"), "Icon17", GetLang("后台按键"), "Icon18", GetLang("真"), "Icon19",
         GetLang("假"), "Icon20", GetLang("循环次数"), "Icon21", GetLang("条件"), "Icon22", GetLang("循环体"), "Icon23",
         GetLang("文本处理"), "Icon24", GetLang("数组"), "Icon25", GetLang("输入"), "Icon26", GetLang("文件读写"), "Icon27", GetLang("Excel"), "Icon41",
-        GetLang("流程控制"), "Icon28", GetLang("窗口管理"), "Icon29", GetLang("按键检测"), "Icon30", GetLang("手柄检测"), "Icon42", GetLang("注释"), "Icon31",
+        GetLang("流程控制"), "Icon28", GetLang("窗口管理"), "Icon29", GetLang("按键检测"), "Icon30", GetLang("手柄检测"), "Icon42", GetLang("跳转"), "Icon43", GetLang("流程跳转"), "Icon43", GetLang("注释"), "Icon31",
         GetLang("抓图"), "Icon32", GetLang("等待"), "Icon33", GetLang("等待确定"), "Icon36", GetLang("时间"), "Icon35", GetLang("倒计时"), "Icon37")
 
         ; IconN → 图标文件（顺序与原 IL_Add 一致）
@@ -257,7 +259,8 @@ class MacroEditGui {
             "Icon39", "Images\Soft\SearchCombo.png",
             "Icon40", "Images\Soft\RunPro.png",
             "Icon41", "Images\Soft\Excel.png",
-            "Icon42", "Images\Soft\JoyListen.png")
+            "Icon42", "Images\Soft\JoyListen.png",
+            "Icon43", "Images\Soft\FlowJump.png")
 
         ; 指令名 → 图标文件（XAML 树节点 Image.Source 用）
         this.CmdIconFileMap := Map()
@@ -300,6 +303,7 @@ class MacroEditGui {
             {class: WaitGui, name: "等待", icon: "Images\Soft\Wait.png", propName: "WaitGui"},
             {class: WaitConfirmGui, name: "等待确定", icon: "Images\Soft\WaitConfirm.png", propName: "WaitConfirmGui"},
             {class: TimeGui, name: "时间", icon: "Images\Soft\Time.png", propName: "TimeGui"},
+            {class: FlowJumpGui, name: "跳转", icon: "Images\Soft\FlowJump.png", propName: "FlowJumpGui"},
             {class: CommentGui, name: "注释", icon: "Images\Soft\Comment.png", propName: "CommentGui"},
             {class: ScreenShotGui, name: "抓图", icon: "Images\Soft\ScreenShot.png", propName: "ScreenShotGui"}
         ]

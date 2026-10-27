@@ -4,7 +4,7 @@
 ; =====================================================================
 ; 如果Pro编辑器 —— XAML 迁移版（独立实现）
 ; 公开接口保持：ShowGui(cmd) / SureBtnAction / OwnerHwnd / ParentTile / Hwnd()
-; 卡片阶梯：ScrollViewer + BranchPanel，每张卡 条件碎片 / 点指令编辑 / 流程下拉；
+; 卡片阶梯：ScrollViewer + BranchPanel，每张卡包含条件、分支指令和编辑操作；
 ;   行模型 this.LVRowArr（[condiStr, logicStr, macro, controlType]），最后一行永远是兜底。
 ; 与 CompareProEditItemGui（分支编辑器）联动契约不变：ShowGui(EditType, DataArr, logicStr, macro, controlType) /
 ;   SureBtnAction(condiStr, logicStr, macro, controlType) / DLVariableArr / ParentTile / OwnerHwnd。
@@ -123,14 +123,6 @@ class CompareProGui {
 
     ; ---------------- 卡片阶梯 ----------------
 
-    _FlowKeys() {
-        return ["无", "循环-跳过本轮", "循环-跳出", "分支-跳出"]
-    }
-
-    _FlowTypes() {
-        return GetLangArr(this._FlowKeys())
-    }
-
     _IsFinally(i) {
         if (i < 1 || i > this.LVRowArr.Length)
             return false
@@ -142,16 +134,6 @@ class CompareProGui {
         if (row.Length >= 4 && row[4] != "")
             return row[4]
         return "无"
-    }
-
-    _FlowIndex(ct) {
-        key := GetLangKey(ct)
-        keys := this._FlowKeys()
-        loop keys.Length {
-            if (keys[A_Index] == key || GetLang(keys[A_Index]) == ct)
-                return A_Index - 1
-        }
-        return 0
     }
 
     _DefaultBranchRow() {
@@ -273,18 +255,15 @@ class CompareProGui {
         ns := 'xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"'
         macro := row[3]
         actionText := (macro == "") ? GetLang("（未填写指令）") : macro
-        flowItems := ""
-        for t in this._FlowTypes()
-            flowItems .= '<ComboBoxItem Content="' this._EscapeXml(t) '"/>'
         editBtn := this._IconBtnXml("BtnEdit" i, "&#xE70F;", GetLang("编辑"), true)
-        flowOps := editBtn . (isFinally ? "" : this._OpsXml(i))
+        branchOps := editBtn . (isFinally ? "" : this._OpsXml(i))
         cardPad := isFinally ? "0" : "0,0,0,8"
         return '<Border ' ns ' Margin="' cardPad '" Padding="8,6" CornerRadius="4" BorderThickness="1"'
             . ' BorderBrush="{DynamicResource ControlBorder}" Background="{DynamicResource ControlBg}"'
             . ' SnapsToDevicePixels="True" UseLayoutRounding="False">'
             . '<Grid>'
             . '<Grid.RowDefinitions>'
-            . '<RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>'
+            . '<RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>'
             . '</Grid.RowDefinitions>'
             . '<Grid Grid.Row="0">'
             . '<Grid.ColumnDefinitions>'
@@ -299,7 +278,7 @@ class CompareProGui {
             . '</Grid>'
             . '<Grid Grid.Row="1" Margin="0,4,0,0">'
             . '<Grid.ColumnDefinitions>'
-            . '<ColumnDefinition Width="40"/><ColumnDefinition Width="*"/>'
+            . '<ColumnDefinition Width="40"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>'
             . '</Grid.ColumnDefinitions>'
             . '<TextBlock Text="' this._EscapeXml(GetLang("指令")) '"'
             . ' Foreground="{DynamicResource TextMain}" VerticalAlignment="Center"/>'
@@ -309,22 +288,8 @@ class CompareProGui {
             . '<TextBlock Text="' this._EscapeXml(actionText) '" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"'
             . ' Foreground="{DynamicResource InputText}" TextAlignment="Left" VerticalAlignment="Center"/>'
             . '</Border>'
-            . '</Grid>'
-            . '<Grid Grid.Row="2" Margin="0,4,0,0">'
-            . '<Grid.ColumnDefinitions>'
-            . '<ColumnDefinition Width="40"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>'
-            . '</Grid.ColumnDefinitions>'
-            . '<TextBlock Text="' this._EscapeXml(GetLang("流程")) '"'
-            . ' Foreground="{DynamicResource TextMain}" VerticalAlignment="Center"/>'
-            . '<ComboBox Grid.Column="1" Name="Flow' i '" Width="160" Height="26" MinHeight="26"'
-            . ' VerticalContentAlignment="Center"'
-            . ' Background="{DynamicResource InputBg}" Foreground="{DynamicResource InputText}"'
-            . ' BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1"'
-            . ' SnapsToDevicePixels="True" UseLayoutRounding="False">'
-            . flowItems
-            . '</ComboBox>'
-            . '<StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">'
-            . flowOps
+            . '<StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="6,0,0,0">'
+            . branchOps
             . '</StackPanel>'
             . '</Grid>'
             . '</Grid></Border>'
@@ -340,7 +305,6 @@ class CompareProGui {
             batch.Push({ControlName: "BranchPanel", PropertyName: "AddXamlItem", Value: this._CardXml(A_Index)})
         this.ui.BatchUpdate(batch)
         this._BindCardEvents()
-        this._FillFlows()
         this._syncing := false
     }
 
@@ -359,7 +323,6 @@ class CompareProGui {
         loop this.LVRowArr.Length {
             i := A_Index
             this._Bind("BtnEdit" i, "Click", ObjBindMethod(this, "OnActionClick", i))
-            this._Bind("Flow" i, "SelectionChanged", ObjBindMethod(this, "OnFlowChange", i))
             if (this._IsFinally(i)) {
                 this._Bind("BtnInsertCondi", "Click", ObjBindMethod(this, "OnAddBranch"))
                 continue
@@ -373,16 +336,6 @@ class CompareProGui {
             loop parts.Length - 1
                 this._Bind("BtnJoin" i "_" A_Index, "Click", ObjBindMethod(this, "OnJoinToggle", i))
         }
-    }
-
-    _FillFlows() {
-        if (!IsObject(this.ui))
-            return
-        batch := []
-        loop this.LVRowArr.Length
-            batch.Push({ControlName: "Flow" A_Index, PropertyName: "SelectedIndex", Value: String(this._FlowIndex(this._RowControlType(A_Index)))})
-        if (batch.Length)
-            this.ui.BatchUpdate(batch)
     }
 
     OnAddBranch(*) {
@@ -399,20 +352,6 @@ class CompareProGui {
             return
         this.LVRowArr[i][2] := this.LVRowArr[i][2] == GetLang("且") ? GetLang("或") : GetLang("且")
         this._RebuildCards()
-    }
-
-    OnFlowChange(i, *) {
-        if (this._syncing || i < 1 || i > this.LVRowArr.Length)
-            return
-        keys := this._FlowKeys()
-        idx := this.ui.Query("Flow" i ">SelectedIndex")
-        if (IsNumber(idx) && Integer(idx) >= 0 && Integer(idx) < keys.Length) {
-            this.LVRowArr[i][4] := keys[Integer(idx) + 1]
-            return
-        }
-        t := this.ui.Query("Flow" i)
-        if (t != "")
-            this.LVRowArr[i][4] := GetLangKey(t)
     }
 
     OnMoveUp(i, *) {

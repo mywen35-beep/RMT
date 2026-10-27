@@ -343,6 +343,8 @@ CmdEditorTitleIcon(title) {
             ["增量移动", "Images\Soft\DeltaMove.png"],
             ["鼠标移动", "Images\Soft\Move.png"],
             ["RMT指令", "Images\Soft\rabit.png"],
+            ["流程跳转", "Images\Soft\FlowJump.png"],
+            ["跳转", "Images\Soft\FlowJump.png"],
             ["宏操作", "Images\Soft\MacroAction.png"],
             ["间隔", "Images\Soft\Interval.png"],
             ["按键", "Images\Soft\Key.png"],

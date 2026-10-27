@@ -33,7 +33,6 @@ class CompareProEditItemGui {
         this.CompareTypeArr := [1, 1]
         this.VariableArr := ["Var1", "Var2"]
         this.LogicalTypeCon := "LogicalTypeCon"
-        this.ControlTypeCon := "ControlTypeCon"
         this.MacroCon := "MacroCon"
         this.SureFocusCon := ""      ; 外部（CompareProGui:224）可能赋值；内部不使用
         this.DLVariableArr := []
@@ -103,7 +102,7 @@ class CompareProEditItemGui {
 
         ; === 内容区 ===
         body := main.Add("Grid").Grid_Row(1).Margin("16,10,16,8")
-        body.Rows("34", this._CondiBoxRowH(), "28", "*", "34")
+        body.Rows("34", this._CondiBoxRowH(), "28", "*")
 
         ; 行0：逻辑关系
         logicRow := body.Add("StackPanel").Grid_Row(0).Orientation("Horizontal").VerticalAlignment("Center")
@@ -141,15 +140,6 @@ class CompareProEditItemGui {
             .VerticalContentAlignment("Top").Padding("4,2").Margin("0,2,0,0")
             .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}")
             .BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
-
-        ; 行4：流程控制（固定宽度，不拉满）
-        ctrlRow := body.Add("StackPanel").Grid_Row(4).Orientation("Horizontal").VerticalAlignment("Center")
-        ctrlRow.Add("TextBlock").Text(GetLang("流程控制：")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
-        cc := ctrlRow.Add("ComboBox").Name("ControlTypeCon").Width(150).Height(26).MinHeight(26).Margin("6,0,0,0")
-            .VerticalContentAlignment("Center").FontSize("11").Foreground("{DynamicResource InputText}")
-            .Background("{DynamicResource InputBg}").BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
-        for t in GetLangArr(["无", "循环-跳过本轮", "循环-跳出", "分支-跳出"])
-            cc.Add("ComboBoxItem").Content(t)
 
         ; === 底部按钮 ===
         btnRow := main.Add("StackPanel").Grid_Row(2).Orientation("Horizontal").HorizontalAlignment("Center").VerticalAlignment("Center")
@@ -203,7 +193,7 @@ class CompareProEditItemGui {
     }
 
     _FitHeight() {
-        return 30 + 10 + 8 + 34 + this._CondiBoxRowH() + 28 + 80 + 34 + 48
+        return 30 + 10 + 8 + 34 + this._CondiBoxRowH() + 28 + 88 + 48
     }
 
     _EnsureCondiDataLen() {
@@ -391,7 +381,7 @@ class CompareProEditItemGui {
         this.EditType := EditType
         this.ui.Update("LogicalTypeCon", "Text", logicStr == "" ? GetLang("且") : logicStr)
         this.ui.Update("MacroCon", "Text", macro)
-        this.ui.Update("ControlTypeCon", "Text", GetLang(controlType))
+        this.LegacyControlType := controlType ; 只保留旧配置的执行语义，不再提供流程下拉
         this.DLVariableArr := GetGuiVarArr(1)
 
         VariNameArr := DataArr[1]
@@ -443,7 +433,7 @@ class CompareProEditItemGui {
         if (this.IsSubMacroEdit) {
             if (this.EditType == 2) {
                 this.Data.DefaultMacro := GetLangStr(this.ui.Query("MacroCon"), 2)
-                this.Data.DefaultControlType := GetLangKey(this.ui.Query("ControlTypeCon"))
+                this.Data.DefaultControlType := GetLangKey(this.LegacyControlType)
             }
             else {
                 this._SaveCondiFromUi()
@@ -462,7 +452,7 @@ class CompareProEditItemGui {
                 this.Data.VariableArr[this.CondiNumber] := GetLangKeyArr(VariableArr)
                 this.Data.LogicTypeArr[this.CondiNumber] := this._LogicalTypeIndex()
                 this.Data.MacroArr[this.CondiNumber] := GetLangStr(this.ui.Query("MacroCon"), 2)
-                this.Data.ControlTypeArr[this.CondiNumber] := GetLangKey(this.ui.Query("ControlTypeCon"))
+                this.Data.ControlTypeArr[this.CondiNumber] := GetLangKey(this.LegacyControlType)
             }
             saveStr := JSON.stringify(this.Data, 0)
             CfgWrite(saveStr, CompareProFile, SettingSection, this.Data.SerialStr)
@@ -489,11 +479,11 @@ class CompareProEditItemGui {
             condiStr := Trim(condiStr, "⎖")
             logicStr := this.ui.Query("LogicalTypeCon")
             macro := this.ui.Query("MacroCon")
-            controlType := GetLangKey(this.ui.Query("ControlTypeCon"))
+            controlType := GetLangKey(this.LegacyControlType)
             action(condiStr, logicStr, macro, controlType)
         }
         else {
-            controlType := GetLangKey(this.ui.Query("ControlTypeCon"))
+            controlType := GetLangKey(this.LegacyControlType)
             action(GetLang("以上都不是"), "", this.ui.Query("MacroCon"), controlType)
         }
 

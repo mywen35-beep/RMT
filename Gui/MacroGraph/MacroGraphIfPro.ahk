@@ -603,13 +603,6 @@ class MacroGraphIfProMixin {
         btn := body.Add("Button").Name("SBExpand_" brId).Content(expanded ? GetLang("收起") : (GetLang("展开") " (" cmds.Length ")")).FontSize(this._MGFontSize(10)).Height("20").Margin("0,4,0,0").Padding("6,0").HorizontalAlignment("Left")
         if (cmds.Length <= this._BranchPreviewCount())
             btn.Visibility("Collapsed")
-        flowTypes := this._IfFlowTypes()
-        ct := GetLang(this._IfProBranchControl(parentId, idx))
-        fidx := this._IndexInLangArr(flowTypes, ct)
-        if (fidx < 0)
-            fidx := 0
-        lw := this._FormalLW(), cw := this._FormalCW()
-        this._AddComboRow(body, "BrFlowRow_" brId, GetLang("流程控制："), "BrFlowCmb_" brId, flowTypes, fidx, true, true, lw, cw)
     }
 
     _BuildProBranchSet(parentId) {
@@ -695,9 +688,6 @@ class MacroGraphIfProMixin {
         this.ui.OnEvent("Node_" brId, "SelectNode", this._OnProBranchClick.Bind(this, parentId, idx))
         this.ui.OnEvent("Node_" brId, "CtrlSelectNode", this._OnProBranchClick.Bind(this, parentId, idx))
         this._BindCtrl("SBExpand_" brId, "Click", this._OnProBranchToggleExpand.Bind(this, parentId, idx), runtime)
-        this._TrackCtrl("BrFlowCmb_" brId, runtime)
-        this._BindCtrl("BrFlowCmb_" brId, "SelectionChanged", this._OnProBranchFlowControl.Bind(this, parentId, idx), runtime)
-        this._BindCtrl("BrFlowCmb_" brId, "DropDownClosed", this._OnProBranchFlowControl.Bind(this, parentId, idx), runtime)
         this._BindCtrl("ILExpand_" brId, "Click", this._OnProBranchInlineToggle.Bind(this, parentId, idx), runtime)
     }
 
@@ -760,37 +750,8 @@ class MacroGraphIfProMixin {
         this._RebuildBranchChips(brId, cmds, expanded)
         this.ui.Update("SBExpand_" brId, "Visibility", cmds.Length > this._BranchPreviewCount() ? "Visible" : "Collapsed")
         this.ui.Update("SBExpand_" brId, "Content", expanded ? GetLang("收起") : (GetLang("展开") " (" cmds.Length ")"))
-        flowTypes := this._IfFlowTypes()
-        ct := GetLang(this._IfProBranchControl(parentId, idx))
-        fidx := this._IndexInLangArr(flowTypes, ct)
-        if (fidx < 0)
-            fidx := 0
-        this.ui.Update("BrFlowCmb_" brId, "SelectedIndex", fidx)
     }
 
-    _OnProBranchFlowControl(parentId, idx, state, ctrl, event) {
-        data := this._IfProData(parentId)
-        if (data == "")
-            return
-        if (!IsObject(state))
-            state := Map()
-        brId := this._ProBranchId(parentId, idx)
-        key := "BrFlowCmb_" brId
-        flowTypes := this._IfFlowTypes()
-        this._EnsureComboInState(state, key, flowTypes)
-        if (!state.Has(key) || state[key] == "")
-            return
-        val := GetLangKey(state[key])
-        cc := this._IfProCaseCountFromData(data)
-        if (idx < cc)
-            data.ControlTypeArr[idx + 1] := val
-        else
-            data.DefaultControlType := val
-        SaveMacroCMDData(data)
-        if (this._NodeFolded(parentId))
-            this._RefreshIfProInlineBranches(parentId)
-        this._Apply()
-    }
 
     _InjectBranches(parentId) {
         if (this._IsIfProNodeId(parentId))
@@ -1092,15 +1053,13 @@ class MacroGraphIfProMixin {
         this._AddEditableComboRow(block, p "VarRow_" id, GetLang("值："), p "Var_" id, GetGuiVarArr(), GetLang(vr), on && showRow && showVal, lw, cw)
     }
 
-    ; 收起态：某一情况/默认分支的指令列表 + 流程控制（嵌在对应组框内、逻辑摘要下方）
+    ; 收起态：某一情况/默认分支的指令列表（嵌在对应组框内、逻辑摘要下方）
     _FillIfProCaseBranchBlock(parent, id, idx) {
         fg := "{DynamicResource TextMain}"
         parent.Add("Border").Height("1").Margin("0,6,0,4").BorderThickness("0").Background("{DynamicResource ControlBorder}").IsHitTestVisible("False")
         cmds := this._BranchGraphCmds(this._IfProBranchMacro(id, idx))
         ; 组框内不使用负边距，避免贴破左右内边距
         this._FillLoopChips(parent, "IfProInline" idx "Chips_" id, "IfProInline" idx "Expand_" id, "IfProInline" idx "_" id, cmds, "0")
-        ct := GetLang(this._IfProBranchControl(id, idx))
-        parent.Add("TextBlock").Name("IfProInline" idx "Flow_" id).Text(GetLang("流程控制") "：" ct).Foreground(fg).FontSize(this._MGFontSize(11)).Margin("0,2,0,0")
     }
 
     _FillIfProCaseSection(body, id, caseIdx, data, folded := "") {
@@ -1130,7 +1089,7 @@ class MacroGraphIfProMixin {
             this._FillIfProCondiSlot(innerFull, id, caseIdx, slot, data, chainVis, cmp != 7)
             prevOn := chainVis && on
         }
-        ; 收起：条件摘要 + 本情况分支指令/流程控制
+        ; 收起：条件摘要 + 本情况分支指令
         innerSum := wrap.Add("StackPanel").Name(p "Sum_" id)
         innerSum.Visibility(folded ? "Visible" : "Collapsed")
         innerSum.Add("TextBlock").Text("情况" caseIdx).Foreground(fg).FontWeight("Bold").FontSize(fs)
@@ -1145,7 +1104,7 @@ class MacroGraphIfProMixin {
         sec := body.Add("Border").Name("IfProDefSec_" id).BorderBrush("{DynamicResource ControlBorder}").BorderThickness("1").CornerRadius("6").Background("{DynamicResource ControlBg}").Margin("0,6,0,0").Padding("6,6,6,6")
         wrap := sec.Add("StackPanel")
         wrap.Add("TextBlock").Text(GetLang("以上都不是")).Foreground("{DynamicResource TextMain}").FontWeight("Bold").FontSize(fs)
-        ; 收起：默认分支指令/流程控制嵌在组框内
+        ; 收起：默认分支指令嵌在组框内
         brBox := wrap.Add("StackPanel").Name("IfProDefBranch_" id)
         brBox.Visibility(folded ? "Visible" : "Collapsed")
         defIdx := this._IfProCaseCountFromData(data)
@@ -1177,8 +1136,6 @@ class MacroGraphIfProMixin {
             this._RebuildLoopChips("IfProInline" idx "Chips_" id, cmds, expanded)
             this.ui.Update("IfProInline" idx "Expand_" id, "Visibility", cmds.Length > this._LoopPreviewCount() ? "Visible" : "Collapsed")
             this.ui.Update("IfProInline" idx "Expand_" id, "Content", expanded ? GetLang("收起") : (GetLang("展开") " (" cmds.Length ")"))
-            ct := GetLang(this._IfProBranchControl(id, idx))
-            this.ui.Update("IfProInline" idx "Flow_" id, "Text", GetLang("流程控制") "：" ct)
         }
     }
 

@@ -1578,29 +1578,6 @@ class MacroGraphFormalHandlersMixin {
         }
     }
 
-    ; 如果分支节点：流程控制下拉变更
-    _OnBranchFlowControl(parentId, isTrue, state, ctrl, event) {
-        data := this._FormalIniData(parentId)
-        if (data == "")
-            return
-        if (!IsObject(state))
-            state := Map()
-        brId := this._BranchId(parentId, isTrue)
-        key := "BrFlowCmb_" brId
-        flowTypes := this._IfFlowTypes()
-        this._EnsureComboInState(state, key, flowTypes)
-        if (state.Has(key) && state[key] != "") {
-            val := GetLangKey(state[key])
-            if (isTrue)
-                data.TrueControlType := val
-            else
-                data.FalseControlType := val
-        }
-        SaveMacroCMDData(data)
-        if (this._IsIfNodeId(parentId) && this._NodeFolded(parentId))
-            this._RefreshIfInlineBranches(parentId)
-        this._Apply()
-    }
 
     ; 循环节点：循环次数/条件类型/逻辑关系/条件行 变更。条件行不重建下拉，标准 mega-handler + reparse 显隐即可。
     _OnFormalLoop(id, state, ctrl, event) {

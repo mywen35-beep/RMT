@@ -142,7 +142,7 @@ WalkGraphNode(tableItem, nodeSerial, index) {
                 item.VariableMap["分支-跳出"] := false
                 return
             }
-            if (item.VariableMap["循环-跳出"])
+            if (item.VariableMap["循环-跳出"] || item.VariableMap["循环-跳过本轮"])
                 return
         }
     }

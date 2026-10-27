@@ -71,7 +71,7 @@ class CompareGui {
         chrome := XAMLHost.AddCmdTitleBar(main, title, titleHeight)
 
         body := main.Add("Grid").Grid_Row(1).Margin("16,10,16,14")
-        body.Rows("34", this._CondiBoxRowH(), "80", "34", "34", "48")
+        body.Rows("34", this._CondiBoxRowH(), "88", "34", "48")
         body.Cols("28", "*", "8", "90", "8", "*", "28")
 
         ; === 逻辑关系 + 备注（备注与比较下拉左对齐）===
@@ -128,28 +128,8 @@ class CompareGui {
             .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}")
             .BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
 
-        ; === 真/假 流程控制（下拉右边缘与分支内容框对齐）===
-        ctrlRow := body.Add("Grid").Grid_Row(3).Grid_ColumnSpan(7)
-        ctrlRow.Cols("*", "8", "*")
-        lc := ctrlRow.Add("Grid").Grid_Column(0)
-        lc.Cols("Auto", "*")
-        lc.Add("TextBlock").Grid_Column(0).Text(GetLang("真-流程控制：")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
-        tcc := lc.Add("ComboBox").Grid_Column(1).Name("TrueControlCon").Height(26).MinHeight(26).Margin("4,0,0,0").HorizontalAlignment("Stretch")
-            .VerticalContentAlignment("Center").FontSize("11").Foreground("{DynamicResource InputText}")
-            .Background("{DynamicResource InputBg}").BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
-        for t in GetLangArr(["无", "循环-跳过本轮", "循环-跳出", "分支-跳出"])
-            tcc.Add("ComboBoxItem").Content(t)
-        rc := ctrlRow.Add("Grid").Grid_Column(2)
-        rc.Cols("Auto", "*")
-        rc.Add("TextBlock").Grid_Column(0).Text(GetLang("假-流程控制：")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
-        fcc := rc.Add("ComboBox").Grid_Column(1).Name("FalseControlCon").Height(26).MinHeight(26).Margin("4,0,0,0").HorizontalAlignment("Stretch")
-            .VerticalContentAlignment("Center").FontSize("11").Foreground("{DynamicResource InputText}")
-            .Background("{DynamicResource InputBg}").BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
-        for t in GetLangArr(["无", "循环-跳过本轮", "循环-跳出", "分支-跳出"])
-            fcc.Add("ComboBoxItem").Content(t)
-
-        ; === 结果保存：下拉右边缘与真-流程控制下拉对齐 ===
-        saveRow := body.Add("Grid").Grid_Row(4).Grid_ColumnSpan(7).VerticalAlignment("Center")
+        ; === 结果保存 ===
+        saveRow := body.Add("Grid").Grid_Row(3).Grid_ColumnSpan(7).VerticalAlignment("Center")
         saveRow.Cols("*", "8", "*")
         saveLeft := saveRow.Add("Grid").Grid_Column(0)
         saveLeft.Cols("Auto", "*")
@@ -173,7 +153,7 @@ class CompareGui {
             .BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
 
         ; === 底部按钮 ===
-        btnRow := body.Add("StackPanel").Grid_Row(5).Grid_ColumnSpan(7).Orientation("Horizontal").HorizontalAlignment("Center").VerticalAlignment("Center")
+        btnRow := body.Add("StackPanel").Grid_Row(4).Grid_ColumnSpan(7).Orientation("Horizontal").HorizontalAlignment("Center").VerticalAlignment("Center")
         AddCmdOkBtn(btnRow, "BtnSure")
 
         ; === 创建 XAMLHost ===
@@ -226,7 +206,7 @@ class CompareGui {
     }
 
     _FitHeight() {
-        return Integer(XAMLHost.CmdTitleBarHeight()) + 10 + 14 + 34 + this._CondiBoxRowH() + 80 + 34 + 34 + 48
+        return Integer(XAMLHost.CmdTitleBarHeight()) + 10 + 14 + 34 + this._CondiBoxRowH() + 88 + 34 + 48
     }
 
     _EnsureCondiDataLen() {
@@ -421,8 +401,6 @@ class CompareGui {
         this.DLVariableArr := GetGuiVarArr(1)
 
         ; 原生 DropDownList.Value 为 1-based，XAML SelectedIndex 为 0-based
-        this._SetComboByText("TrueControlCon", GetLangArr(["无", "循环-跳过本轮", "循环-跳出", "分支-跳出"]), GetLang(ObjHasOwnProp(this.Data, "TrueControlType") ? this.Data.TrueControlType : "无"))
-        this._SetComboByText("FalseControlCon", GetLangArr(["无", "循环-跳过本轮", "循环-跳出", "分支-跳出"]), GetLang(ObjHasOwnProp(this.Data, "FalseControlType") ? this.Data.FalseControlType : "无"))
         this.ui.Update("TrueMacroCon", "Text", GetLangMacro(ObjHasOwnProp(this.Data, "TrueMacro") ? this.Data.TrueMacro : "", 1))
         this.ui.Update("FalseMacroCon", "Text", GetLangMacro(ObjHasOwnProp(this.Data, "FalseMacro") ? this.Data.FalseMacro : "", 1))
         this.ui.Update("SaveToggleCon", "IsChecked", this._ToggleInt(ObjHasOwnProp(this.Data, "SaveToggle") ? this.Data.SaveToggle : 0) ? "True" : "False")
@@ -547,8 +525,6 @@ class CompareGui {
     }
 
     SaveCompareData() {
-        this.Data.TrueControlType := GetLangKey(this.ui.Query("TrueControlCon"))
-        this.Data.FalseControlType := GetLangKey(this.ui.Query("FalseControlCon"))
         this.Data.TrueMacro := GetLangMacro(this.ui.Query("TrueMacroCon"), 2)
         this.Data.FalseMacro := GetLangMacro(this.ui.Query("FalseMacroCon"), 2)
         this.Data.SaveToggle := this.ui.Query("SaveToggleCon") == "True" ? 1 : 0

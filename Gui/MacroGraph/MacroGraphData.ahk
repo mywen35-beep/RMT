@@ -928,7 +928,11 @@ class MacroGraphDataMixin {
         d := { type: name, raw: cmd, temp: false, time: "", time2: "", itype: "", key: "", ktype: "", hold: "", count: "", inter: "", posx: "", posy: "", speed: "", mode: "" }
         ObjSetBase(d, MGParseObjBase.Prototype)   ; 启用 d["dynKey"] 中括号读写（见 MGParseObjBase）
 
-        if (name == GetLang("间隔")) {
+        if (GetLangKey(name) == "流程跳转") {
+            d.type := GetLang("跳转")
+            d.jumpAction := FlowJumpAction(GetLangCmd(cmd, 2))
+        }
+        else if (name == GetLang("间隔")) {
             raw := paramArr.Length >= 2 ? paramArr[2] : "500"
             timeArr := StrSplit(raw, "~")
             if (timeArr.Length >= 2) {
@@ -1104,6 +1108,8 @@ class MacroGraphDataMixin {
     }
 
     _BuildCmd(d) {
+        if (d.type == GetLang("跳转"))
+            return "流程跳转_" GetLangKey(d.jumpAction)
         if (d.type == GetLang("间隔")) {
             timePart := (d.itype == GetLang("随机")) ? d.time "~" d.time2 : d.time
             return CorrectRemark(GetLang("间隔") "_" timePart, d.HasOwnProp("remark") ? d.remark : "")

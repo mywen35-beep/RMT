@@ -1923,3 +1923,6 @@ Unix时间戳=Unix Timestamp
 五=Fri
 六=Sat
 日=Sun
+跳转=Jump
+流程跳转=FlowJump
+跳转编辑器=Jump Editor

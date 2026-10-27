@@ -53,7 +53,7 @@ class MacroGraphGui {
         ; 若梦兔全部指令（§20 改名：移动→鼠标移动、移动Pro→鼠标移动Pro、新增 增量移动）
         this.CmdList := GetLangArr(["间隔", "时间", "按键", "手柄", "搜索", "搜索Pro", "搜索Combo", "鼠标移动", "鼠标移动Pro", "增量移动", "输入", "输出", "循环", "宏操作",
             "变量", "变量提取", "如果", "如果Pro", "运算", "运行", "运行Pro", "文件读写", "Excel", "文本处理", "数组", "RMT指令", "后台鼠标",
-            "后台按键", "窗口管理", "按键检测", "手柄检测", "等待", "等待确定", "注释", "抓图"])
+            "后台按键", "窗口管理", "按键检测", "手柄检测", "等待", "等待确定", "注释", "抓图", "跳转"])
 
         ; 各指令对应图标（顺序与 CmdList 一一对应，复用 MacroEditGui 的图标资源）
         this.CmdIconArr := ["Images\Soft\Interval.png", "Images\Soft\Time.png", "Images\Soft\Key.png", "Images\Soft\Joy.png",
@@ -69,7 +69,7 @@ class MacroGraphGui {
             "Images\Soft\Mouse.png", "Images\Soft\BGKey.png",
             "Images\Soft\WindowManage.png", "Images\Soft\KeyListen.png", "Images\Soft\JoyListen.png",
             "Images\Soft\Wait.png", "Images\Soft\WaitConfirm.png",
-            "Images\Soft\Comment.png", "Images\Soft\ScreenShot.png"]
+            "Images\Soft\Comment.png", "Images\Soft\ScreenShot.png", "Images\Soft\FlowJump.png"]
 
         ; 复用现有子编辑器（双击节点时打开）
         this.IntervalGui := IntervalGui()
@@ -107,6 +107,7 @@ class MacroGraphGui {
         this.LoopGui := LoopGui()
         this.CompareGui := CompareGui()
         this.CompareProGui := CompareProGui()
+        this.FlowJumpGui := FlowJumpGui()
         this.BranchGraphGui := ""     ; 搜索/如果/如果Pro 分支的「嵌套节点编辑器」（懒加载）
         this._branchExpanded := Map() ; 分支节点是否展开显示全部指令（key=分支合成ID）
         this._loopChipsExpanded := Map() ; 循环体指令卡片是否展开（key=内联用循环ID/外置用循环体合成ID）
@@ -469,6 +470,8 @@ class MacroGraphGui {
 
 
     _DefaultObj(cmdName) {
+        if (cmdName == GetLang("跳转"))
+            return this._MakeNode("流程跳转_" FlowJumpActions()[1])
         if (cmdName == GetLang("间隔")) {
             return this._MakeNode(GetLang("间隔") "_500")
         }
@@ -552,6 +555,22 @@ class MacroGraphGui {
         }
         ; 其它指令：临时节点占位（仍只存 CurCMD，类型由解析判定）
         return this._MakeNode(cmdName)
+    }
+
+    _OnFlowJump(id, state, ctrl, event) {
+        if (!this.cmdNodes.Has(id))
+            return
+        key := "JumpCmb_" id
+        value := IsObject(state) && state.Has(key) ? state[key] : this.ui.Query(key)
+        action := GetLangKey(value)
+        for valid in FlowJumpActions() {
+            if (action != valid)
+                continue
+            cmd := "流程跳转_" action
+            if (this.cmdNodes[id].CurCMD != cmd)
+                this.OnEditorSure(id, cmd)
+            return
+        }
     }
 
     _OnField(id, field, state, ctrl, event) {
@@ -676,7 +695,9 @@ class MacroGraphGui {
         this._FlushInlineFieldsFromUI(id)
         d := this._Parse(this.cmdNodes[id].CurCMD)
         editor := ""
-        if (d.type == GetLang("间隔"))
+        if (d.type == GetLang("跳转"))
+            editor := this.FlowJumpGui
+        else if (d.type == GetLang("间隔"))
             editor := this.IntervalGui
         else if (d.type == GetLang("按键")) {
             if (IsJoyLegacyKeyCmd(this.cmdNodes[id].CurCMD))
@@ -726,6 +747,17 @@ class MacroGraphGui {
         oldType := this._Parse(this.cmdNodes[id].CurCMD).type
         this.cmdNodes[id].CurCMD := cmd
         dEdit := this._Parse(cmd)
+        if (dEdit.type == GetLang("跳转")) {
+            for i, action in FlowJumpActions() {
+                if (action == dEdit.jumpAction) {
+                    this.ui.Update("JumpCmb_" id, "SelectedIndex", i - 1)
+                    break
+                }
+            }
+            this.ui.Update("Title_" id, "Text", this._NodeTitleText(dEdit))
+            this._Apply()
+            return
+        }
         if (oldType != dEdit.type) {
             this._CaptureLinks()
             this._Render()

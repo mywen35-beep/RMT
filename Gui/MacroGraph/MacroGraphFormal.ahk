@@ -1170,7 +1170,7 @@ class MacroGraphFormalMixin {
             emptyTb.Visibility("Collapsed")
     }
 
-    ; 收起态：内嵌真/假分支指令列表 + 流程控制（简化文字）
+    ; 收起态：内嵌真/假分支指令列表
     _FillIfInlineBranches(parent, id, folded) {
         fg := "{DynamicResource TextMain}"
         box := parent.Add("StackPanel").Name("IfInlineBranch_" id).Margin("0,2,0,0")
@@ -1183,13 +1183,6 @@ class MacroGraphFormalMixin {
             head.Add("TextBlock").Text(this._BranchTitleFor(id, isTrue)).Foreground(fg).FontSize(this._MGFontSize(12)).FontWeight("Bold")
             cmds := this._BranchGraphCmds(this._BranchStartSerial(id, isTrue))
             this._FillLoopChips(box, "IfInline" tag "Chips_" id, "IfInline" tag "Expand_" id, "IfInline" tag "_" id, cmds)
-            data := this._BranchParentData(id)
-            ct := "无"
-            if (data != "") {
-                raw := isTrue ? (data.HasOwnProp("TrueControlType") ? data.TrueControlType : "无") : (data.HasOwnProp("FalseControlType") ? data.FalseControlType : "无")
-                ct := GetLang(raw)
-            }
-            box.Add("TextBlock").Name("IfInline" tag "Flow_" id).Text(GetLang("流程控制") "：" ct).Foreground(fg).FontSize(this._MGFontSize(11)).Margin("0,2,0,0")
         }
     }
 
@@ -1237,13 +1230,6 @@ class MacroGraphFormalMixin {
             this._RebuildLoopChips("IfInline" tag "Chips_" id, cmds, expanded)
             this.ui.Update("IfInline" tag "Expand_" id, "Visibility", cmds.Length > this._LoopPreviewCount() ? "Visible" : "Collapsed")
             this.ui.Update("IfInline" tag "Expand_" id, "Content", expanded ? GetLang("收起") : (GetLang("展开") " (" cmds.Length ")"))
-            data := this._BranchParentData(id)
-            ct := "无"
-            if (data != "") {
-                raw := isTrue ? (data.HasOwnProp("TrueControlType") ? data.TrueControlType : "无") : (data.HasOwnProp("FalseControlType") ? data.FalseControlType : "无")
-                ct := GetLang(raw)
-            }
-            this.ui.Update("IfInline" tag "Flow_" id, "Text", GetLang("流程控制") "：" ct)
         }
     }
 
