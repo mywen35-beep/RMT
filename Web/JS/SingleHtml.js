@@ -435,7 +435,8 @@ function findPageIndexByRoute(route){
   if(idx >= 0) return idx;
   // 指令重排后，编辑器及旧书签里的编号可能过期，优先按完整指令名定位。
   if(group === '指令手册'){
-    const aliases = {'移动': '鼠标移动', '移动Pro': '鼠标移动Pro', '组合搜索': '搜索Combo', '搜索Multi': '搜索Combo', '倒计时': '时间', '流程跳转': '跳转'};
+    // 别名统一为「旧名 -> 现名」：新名直接与页面标题相等，旧名经别名映射后命中，保证新编辑器与历史书签都能跳转
+    const aliases = {'鼠标移动': '移动', '鼠标移动Pro': '移动Pro', '组合搜索': '搜索Combo', '搜索Multi': '搜索Combo', '倒计时': '时间', '流程跳转': '跳转'};
     const name = key.replace(/^\\d+[-\\s]+/, '');
     const command = aliases[name] || name;
     idx = PAGE_META.findIndex(p => p.group === group && p.title.replace(/^\\d+\\s+/, '') === command);
