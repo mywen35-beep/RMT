@@ -1,8 +1,8 @@
-# RMT 自动打包脚本
+﻿# RMT 自动打包脚本
 # 使用 Ahk2Exe.exe 编译 Work.ahk 为 Work.exe
 # 此脚本需要编码格式为UTF-8 BOM 或者 UTF-16才能正常运行
 # 若运行直接闪退，请在powershell执行：Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-param([switch]$NoPause)
+param([switch]$NoPause, [switch]$StopRunningOnly)
 
 try { $Host.UI.RawUI.WindowTitle = "RMT 打包工具" } catch { }
 $ErrorActionPreference = "Stop"
@@ -185,15 +185,61 @@ function Get-Version {
 # ============================================================
 
 function Stop-RunningRMT {
-    Write-Log "检查 RMT.ahk 是否正在运行..." "Gray"
-    $rmtProcess = Get-CimInstance Win32_Process -Filter "Name LIKE '%AutoHotkey%'" | Where-Object { $_.CommandLine -like "*RMT.ahk*" }
-    if ($rmtProcess) {
-        Write-Log "RMT.ahk 正在运行，正在关闭..." "Yellow"
-        $rmtProcess | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
-        Start-Sleep -Seconds 1
-        Write-Log "RMT.ahk 已关闭" "Green"
-    } else {
-        Write-Log "RMT.ahk 未运行" "Green"
+    Write-Log "检查当前项目的 RMT 和 Work.exe..." "Gray"
+    $processes = @(Get-CimInstance Win32_Process -Filter "Name LIKE 'AutoHotkey%.exe' OR Name = 'Work.exe' OR Name LIKE 'RMTv%.exe'")
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    # 高权限进程的 CommandLine / ExecutablePath 对普通用户可能均为空。
+    # 只给清理子流程提权，避免因检测漏报而继续删除仍被占用的 Work.exe。
+    $unreadable = @($processes | Where-Object { -not $_.ExecutablePath -or ($_.Name -like 'AutoHotkey*' -and -not $_.CommandLine) })
+    if ($unreadable.Count -gt 0 -and -not $isAdmin) {
+        if ($StopRunningOnly) { throw "进程清理需要管理员权限，请以管理员身份运行打包脚本。" }
+        Write-Log "检测到无法读取的高权限进程，正在请求管理员权限清理..." "Yellow"
+        $cleanupArgs = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -NoPause -StopRunningOnly' -f (Join-Path $PSScriptRoot 'PackRMT.ps1')
+        $cleanup = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') -Verb RunAs -WindowStyle Hidden -ArgumentList $cleanupArgs -Wait -PassThru
+        if ($cleanup.ExitCode -ne 0) { throw "管理员进程清理失败（退出码 $($cleanup.ExitCode)），请查看 Log\PackRMT_*.log。" }
+        return
+    }
+
+    $targets = @(Get-RMTBuildProcesses -Processes $processes -Root $PSScriptRoot)
+    # 先停止主进程，防止线程池在清理期间重新创建 Worker。
+    foreach ($target in @($targets | Sort-Object { $_.Name -eq 'Work.exe' })) {
+        $live = Get-Process -Id $target.ProcessId -ErrorAction SilentlyContinue
+        if (-not $live) { continue }
+        Write-Log "关闭 $($target.Name) (PID $($target.ProcessId))..." "Yellow"
+        try {
+            Stop-Process -InputObject $live -Force -ErrorAction Stop
+            if (-not $live.WaitForExit(10000)) { throw "等待进程退出超时" }
+        } catch {
+            if (Get-Process -Id $target.ProcessId -ErrorAction SilentlyContinue) {
+                throw "无法关闭 $($target.Name) (PID $($target.ProcessId))：$($_.Exception.Message)。请以管理员身份运行打包脚本。"
+            }
+        }
+    }
+    # 再次枚举，发现残留时中止，不带着占用继续编译。
+    $remaining = @(Get-RMTBuildProcesses -Processes @(Get-CimInstance Win32_Process -Filter "Name LIKE 'AutoHotkey%.exe' OR Name = 'Work.exe' OR Name LIKE 'RMTv%.exe'") -Root $PSScriptRoot)
+    if ($remaining.Count) { throw "RMT 工作进程仍在运行：$($remaining.ProcessId -join ', ')，已取消打包。" }
+    Write-Log "[OK] 当前项目的 RMT 和 Worker 已退出，可开始打包" "Green"
+}
+
+function Get-RMTBuildProcesses {
+    param([object[]]$Processes, [string]$Root)
+    $rootPath = [IO.Path]::GetFullPath($Root).TrimEnd('\')
+    $mainScript = Join-Path $rootPath 'RMT.ahk'
+    $workerScript = Join-Path $rootPath 'Thread\Work.ahk'
+    $workerPaths = @('Thread\Work.exe', 'ReleaseX64\Thread\Work.exe', 'ReleaseX86\Thread\Work.exe') | ForEach-Object { Join-Path $rootPath $_ }
+    foreach ($proc in $Processes) {
+        $exe = $proc.ExecutablePath
+        if ($exe) {
+            $exe = [IO.Path]::GetFullPath($exe)
+            if ($proc.Name -eq 'Work.exe' -and $workerPaths -contains $exe) { $proc; continue }
+            if ($proc.Name -like 'RMTv*.exe' -and (Split-Path $exe -Parent) -in @($rootPath, (Join-Path $rootPath 'ReleaseX64'), (Join-Path $rootPath 'ReleaseX86'))) { $proc; continue }
+        }
+        if ($proc.Name -notlike 'AutoHotkey*' -or -not $proc.CommandLine) { continue }
+        # 匹配完整脚本参数，避免误关其它项目或 RMT.ahk.bak 等相似名称。
+        foreach ($scriptPath in @($mainScript, $workerScript)) {
+            $pattern = '(?i)(?:^|\s)(?:"' + [regex]::Escape($scriptPath).Replace('\\', '[\\/]') + '"|' + [regex]::Escape($scriptPath).Replace('\\', '[\\/]') + ')(?=\s|$)'
+            if ($proc.CommandLine -match $pattern) { $proc; break }
+        }
     }
 }
 
@@ -957,8 +1003,8 @@ function Main {
 
     $script:Base32Exe = Find-Exe "32Base (AutoHotkey32.exe)" $Base32Paths
 
-    # 步骤 3: 关闭正在运行的 RMT.ahk
-    Write-Step 3 "关闭正在运行的 RMT.ahk"
+    # 步骤 3: 先关闭主进程与 Worker，释放 Work.exe 后才能清理和编译
+    Write-Step 3 "关闭正在运行的 RMT 和 Work.exe"
     Stop-RunningRMT
 
     # 步骤 4: 清理旧文件
@@ -1019,14 +1065,14 @@ try {
     if ($PSScriptRoot) {
         $logDir = Join-Path $PSScriptRoot "Log"
         if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
-        $script:Transcript = Join-Path $logDir "PackRMT_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+        $script:Transcript = Join-Path $logDir "PackRMT_$(Get-Date -Format 'yyyyMMdd_HHmmss_fff')_$PID.log"
         Start-Transcript -Path $script:Transcript -Force | Out-Null
     }
 }
 catch { $script:Transcript = $null }
 
 try {
-    Main
+    if ($StopRunningOnly) { Stop-RunningRMT } else { Main }
 }
 catch {
     Show-ErrorDetail $_

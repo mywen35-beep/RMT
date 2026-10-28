@@ -671,6 +671,9 @@ InitFilePath() {
         DirCreate(A_WorkingDir "\Setting\" MySoftData.CurSettingName)
     }
 
+    ; 在任何默认宏表写入之前迁移直接覆盖安装的旧方案；失败必须中止加载。
+    Compat_UpgradeDir(A_WorkingDir "\Setting\" MySoftData.CurSettingName)
+
     if (!DirExist(A_WorkingDir "\Setting\" MySoftData.CurSettingName "\Images\UseExplain")) {
         DirCreate(A_WorkingDir "\Setting\" MySoftData.CurSettingName "\Images\UseExplain")
     }

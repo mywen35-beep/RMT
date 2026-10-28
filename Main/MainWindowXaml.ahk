@@ -706,17 +706,15 @@ class MainWin {
         this.ui := XAMLHost(StrReplace(tmp, "%app%", main.ToString()), "", "")
         ; 首帧即定死保存位置：模板 CenterScreen 会让 WPF 强制居中并覆盖后续 WinMove → 先默认位置闪一帧。
         ; 改 Manual + 注入 Left/Top/Width/Height（AHK 逻辑坐标 = WPF DIP，125% DPI 下物理 132,126 已实测吻合，无单位错位）。
-        ; LastWinPos 无效时保持 CenterScreen 1070×590 居中默认。
+        ; LastWinPos 无效或仅含旧坐标时使用新版居中默认尺寸。
         pos := GetLastWinPos()
         startLoc := 'WindowStartupLocation="CenterScreen"'
         ; 主界面默认尺寸按屏幕等比缩放：1920×1080 参考 1400×787。
         ; 更宽的屏幕（横向富余）按高度缩放、更高的屏幕（纵向富余）按宽度缩放，
         ; 即缩放系数 = min(屏幕宽/1920, 屏幕高/1080)；用 DIP 屏幕尺寸计算，物理像素随 DPI 正确。
         dpiScale := DllCall("GetDpiForSystem", "UInt") / 96.0
-        dipSW := A_ScreenWidth / dpiScale
-        dipSH := A_ScreenHeight / dpiScale
-        fs := Min(dipSW / 1920, dipSH / 1080)
-        wh := 'Width="' Round(1400 * fs) '" Height="' Round(787 * fs) '"'
+        size := GetMainWindowDefaultSize()
+        wh := 'Width="' Round(size[1] / dpiScale) '" Height="' Round(size[2] / dpiScale) '"'
         if (pos.Length) {
             ; AHK 进程 DPI aware，WinGetPos/LastWinPos 是物理像素；XAML 注入按 DIP 解释，须换算（实测 125% 屏偏右下 26px）
             ; ponytail: 用 GetDpiForSystem 单值；跨屏不同 DPI 时可能偏差，待真机多屏再按 per-monitor 换算
@@ -728,6 +726,10 @@ class MainWin {
         ; 先填内容再显示：Opacity=0 走引擎离屏揭盖，避免空壳→主题/列表刷入时抖动
         this.ui.xaml := StrReplace(this.ui.xaml, 'Width="940" Height="700"', 'Title="' title '" ' wh ' Opacity="0"')
         this.ui.xaml := StrReplace(this.ui.xaml, 'WindowStartupLocation="CenterScreen"', startLoc)
+        ; Viewbox 或窗口非客户区露出的边缘也使用主题底色，避免透明背景呈黑色。
+        winEnd := InStr(this.ui.xaml, ">")
+        head := StrReplace(SubStr(this.ui.xaml, 1, winEnd), 'Background="Transparent"', 'Background="{DynamicResource BgColor}"')
+        this.ui.xaml := head SubStr(this.ui.xaml, winEnd + 1)
 
         ; ---- 壳级事件（初始 XAML 内，经 eventBindings 绑定） ----
         this.ui.OnEvent("Window", "Closing", ObjBindMethod(this, "OnWindowClosing"))
@@ -5383,7 +5385,7 @@ class MainWin {
         Add := (x) => this.ui.Update(p, "AddXamlItem", x)
         ns := 'xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"'
 
-        ; ============ 设置中心（参考 Web\SettingsLayoutReference.html）============
+        ; ============ 设置中心 ============
         ; 左侧 8 页导航 + 右侧卡片页，全部设置内联；控件沿用既有 Name 与 MainSoftData 字段；
         ; 落盘仍由主界面「应用并保存」统一处理（OnSaveSetting 的 CheckAndAddDirty 已覆盖这些键）。
         iconFont := 'Segoe Fluent Icons, Segoe MDL2 Assets'
@@ -6673,7 +6675,7 @@ class MainWin {
         ; §23 Panel_ 编号 = TableInfo 位置：表集合新增「网络宏」后 Help 起顺延 +1，改按 Symbol 动态取位
         p := "Panel_" GetTableIndexByID("Help")
         Add := (x) => this.ui.Update(p, "AddXamlItem", x)
-        ; 结构与 HelpTabLayoutReference.html 一致：先说明合法使用，再给出文档、社区与反馈入口。
+        ; 先说明合法使用，再给出文档、社区与反馈入口。
         disclaimerRules := '<Grid Margin="10,8"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>'
             . '<Border Grid.Row="0" Grid.Column="0" Margin="0,0,8,5" Padding="8,6" Background="{DynamicResource ControlBg}" BorderBrush="{DynamicResource OutlineStroke}" BorderThickness="1" CornerRadius="5">' this._HelpDisclaimerItem("1", "本软件按“原样”提供。因使用、修改、传播或分发本软件所产生的风险与后果，由使用者自行承担；开发者不作任何明示或默示担保。") '</Border>'
             . '<Border Grid.Row="0" Grid.Column="1" Margin="8,0,0,5" Padding="8,6" Background="{DynamicResource ControlBg}" BorderBrush="{DynamicResource OutlineStroke}" BorderThickness="1" CornerRadius="5">' this._HelpDisclaimerItem("2", "本软件仅限用于合法且已获授权的场景。严禁用于游戏作弊、未经授权的系统访问、数据篡改，或其他违反法律法规及第三方规则的行为。") '</Border>'

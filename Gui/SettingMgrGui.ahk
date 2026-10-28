@@ -349,9 +349,7 @@ class SettingMgrGui {
         DirCopy(SelectedFolder, CurSettingDir, 1)
         ; Setting 根下的旧版共用配置（MainSettings.ini / themes.ini）→ TOML
         try {
-            converted := IniImport_ConvertDir(CurSettingDir)
-            for name, message in converted["Failed"]
-                throw Error(name "：" message)
+            Compat_UpgradeDir(CurSettingDir)
             loop files, CurSettingDir "\*", "D" {
                 this.OnRepairSetting(A_LoopFilePath, true)
             }

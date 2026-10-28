@@ -135,12 +135,7 @@ global SettingFile := A_WorkingDir "\Setting\MainSettings.toml"
 global LangDir := A_WorkingDir "\Lang"
 ; 旧安装目录直接升级：先迁移全局设置，避免先读到新版本默认值再覆盖旧偏好。
 if (FileExist(A_WorkingDir "\Setting\MainSettings.ini")) {
-    imported := IniImport_ConvertDir(A_WorkingDir "\Setting")
-    if (imported["Failed"].Count) {
-        for name, message in imported["Failed"]
-            throw Error("软件设置迁移失败：" name "：" message)
-    }
-    Compat13_UpgradeSettings(A_WorkingDir "\Setting")
+    Compat_UpgradeDir(A_WorkingDir "\Setting")
 }
 LoadMainSetting()               ;加载通用设置
 SyncBootStartRegistry()         ;主进程：开机自启选项与注册表对账（Worker 勿调用）

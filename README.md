@@ -11,6 +11,10 @@
   <a href="README.en.md">🌐 English</a>
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Windows-7%20%7C%208%20%7C%208.1%20%7C%2010%20%7C%2011-0078D6?style=flat-square" alt="Windows 7 / 8 / 8.1 / 10 / 11">
+</p>
+
 ---
 
 ## 🧩 项目介绍
@@ -25,12 +29,6 @@
 - 💡 可广泛应用于游戏辅助、办公自动化、脚本执行等场景  
 
 > 💬 无论是重复操作还是复杂交互流程，RMT 都能让你的电脑「自动工作」。
----
-
-## 🖥️ 系统支持
-
-支持 **Windows 7 / 8 / 8.1 / 10 / 11**。
-
 ---
 
 ## 🚀 快速上手

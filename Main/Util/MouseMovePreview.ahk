@@ -13,7 +13,7 @@ PreviewMouseMovement(ui, kind) => MouseMovePreview.Toggle(ui, kind)
 ; while the user is in the middle of typing a coordinate.
 ReadMousePreview(ui, kind, cx, cy, notify := false) {
     fields := kind == "delta" ? ["DeltaXCon", "DeltaYCon", "CountCon"]
-        : (kind == "pro" ? ["MouseMoveModeCombo>SelectedIndex", "ActionTypeCombo>SelectedIndex", "PosVarX", "PosVarY", "EndPosVarX", "EndPosVarY", "RefCombo>SelectedIndex", "WinInfoCon"]
+        : (kind == "pro" ? ["MouseMoveModeCombo>SelectedIndex", "ActionTypeCombo>SelectedIndex", "PosVarX", "PosVarY", "EndPosVarX", "EndPosVarY", "RefCombo>SelectedIndex", "WinInfoCon", "HumanMouseTog", "SpeedCon"]
         : ["MouseMoveModeCombo>SelectedIndex", "PosXCon", "PosYCon"])
     state := ui.Query(fields*)
     mode := 1, action := 1, endX := 0, endY := 0, count := 1, wx := 0, wy := 0
@@ -51,7 +51,11 @@ ReadMousePreview(ui, kind, cx, cy, notify := false) {
             return ""
         }
     }
-    return MousePreviewPoints(kind, x, y, cx, cy, mode, action, endX, endY, count, wx, wy)
+    points := MousePreviewPoints(kind, x, y, cx, cy, mode, action, endX, endY, count, wx, wy)
+    points.Human := kind == "pro" && state.Get("HumanMouseTog", "False") == "True"
+    speed := state.Get("SpeedCon", 90)
+    points.Speed := IsNumber(speed) ? Max(0, Min(100, Integer(speed))) : 90
+    return points
 }
 
 ; Numeric geometry follows the executor: relative moves truncate, absolute moves round.
@@ -75,6 +79,8 @@ class MouseMovePreview {
     static OriginY := 0
     static LastFrame := ""
     static Revision := 0
+    static LastPathKey := ""
+    static LastPath := []
     static RefreshTimer := ObjBindMethod(MouseMovePreview, "Refresh")
 
     static Toggle(ui, kind) {
@@ -103,6 +109,7 @@ class MouseMovePreview {
         if (IsObject(this.Editor))
             this.SetButton(false)
         this.Editor := "", this.Kind := "", this.LastFrame := ""
+        this.LastPathKey := "", this.LastPath := []
         this.HideOverlay()
     }
 
@@ -138,8 +145,18 @@ class MouseMovePreview {
             this.LastFrame := ""
             return false
         }
+        pathKey := points.X1 "," points.Y1 "," points.X2 "," points.Y2 "," points.Human "," points.Speed
+        if (points.Human) {
+            if (pathKey != this.LastPathKey) {
+                this.LastPath := MousePreviewCurve(points)
+                this.LastPathKey := pathKey
+            }
+            points.Path := this.LastPath
+        } else {
+            this.LastPathKey := "", this.LastPath := []
+        }
         palette := this.Palette()
-        frame := points.X1 "," points.Y1 "," points.X2 "," points.Y2 "," palette.Line "," palette.Outline
+        frame := pathKey "," points.X1 "," points.Y1 "," points.X2 "," points.Y2 "," palette.Line "," palette.Outline
         if (points.HasOwnProp("Steps"))
             frame .= "," points.Steps "," points.StepX "," points.StepY
         if (frame != this.LastFrame) {
@@ -168,14 +185,34 @@ class MouseMovePreview {
             pen := Gdip_CreatePen(palette.Line, 3)
             brush := Gdip_BrushCreateSolid(palette.Line)
             x1 := p.X1 - left, y1 := p.Y1 - top, x2 := p.X2 - left, y2 := p.Y2 - top
-            dx := x2-x1, dy := y2-y1, length := Sqrt(dx*dx + dy*dy)
+            curve := p.HasOwnProp("Path") && p.Path.Length > 1
+            polyline := ""
+            if (curve) {
+                for point in p.Path
+                    polyline .= (A_Index == 1 ? "" : "|") (point.X-left) "," (point.Y-top)
+            }
+            dx := x2-x1, dy := y2-y1
+            if (curve) {
+                ; Orient the arrowhead along the curve's final nonzero segment.
+                loop p.Path.Length - 1 {
+                    point := p.Path[p.Path.Length-A_Index]
+                    dx := p.X2-point.X, dy := p.Y2-point.Y
+                    if (dx*dx+dy*dy >= 1)
+                        break
+                }
+            }
+            length := Sqrt(dx*dx + dy*dy)
             if (length > 0) {
                 ux := dx/length, uy := dy/length
-                arrow := Min(18, length), wing := arrow * 0.5
+                ; The final eased segment can be subpixel; keep the arrowhead readable.
+                arrow := Min(18, Sqrt((x2-x1)**2 + (y2-y1)**2)), wing := arrow * 0.5
                 ax := x2 - ux*arrow - uy*wing, ay := y2 - uy*arrow + ux*wing
                 bx := x2 - ux*arrow + uy*wing, by := y2 - uy*arrow - ux*wing
                 for linePen in [outline, pen] {
-                    Gdip_DrawLine(g, linePen, x1, y1, x2, y2)
+                    if (curve)
+                        Gdip_DrawLines(g, linePen, polyline)
+                    else
+                        Gdip_DrawLine(g, linePen, x1, y1, x2, y2)
                     Gdip_DrawLine(g, linePen, ax, ay, x2, y2)
                     Gdip_DrawLine(g, linePen, bx, by, x2, y2)
                 }
@@ -234,4 +271,17 @@ MousePreviewVisibleSteps(p, left, top, width, height) {
     if (p.StepX == 0 && p.StepY == 0)
         last := Min(last, 1) ; coincident points have identical pixels
     return {First: first, Last: last}
+}
+
+; Generate a sample with the execution algorithm, without moving the real pointer
+; or changing the singleton's parameters. Cache it until geometry/speed changes.
+MousePreviewCurve(p) {
+    runtime := HumanMouse.GetInstance()
+    generator := HumanMouse()
+    for name, value in runtime.OwnProps()
+        generator.%name% := value
+    generator.Speed := p.Speed
+    distance := Sqrt((p.X2-p.X1)**2 + (p.Y2-p.Y1)**2)
+    generator.AutoCalculateParams(distance)
+    return generator.GeneratePath(p.X1, p.Y1, p.X2, p.Y2)
 }

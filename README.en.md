@@ -11,6 +11,10 @@
   <a href="README.md">🌐 中文版</a>
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Windows-7%20%7C%208%20%7C%208.1%20%7C%2010%20%7C%2011-0078D6?style=flat-square" alt="Windows 7 / 8 / 8.1 / 10 / 11">
+</p>
+
 ---
 
 ## 🧩 Introduction
@@ -25,12 +29,6 @@ designed to help users easily create and run various automation tasks through si
 - 💡 Perfect for **gaming assistance, office automation, and custom scripting**
 
 > 💬 Whether it's repetitive clicks or complex workflows, RMT lets your computer *work automatically*.
-
----
-
-## 🖥️ Supported Systems
-
-Supports **Windows 7 / 8 / 8.1 / 10 / 11**.
 
 ---
 

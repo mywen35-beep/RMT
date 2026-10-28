@@ -92,7 +92,8 @@ class MMProGui {
 
         ; === 内容 ===
         body := main.Add("Grid").Grid_Row(1).Margin("10,8,10,18")
-        body.Rows("32", "36", "36", "36", "36", "Auto", "36", "24", "40")
+        ; 为拖拽坐标预留行高，避免引擎首次测量后展开新行将确定按钮挤出窗口。
+        body.Rows("32", "36", "36", "36", "36", "36", "36", "24", "40")
         body.Cols("90", "130", "110", "150")
 
         ; 行0：当前鼠标位置 + 备注（备注与坐标Y左对齐，输入右对齐下方下拉）
@@ -153,7 +154,7 @@ class MMProGui {
             .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}").BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
         body.Add("TextBlock").Grid_Row(4).Grid_Column(2).Name("PosYLabel").Text(GetLang("坐标位置Y:")).VerticalAlignment("Center").Margin("20,0,0,0")
             .Foreground("{DynamicResource TextMain}").FontSize("12")
-        body.Add("ComboBox").Grid_Row(4).Grid_Column(3).Name("PosVarY").Height(26).MinHeight(26).Margin("20,0,0,0").IsEditable("True")
+        body.Add("ComboBox").Grid_Row(4).Grid_Column(3).Name("PosVarY").Width(130).HorizontalAlignment("Left").Height(26).MinHeight(26).Margin("20,0,0,0").IsEditable("True")
             .VerticalContentAlignment("Center").FontSize("11")
             .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}").BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
 
@@ -167,7 +168,7 @@ class MMProGui {
             .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}").BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
         endRow.Add("TextBlock").Grid_Column(2).Text("").VerticalAlignment("Center").Margin("20,0,0,0")
             .Foreground("{DynamicResource TextMain}").FontSize("12")
-        endRow.Add("ComboBox").Grid_Column(3).Name("EndPosVarY").Height(26).MinHeight(26).Margin("20,0,0,0").IsEditable("True")
+        endRow.Add("ComboBox").Grid_Column(3).Name("EndPosVarY").Width(130).HorizontalAlignment("Left").Height(26).MinHeight(26).Margin("-90,0,0,0").IsEditable("True")
             .VerticalContentAlignment("Center").FontSize("11")
             .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}").BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
 
@@ -385,6 +386,8 @@ class MMProGui {
         isRel := this._MoveMode() == 1
         isDrag := this._TypeValue() == 4 && !isRel
         this.ui.Update("EndPosRow", "Visibility", isDrag ? "Visible" : "Collapsed")
+        ; 拖拽时右侧坐标框靠近 X 框，保留 20px 间距；其他动作恢复原位。
+        this.ui.Update("PosVarY", "Margin", isDrag ? "-90,0,0,0" : "20,0,0,0")
         if (!isDrag)
             this._posTarget := "PosVar"
         this.ui.Update("PosXLabel", "Text", GetLang(isRel ? "坐标偏移X:" : (isDrag ? "起始点" : "坐标位置X:")))

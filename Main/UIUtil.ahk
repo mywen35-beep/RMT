@@ -77,11 +77,19 @@ OnGuiClose(*) {
     MyTargetGui._lbuttonCb := ""
 }
 
-; 读取保存的主窗口位置尺寸；旧格式 xπy 两段回退默认 1070×590，损坏/越界返回空数组
+; 统一主窗口默认尺寸（物理像素），与 1400×787 设计比例一致。
+GetMainWindowDefaultSize() {
+    scale := Min(A_ScreenWidth / 1920, A_ScreenHeight / 1080)
+    return [Round(1400 * scale), Round(787 * scale)]
+}
+
+; 读取保存的主窗口位置尺寸；旧格式只有坐标，使用新版默认居中尺寸。
 ; BuildAndShow 可见前置位 + RefreshGui 都复用，避免两处解析漂移
 GetLastWinPos() {
     LastWinPosStr := CfgRead(SettingFile, SettingSection, "LastWinPos", "")
     WinPosArr := StrSplit(LastWinPosStr, "π")
+    if (WinPosArr.Length != 4)
+        return []
     if (WinPosArr.Length >= 2 && IsNumber(WinPosArr[1]) && IsNumber(WinPosArr[2])) {
         VirtualWidth := SysGet(78)
         VirtualHeight := SysGet(79)
@@ -94,13 +102,19 @@ GetLastWinPos() {
                 dipSH := A_ScreenHeight / dpi
                 fs := Min(dipSW / 1920, dipSH / 1080)
                 scale := Float(WinPosArr[4])
+                if (scale <= 0 || scale > 3)
+                    return []
                 w := Min(Round(1400 * fs * scale * dpi), VirtualWidth)
                 h := Min(Round(787 * fs * scale * dpi), VirtualHeight)
+                if (w < 400 || h < 300)
+                    return []
                 return [WinPosArr[1], WinPosArr[2], w, h]
             }
-            ; 旧格式 xπy 两段 → 默认 1070×590；旧 4 段含绝对 w/h（≥400×300 才采信，上界钳虚拟屏防存档超大值）
-            w := (WinPosArr.Length >= 4 && IsNumber(WinPosArr[3]) && WinPosArr[3] >= 400) ? Min(WinPosArr[3], VirtualWidth) : 1070
-            h := (WinPosArr.Length >= 4 && IsNumber(WinPosArr[4]) && WinPosArr[4] >= 300) ? Min(WinPosArr[4], VirtualHeight) : 590
+            ; 旧四段绝对尺寸只在宽高都有效时恢复，不能混用旧尺寸与新默认值。
+            if (!IsNumber(WinPosArr[3]) || !IsNumber(WinPosArr[4]) || WinPosArr[3] < 400 || WinPosArr[4] < 300)
+                return []
+            w := Min(WinPosArr[3], VirtualWidth)
+            h := Min(WinPosArr[4], VirtualHeight)
             return [WinPosArr[1], WinPosArr[2], w, h]
         }
     }
@@ -123,7 +137,8 @@ RefreshGui() {
         CfgWrite(MainSoftData.LastShowMonth, SettingFile, SettingSection, "LastShowMonth")
     }
 
-    MainSoftData.MyGui.Show(Format("w{} h{}", 1070, 590))
+    size := GetMainWindowDefaultSize()
+    MainSoftData.MyGui.Show(Format("w{} h{}", size[1], size[2]))
     RefreshListenVarGui()
 }
 
