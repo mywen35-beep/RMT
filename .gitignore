@@ -1,5 +1,7 @@
 Log/
+/Test/
 Setting/
+OldSetting/
 settings.ini
 .vscode
 /*.code-workspace
