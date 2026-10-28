@@ -45,7 +45,7 @@ class MouseMoveGui {
     _BuildAndShow() {
         global MySoftData
         this._closed := false
-        title := this.ParentTile GetLang("鼠标移动编辑器")
+        title := this.ParentTile GetLang("移动编辑器")
         this._title := title
         titleHeight := XAMLHost.CmdTitleBarHeight()
 
@@ -88,7 +88,7 @@ class MouseMoveGui {
             mm.Add("ComboBoxItem").Content(m)
 
         ; 行3：当前指令
-        body.Add("TextBlock").Grid_Row(3).Grid_ColumnSpan(4).Name("CommandStrCon").Text(GetLang("当前指令：鼠标移动")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
+        body.Add("TextBlock").Grid_Row(3).Grid_ColumnSpan(4).Name("CommandStrCon").Text(GetLang("当前指令：移动")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
 
         ; 行4：确定
         btnRow := body.Add("StackPanel").Grid_Row(4).Grid_ColumnSpan(4).Orientation("Horizontal").HorizontalAlignment("Center").VerticalAlignment("Center")
@@ -110,6 +110,7 @@ class MouseMoveGui {
         this.ui.OnEvent("PosYCon", "TextChanged", ObjBindMethod(this, "OnChangeEditValue"))
         this.ui.OnEvent("SpeedCon", "TextChanged", ObjBindMethod(this, "OnChangeEditValue"))
         this.ui.OnEvent("MouseMoveModeCombo", "SelectionChanged", ObjBindMethod(this, "OnChangeEditValue"))
+        BindMouseMovePreview(this.ui, "move")
         this.ui.OnEvent("BtnOk", "Click", ObjBindMethod(this, "OnClickSureBtn"))
 
     }
@@ -119,6 +120,7 @@ class MouseMoveGui {
     }
 
     OnWindowClosing(state, ctrl, event) {
+        MouseMovePreview.Clear(this.ui)
         try this.ToggleFunc(false)
         if (this.OwnerHwnd != "" && MainSoftData.IsModalSubGui) {
             try SafeGuiFromHwnd(this.OwnerHwnd).Opt("-Disabled")
@@ -132,6 +134,7 @@ class MouseMoveGui {
     }
 
     _CloseWindow() {
+        MouseMovePreview.Clear(this.ui)
         if (IsObject(this.ui)) {
             try this.ui.Update("Window", "Close", "")
         }
@@ -196,7 +199,7 @@ class MouseMoveGui {
         if (!IsObject(this.ui))
             return
         MoveMode := this._MoveMode()
-        CommandStr := GetLang("鼠标移动")
+        CommandStr := GetLang("移动")
         CommandStr .= "_" this.ui.Query("PosXCon")
         CommandStr .= "_" this.ui.Query("PosYCon")
         CommandStr .= "_" this.ui.Query("SpeedCon")
@@ -280,7 +283,7 @@ class MouseMoveGui {
         this.Data.MoveMode := this._MoveMode()
 
         if (this.Data.SerialStr == "")
-            this.Data.SerialStr := GetCMDSerialStr(GetLang("鼠标移动"))
+            this.Data.SerialStr := GetCMDSerialStr(GetLang("移动"))
         SaveMacroCMDData(this.Data)
         remark := this.Data.PosX " " this.Data.PosY
         return CorrectRemark(this.Data.SerialStr, remark)

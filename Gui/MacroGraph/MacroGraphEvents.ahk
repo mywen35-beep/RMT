@@ -124,6 +124,8 @@ class MacroGraphEventsMixin {
             this._BindCtrl("DInterval_" id, "SelectionChanged", this._OnField.Bind(this, id, "interval"), runtime)
         }
         else if (IsMoveProCmd(d.type)) {
+            this._TrackCtrl("MPEndX_" id, runtime)
+            this._TrackCtrl("MPEndY_" id, runtime)
             this._TrackCtrl("MPPosX_" id, runtime)
             this._TrackCtrl("MPPosY_" id, runtime)
             this._TrackCtrl("MPSpeed_" id, runtime)
@@ -132,6 +134,10 @@ class MacroGraphEventsMixin {
             this._TrackCtrl("MPHuman_" id, runtime)
             this._TrackCtrl("MPCount_" id, runtime)
             this._TrackCtrl("MPInterval_" id, runtime)
+            for field, prefix in Map("EndPosVarX", "MPEndX_", "EndPosVarY", "MPEndY_") {
+                this._BindCtrl(prefix id, "LostFocus", this._OnMMProField.Bind(this, id, field), runtime)
+                this._BindCtrl(prefix id, "SelectionChanged", this._OnMMProField.Bind(this, id, field), runtime)
+            }
             this._BindCtrl("MPPosX_" id, "LostFocus", this._OnMMProField.Bind(this, id, "PosVarX"), runtime)
             this._BindCtrl("MPPosX_" id, "SelectionChanged", this._OnMMProField.Bind(this, id, "PosVarX"), runtime)
             this._BindCtrl("MPPosY_" id, "LostFocus", this._OnMMProField.Bind(this, id, "PosVarY"), runtime)

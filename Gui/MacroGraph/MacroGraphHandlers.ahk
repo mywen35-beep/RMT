@@ -330,8 +330,10 @@ class MacroGraphHandlersMixin {
         return RegExReplace(name, "\d+$", "") == GetLang("如果")
     }
 
-    ; 鼠标动作编号(1/2/3) -> 下拉项索引
+    ; 鼠标动作编号(1/2/3/4) -> 下拉项索引
     _MMProActionIndex(at) {
+        if (at == "4" || at == 4)
+            return 3
         if (at == "2" || at == 2)
             return 1
         if (at == "3" || at == 3)
@@ -339,11 +341,13 @@ class MacroGraphHandlersMixin {
         return 0
     }
 
-    ; 下拉项文本 -> 鼠标动作编号(1=移动 2=移动点击1次 3=移动点击2次)
+    ; 下拉项文本 -> 鼠标动作编号(1=移动 2=移动后单击 3=移动后双击 4=拖拽)
     _MMProActionFromText(text) {
-        if (text == GetLang("移动点击1次"))
+        if (text == GetLang("拖拽"))
+            return 4
+        if (text == GetLang("移动后单击") || text == GetLang("移动点击1次"))
             return 2
-        if (text == GetLang("移动点击2次"))
+        if (text == GetLang("移动后双击") || text == GetLang("移动点击2次"))
             return 3
         return 1
     }
@@ -380,7 +384,7 @@ class MacroGraphHandlersMixin {
             if (k != "Return" && k != "Enter")
                 return
         }
-        nameMap := Map("PosVarX", "MPPosX_", "PosVarY", "MPPosY_", "Speed", "MPSpeed_", "Count", "MPCount_", "Interval", "MPInterval_")
+        nameMap := Map("EndPosVarX", "MPEndX_", "EndPosVarY", "MPEndY_", "PosVarX", "MPPosX_", "PosVarY", "MPPosY_", "Speed", "MPSpeed_", "Count", "MPCount_", "Interval", "MPInterval_")
         key := nameMap[field] id
         val := ""
         hasVal := false
@@ -416,16 +420,16 @@ class MacroGraphHandlersMixin {
         this._MMProApply()
     }
 
-    ; 从引擎当前选中项解析鼠标动作编号(1/2/3)：SelectedIndex 优先
+    ; 从引擎当前选中项解析鼠标动作编号(1/2/3/4)：SelectedIndex 优先
     _MMProActionFromState(key, state, fallback := 1) {
         idx := this._ComboSelectedIndex(key)
-        if (idx >= 0 && idx <= 2)
+        if (idx >= 0 && idx <= 3)
             return idx + 1
         txt := this._ComboText(key, state)
         if (txt != "")
             return this._MMProActionFromText(txt)
         fb := Integer(fallback)
-        return (fb >= 1 && fb <= 3) ? fb : 1
+        return (fb >= 1 && fb <= 4) ? fb : 1
     }
 
     ; 鼠标动作下拉变更
@@ -1726,7 +1730,7 @@ class MacroGraphHandlersMixin {
         if (data == "")
             return
         dirty := false
-        for field, prefix in Map("PosVarX", "MPPosX_", "PosVarY", "MPPosY_") {
+        for field, prefix in Map("EndPosVarX", "MPEndX_", "EndPosVarY", "MPEndY_", "PosVarX", "MPPosX_", "PosVarY", "MPPosY_") {
             if (!this._InlineVal(state, prefix id, &val))
                 continue
             data.%field% := GetLangKey(val)
@@ -1741,7 +1745,7 @@ class MacroGraphHandlersMixin {
             dirty := true
         }
         aidx := this._ComboSelectedIndex("MPActionCmb_" id)
-        if (aidx >= 0 && aidx <= 2) {
+        if (aidx >= 0 && aidx <= 3) {
             data.ActionType := aidx + 1
             dirty := true
         } else if (this._InlineVal(state, "MPActionCmb_" id, &actTxt)) {

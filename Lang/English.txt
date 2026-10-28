@@ -643,6 +643,8 @@ Stripe订阅=Stripe Subscription
 微软截图=Win Snip
 搜图模型=Search Model
 图片识别模型=Image recognition model
+图片识别自适应=Adaptive image recognition
+仅 OpenCV 生效，匹配分辨率或 DPI 缩放变化后的图片=OpenCV only; match images after resolution or DPI scaling changes
 快捷方式编辑=Edit Shortcut
 快捷方式：=Shortcut:
 快捷键=Hotkey
@@ -1926,3 +1928,20 @@ Unix时间戳=Unix Timestamp
 跳转=Jump
 流程跳转=FlowJump
 跳转编辑器=Jump Editor
+
+移动后单击=Move then Click
+移动后双击=Move then Double-click
+拖拽=Drag
+起始坐标X:=Start X:
+终止坐标X:=End X:
+终止坐标是变量时，编辑模式下无法执行=Cannot preview variable end coordinates in the editor
+起始坐标Y:=Start Y:
+终止坐标Y:=End Y:
+
+起始点=Start
+终止点=End
+预览移动路径=Preview movement path
+预览需要数值坐标和次数，请先将变量替换为数值。=Preview requires numeric coordinates and count. Replace variables with numbers first.
+预览未找到目标窗口。=Target window not found for preview.
+
+关闭指令预览=Turn off command preview

@@ -290,7 +290,7 @@ BindCmdEditorChrome(ui, helpRoute := "", playAction := "", playHotkey := "!l", t
     }
 }
 
-; 标题去掉「编辑器」后缀：宏指令-鼠标移动编辑器 → 宏指令-鼠标移动
+; 标题去掉「编辑器」后缀：宏指令-移动编辑器 → 宏指令-移动
 CmdEditorDisplayTitle(title) {
     s := String(title)
     try s := StrReplace(s, GetLang("编辑器"), "")
@@ -324,7 +324,7 @@ CmdEditorTitleIcon(title) {
     static pairs := ""
     if (!IsObject(pairs)) {
         pairs := [
-            ["鼠标移动Pro", "Images\Soft\MovePro.png"],
+            ["移动Pro", "Images\Soft\MovePro.png"],
             ["搜索Pro", "Images\Soft\SearchPro.png"],
             ["搜索Combo", "Images\Soft\SearchCombo.png"],
             ["组合搜索", "Images\Soft\SearchCombo.png"],
@@ -341,7 +341,7 @@ CmdEditorTitleIcon(title) {
             ["后台鼠标", "Images\Soft\Mouse.png"],
             ["后台按键", "Images\Soft\BGKey.png"],
             ["增量移动", "Images\Soft\DeltaMove.png"],
-            ["鼠标移动", "Images\Soft\Move.png"],
+            ["移动", "Images\Soft\Move.png"],
             ["RMT指令", "Images\Soft\rabit.png"],
             ["流程跳转", "Images\Soft\FlowJump.png"],
             ["跳转", "Images\Soft\FlowJump.png"],

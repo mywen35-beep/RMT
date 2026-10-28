@@ -19,6 +19,7 @@ class MMProGui {
         this.Data := ""
         this.SerialStr := ""
         this.PosAction := () => this.RefreshMousePos()
+        this._posTarget := "PosVar"
         this._syncing := false   ; 程序初始化/刷新配置时抑制 SelectionChanged/Click 递归
     }
 
@@ -79,7 +80,7 @@ class MMProGui {
     _BuildAndShow() {
         global MySoftData
         this._closed := false
-        title := this.ParentTile GetLang("鼠标移动Pro编辑器")
+        title := this.ParentTile GetLang("移动Pro编辑器")
         this._title := title
         titleHeight := XAMLHost.CmdTitleBarHeight()
 
@@ -91,7 +92,7 @@ class MMProGui {
 
         ; === 内容 ===
         body := main.Add("Grid").Grid_Row(1).Margin("10,8,10,18")
-        body.Rows("32", "36", "36", "36", "36", "36", "24", "40")
+        body.Rows("32", "36", "36", "36", "36", "Auto", "36", "24", "40")
         body.Cols("90", "130", "110", "150")
 
         ; 行0：当前鼠标位置 + 备注（备注与坐标Y左对齐，输入右对齐下方下拉）
@@ -141,7 +142,7 @@ class MMProGui {
         act := body.Add("ComboBox").Grid_Row(3).Grid_Column(3).Name("ActionTypeCombo").Height(26).MinHeight(26).Margin("20,0,0,0")
             .VerticalContentAlignment("Center").FontSize("11")
             .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}").BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
-        for a in GetLangArr(["移动", "移动点击1次", "移动点击2次"])
+        for a in GetLangArr(["移动", "移动后单击", "移动后双击", "拖拽"])
             act.Add("ComboBoxItem").Content(a)
 
         ; 行4：坐标X/Y（绝对=坐标位置，相对=坐标偏移）
@@ -156,22 +157,36 @@ class MMProGui {
             .VerticalContentAlignment("Center").FontSize("11")
             .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}").BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
 
+        ; 绝对拖拽终止坐标；其他动作折叠此行。
+        endRow := body.Add("Grid").Grid_Row(5).Grid_ColumnSpan(4).Name("EndPosRow").Visibility("Collapsed").Height(36)
+        endRow.Cols("90", "130", "110", "150")
+        endRow.Add("TextBlock").Grid_Column(0).Text(GetLang("终止点")).VerticalAlignment("Center")
+            .Foreground("{DynamicResource TextMain}").FontSize("12")
+        endRow.Add("ComboBox").Grid_Column(1).Name("EndPosVarX").Height(26).MinHeight(26).IsEditable("True")
+            .VerticalContentAlignment("Center").FontSize("11")
+            .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}").BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
+        endRow.Add("TextBlock").Grid_Column(2).Text("").VerticalAlignment("Center").Margin("20,0,0,0")
+            .Foreground("{DynamicResource TextMain}").FontSize("12")
+        endRow.Add("ComboBox").Grid_Column(3).Name("EndPosVarY").Height(26).MinHeight(26).Margin("20,0,0,0").IsEditable("True")
+            .VerticalContentAlignment("Center").FontSize("11")
+            .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}").BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
+
         ; 行5：移动速度
-        spdHost := body.Add("Border").Grid_Row(5).Grid_Column(0).Background("Transparent").VerticalAlignment("Center")
+        spdHost := body.Add("Border").Grid_Row(6).Grid_Column(0).Background("Transparent").VerticalAlignment("Center")
             .ToolTip(GetLang("移动速度0~100，100为瞬移"))
         spdHost.Add("TextBlock").Text(GetLang("移动速度：")).VerticalAlignment("Center")
             .Foreground("{DynamicResource TextMain}").FontSize("12")
-        body.Add("TextBox").Grid_Row(5).Grid_Column(1).Name("SpeedCon").Height(26).MinHeight(26).VerticalContentAlignment("Center")
+        body.Add("TextBox").Grid_Row(6).Grid_Column(1).Name("SpeedCon").Height(26).MinHeight(26).VerticalContentAlignment("Center")
             .FontSize("11").Padding("4,0").Text("90")
             .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}")
             .BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
 
         ; 行6：提示
-        body.Add("TextBlock").Grid_Row(6).Grid_ColumnSpan(4).Text(GetLang("坐标基准=窗口时，坐标按所选窗口左上角偏移计算（绝对移动）。")).VerticalAlignment("Center")
+        body.Add("TextBlock").Grid_Row(7).Grid_ColumnSpan(4).Text(GetLang("坐标基准=窗口时，坐标按所选窗口左上角偏移计算（绝对移动）。")).VerticalAlignment("Center")
             .Foreground("{DynamicResource TextSub}").FontSize("11")
 
         ; 行7：确定（水平居中）
-        btnRow := body.Add("StackPanel").Grid_Row(7).Grid_ColumnSpan(4).Orientation("Horizontal").HorizontalAlignment("Center").VerticalAlignment("Center")
+        btnRow := body.Add("StackPanel").Grid_Row(8).Grid_ColumnSpan(4).Orientation("Horizontal").HorizontalAlignment("Center").VerticalAlignment("Center")
         AddCmdOkBtn(btnRow)
 
         ; === 创建 XAMLHost ===
@@ -189,7 +204,13 @@ class MMProGui {
         this.ui.OnEvent("RefCombo", "SelectionChanged", ObjBindMethod(this, "OnRefChange"))
         this.ui.OnEvent("BtnWinInfoEdit", "Click", ObjBindMethod(this, "OnWinInfoEdit"))
         this.ui.OnEvent("MouseMoveModeCombo", "SelectionChanged", ObjBindMethod(this, "OnTypeChange"))
+        this.ui.OnEvent("ActionTypeCombo", "SelectionChanged", ObjBindMethod(this, "OnTypeChange"))
+        for field in ["PosVarX", "PosVarY"]
+            this.ui.OnEvent(field, "GotKeyboardFocus", (*) => this._posTarget := "PosVar")
+        for field in ["EndPosVarX", "EndPosVarY"]
+            this.ui.OnEvent(field, "GotKeyboardFocus", (*) => this._posTarget := "EndPosVar")
         this.ui.OnEvent("HumanMouseTog", "Click", ObjBindMethod(this, "OnHumanMouseTogClick"))
+        BindMouseMovePreview(this.ui, "pro")
         this.ui.OnEvent("BtnOk", "Click", ObjBindMethod(this, "OnClickSureBtn"))
 
     }
@@ -199,6 +220,7 @@ class MMProGui {
     }
 
     OnWindowClosing(state, ctrl, event) {
+        MouseMovePreview.Clear(this.ui)
         
         try this.ToggleFunc(false)
         if (this.OwnerHwnd != "" && MainSoftData.IsModalSubGui) {
@@ -213,6 +235,7 @@ class MMProGui {
     }
 
     _CloseWindow() {
+        MouseMovePreview.Clear(this.ui)
         ; 先关窗（PostMessage WM_CLOSE），再清理——任何清理异常都不阻断关闭
         if (IsObject(this.ui)) {
             try this.ui.Update("Window", "Close", "")
@@ -249,7 +272,7 @@ class MMProGui {
     Init(cmd) {
         
         cmdArr := cmd != "" ? StrSplit(cmd, "_") : []
-        this.SerialStr := cmdArr.Length >= 1 ? cmdArr[1] : GetCMDSerialStr("鼠标移动Pro")
+        this.SerialStr := cmdArr.Length >= 1 ? cmdArr[1] : GetCMDSerialStr("移动Pro")
         
         this.ui.Update("RemarkCon", "Text", cmdArr.Length >= 2 ? cmdArr[2] : "")
         
@@ -259,6 +282,8 @@ class MMProGui {
         
         this._SetCombo("PosVarX", this.DLVariableArr, GetLang(this.Data.PosVarX))
         this._SetCombo("PosVarY", this.DLVariableArr, GetLang(this.Data.PosVarY))
+        this._SetCombo("EndPosVarX", this.DLVariableArr, GetLang(this.Data.HasOwnProp("EndPosVarX") ? this.Data.EndPosVarX : 200))
+        this._SetCombo("EndPosVarY", this.DLVariableArr, GetLang(this.Data.HasOwnProp("EndPosVarY") ? this.Data.EndPosVarY : 200))
         this.ui.Update("ActionTypeCombo", "SelectedIndex", String(this.Data.ActionType - 1))
 
         MoveMode := 0
@@ -290,6 +315,11 @@ class MMProGui {
         }
         if (!IsNumber(this.ui.Query("PosVarY"))) {
             MsgBox(GetLang("坐标Y是变量时，编辑模式下无法执行"))
+            return
+        }
+        if (this._TypeValue() == 4 && this._MoveMode() == 0
+            && (!IsNumber(this.ui.Query("EndPosVarX")) || !IsNumber(this.ui.Query("EndPosVarY")))) {
+            MsgBox(GetLang("终止坐标是变量时，编辑模式下无法执行"))
             return
         }
         this.SaveMMProData()
@@ -353,14 +383,18 @@ class MMProGui {
         if (this._syncing || !IsObject(this.ui))
             return
         isRel := this._MoveMode() == 1
-        this.ui.Update("PosXLabel", "Text", GetLang(isRel ? "坐标偏移X:" : "坐标位置X:"))
-        this.ui.Update("PosYLabel", "Text", GetLang(isRel ? "坐标偏移Y:" : "坐标位置Y:"))
+        isDrag := this._TypeValue() == 4 && !isRel
+        this.ui.Update("EndPosRow", "Visibility", isDrag ? "Visible" : "Collapsed")
+        if (!isDrag)
+            this._posTarget := "PosVar"
+        this.ui.Update("PosXLabel", "Text", GetLang(isRel ? "坐标偏移X:" : (isDrag ? "起始点" : "坐标位置X:")))
+        this.ui.Update("PosYLabel", "Text", GetLang(isRel ? "坐标偏移Y:" : (isDrag ? "" : "坐标位置Y:")))
     }
 
     OnSureTarget(PosX, PosY, Color) {
         if (IsObject(this.ui)) {
-            this.ui.Update("PosVarX", "Text", PosX)
-            this.ui.Update("PosVarY", "Text", PosY)
+            this.ui.Update(this._posTarget "X", "Text", PosX)
+            this.ui.Update(this._posTarget "Y", "Text", PosY)
         }
     }
 
@@ -399,8 +433,8 @@ class MMProGui {
             mouseX := mouseX - curX
             mouseY := mouseY - curY
         }
-        this.ui.Update("PosVarX", "Text", mouseX)
-        this.ui.Update("PosVarY", "Text", mouseY)
+        this.ui.Update(this._posTarget "X", "Text", mouseX)
+        this.ui.Update(this._posTarget "Y", "Text", mouseY)
     }
 
     OnHumanMouseTogClick(state := "", ctrl := "", event := "") {
@@ -414,6 +448,7 @@ class MMProGui {
             }
             if (this._TypeValue() != 1)
                 this.ui.Update("ActionTypeCombo", "SelectedIndex", "0")
+            this.OnTypeChange()
             this.ui.Update("ActionTypeCombo", "IsEnabled", "False")
             this.ui.Update("MouseMoveModeCombo", "IsEnabled", "False")
         }
@@ -426,6 +461,8 @@ class MMProGui {
     SaveMMProData() {
         this.Data.PosVarX := GetLangKey(this.ui.Query("PosVarX"))
         this.Data.PosVarY := GetLangKey(this.ui.Query("PosVarY"))
+        this.Data.EndPosVarX := GetLangKey(this.ui.Query("EndPosVarX"))
+        this.Data.EndPosVarY := GetLangKey(this.ui.Query("EndPosVarY"))
         this.Data.ActionType := this._TypeValue()
         this.Data.MouseMoveMode := this._MoveMode()
         ; §20 坐标基准 + 窗口信息

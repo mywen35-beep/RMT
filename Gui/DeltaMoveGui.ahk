@@ -145,6 +145,7 @@ class DeltaMoveGui {
         this.ui.OnEvent("Window", "LoadedHwnd", ObjBindMethod(this, "OnWindowLoad"))
         this.ui.OnEvent("BtnClosePanel", "Click", ObjBindMethod(this, "OnCancelClick"))
         BindCmdEditorChrome(this.ui, "#指令手册/增量移动", ObjBindMethod(this, "TriggerMacro"), "!l")
+        BindMouseMovePreview(this.ui, "delta")
         this.ui.OnEvent("BtnOk", "Click", ObjBindMethod(this, "OnSureBtnClick"))
     }
 
@@ -153,6 +154,7 @@ class DeltaMoveGui {
     }
 
     OnWindowClosing(state, ctrl, event) {
+        MouseMovePreview.Clear(this.ui)
         try this.ToggleFunc(false)
         if (this.OwnerHwnd != "" && MainSoftData.IsModalSubGui) {
             try SafeGuiFromHwnd(this.OwnerHwnd).Opt("-Disabled")
@@ -166,6 +168,7 @@ class DeltaMoveGui {
     }
 
     _CloseWindow() {
+        MouseMovePreview.Clear(this.ui)
         try this.ToggleFunc(false)
         if (this.OwnerHwnd != "" && MainSoftData.IsModalSubGui) {
             try SafeGuiFromHwnd(this.OwnerHwnd).Opt("-Disabled")

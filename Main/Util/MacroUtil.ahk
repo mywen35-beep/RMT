@@ -785,6 +785,16 @@ OnMMProOnce(tableItem, index, Data) {
     if (MoveMode == 2)
         return MouseMoveGameViewByKeyMode(keyMode, PosX, PosY, Speed)
 
+    isDrag := Data.ActionType == 4
+    EndX := 0, EndY := 0
+    if (isDrag && MoveMode == 0) {
+        if (!TryGetTabVarValue(&EndX, tableItem, index, Data.HasOwnProp("EndPosVarX") ? Data.EndPosVarX : 200)
+            || !TryGetTabVarValue(&EndY, tableItem, index, Data.HasOwnProp("EndPosVarY") ? Data.EndPosVarY : 200))
+            return
+        EndX := GetFloatValue(EndX, MainSoftData.CoordXFloat)
+        EndY := GetFloatValue(EndY, MainSoftData.CoordYFloat)
+    }
+
     ; §20 坐标基准：RefMode==1（窗口）且绝对移动时，坐标按窗口左上角偏移（窗口信息支持 {绑定窗口}）
     RefMode := ObjHasOwnProp(Data, "RefMode") ? Integer(Data.RefMode) : 0
     if (RefMode == 1 && MoveMode == 0) {
@@ -795,9 +805,16 @@ OnMMProOnce(tableItem, index, Data) {
         WinGetPos(&winX, &winY, , , "ahk_id " hwndList[1])
         PosX := winX + PosX
         PosY := winY + PosY
+        if (isDrag) {
+            EndX += winX
+            EndY += winY
+        }
     }
 
-    ; ActionType: 1 移动 | 2 单击 | 3 双击
+    if (isDrag)
+        return MouseDragByStrategy(keyMode, MoveMode, PosX, PosY, EndX, EndY, Speed, IsHumanMouse)
+
+    ; ActionType: 1 移动 | 2 单击 | 3 双击 | 4 拖拽
     clickCount := (Data.ActionType == 1) ? 0 : (Data.ActionType == 2 ? 1 : 2)
     MouseMoveByStrategy(keyMode, MoveMode, PosX, PosY, Speed, clickCount, IsHumanMouse)
 }

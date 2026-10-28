@@ -555,6 +555,7 @@ class XAMLHost {
         chrome.Targeter.ToolTip(tgtTip)
         playTip := "Alt + L：执行"
         try playTip := CmdEditorPlayTip("!l")
+        chrome.Preview := XAMLHost.AddTitleChromeBtn(chrome.Btns, "BtnCmdPreview", titleHeight, Chr(0xE890), "Collapsed", "{StaticResource TitleBarChromeButton}", cmdBtnW, glyphSize)
         chrome.Play := XAMLHost.AddTitleChromeBtn(chrome.Btns, "BtnCmdPlay", titleHeight, Chr(0xE768), "Collapsed", "{StaticResource TitleBarChromeButton}", cmdBtnW, glyphSize)
         chrome.Play.ToolTip(playTip)
         chrome.Help := XAMLHost.AddTitleChromeBtn(chrome.Btns, "BtnCmdHelp", titleHeight, Chr(0xE8F1), "Visible", "{StaticResource TitleBarChromeButton}", cmdBtnW, glyphSize)
@@ -574,7 +575,7 @@ class XAMLHost {
         if (!macroStyle) {
             try chrome.Btns.VerticalAlignment("Stretch")
             sq := cmdBtnW
-            for btn in [chrome.F1, chrome.F2, chrome.F3, chrome.Targeter, chrome.Play, chrome.Help, chrome.Video] {
+            for btn in [chrome.F1, chrome.F2, chrome.F3, chrome.Targeter, chrome.Preview, chrome.Play, chrome.Help, chrome.Video] {
                 try btn.Width(sq).MinWidth(sq).Height(sq).MinHeight(sq).VerticalAlignment("Center").Margin("0")
             }
             ; 关闭钮贴齐标题栏右上角：全高 Stretch + TitleBarCloseButton 圆角，hover 才贴窗口弧

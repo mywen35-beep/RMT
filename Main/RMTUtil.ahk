@@ -93,6 +93,7 @@ OnSaveSetting(*) {
     CheckAndAddDirty("CMDTip", MySoftData.CMDTip)
     CheckAndAddDirty("ScreenShotType", MainSoftData.ScreenShotType)
     CheckAndAddDirty("SearchImageType", MainSoftData.SearchImageType)
+    CheckAndAddDirty("SearchImageAdaptive", MainSoftData.SearchImageAdaptive)
     CheckAndAddDirty("KeyDownDown", MainSoftData.KeyDownDownType)
     CheckAndAddDirty("AutoLoosenModifier", MainSoftData.AutoLoosenModifier ? 1 : 0)
     CheckAndAddDirty("ContinuousTrigger", MainSoftData.ContinuousTrigger ? 1 : 0)

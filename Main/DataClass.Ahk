@@ -259,6 +259,7 @@ class MainConfig {
 
         ; ========== 屏幕截图 ==========
         this.ScreenShotType := 3        ; 截图方式 (1=微软截图, 2=RMT截图, 3=SC截图)
+        this.SearchImageAdaptive := false ; 图片识别自适应（仅 OpenCV）
         this.SearchImageType := 1       ; 图片识别模型 (1=OpenCV, 2=RMT搜图)，搜图指令统一使用该值
         this.CheckForeground := false   ; 是否仅前台窗口运行宏
 
@@ -1226,7 +1227,9 @@ class MMProData {
         this.SerialStr := ""
         this.PosVarX := 100
         this.PosVarY := 100
-        this.ActionType := 1          ;鼠标动作 1移动 2移动点击1次 3移动点击2次
+        this.EndPosVarX := 200       ;绝对拖拽终止坐标（PosVarX/Y 为起始坐标）
+        this.EndPosVarY := 200
+        this.ActionType := 1          ;鼠标动作 1移动 2移动后单击 3移动后双击 4拖拽
         this.MouseMoveMode := 0      ;§20 移动模式 0=绝对移动 1=相对移动（旧值 2=游戏视角 已拆为「增量移动」指令，仅旧配置兼容执行）
         this.RefMode := 0            ;§20 坐标基准 0=屏幕 1=窗口（选窗口时配合 WinInfo）
         this.WinInfo := ""           ;§20 窗口信息（基准=窗口时的标题/类名等）

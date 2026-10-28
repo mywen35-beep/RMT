@@ -224,11 +224,12 @@ DoSearch(Data, X1, Y1, X2, Y2, Text, ImagePath, &ResX, &ResY, &ResXList, &ResYLi
     return found
 }
 
-; 目标是否勾了「自适应匹配」（跨分辨率找图）
+; 设置中的全局图片识别自适应开关（跨分辨率找图）
 SearchAdaptiveOn(Data) {
-    if (!ObjHasOwnProp(Data, "Adaptive"))
+    ; 所有搜索目标统一使用全局设置，忽略旧指令中的 Adaptive 字段。
+    if (!IsSet(MainSoftData) || !MainSoftData.HasProp("SearchImageAdaptive"))
         return false
-    v := Data.Adaptive
+    v := MainSoftData.SearchImageAdaptive
     if (IsNumber(v))
         return Integer(v) != 0
     return (v == true || v == "true" || v == 1)

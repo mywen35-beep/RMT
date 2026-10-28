@@ -28,6 +28,12 @@ designed to help users easily create and run various automation tasks through si
 
 ---
 
+## 🖥️ Supported Systems
+
+Supports **Windows 7 / 8 / 8.1 / 10 / 11**.
+
+---
+
 ## ☕ Support the Project
 
 **RMT (RuoMengTu)** is a completely free and open-source project.  

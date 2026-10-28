@@ -517,14 +517,6 @@ class SearchComboGui {
             . ' Background="{DynamicResource ControlBg}" BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1">'
             . '<Image Name="' this._TN(n, "Image") '" Stretch="Uniform" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>'
             . '</Border>'
-            . '<Button Name="' this._TN(n, "AdaptiveBtn") '" Grid.Row="3" Grid.Column="4" Width="64" Height="28" MinHeight="28"'
-            . ' Padding="0" VerticalAlignment="Center" HorizontalAlignment="Stretch" Cursor="Hand" FontSize="' fs '"'
-            . ' Content="' GetLang("自适应") '" Tag="0"'
-            . ' ToolTip="' GetLang("自适应匹配：分辨率或缩放比例变了也能找到") '"'
-            . ' Foreground="{DynamicResource TextMain}" Background="{DynamicResource ControlBg}"'
-            . ' BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1">'
-            . this._ThemeHoverBtnStyle()
-            . '</Button>'
             . '<TextBlock Name="' this._TN(n, "ImagePathTip") '" Grid.Row="3" Grid.Column="0" Text="' GetLang("图片路径：") '" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="{DynamicResource TextMain}" FontSize="' fs '"/>'
             . '<Grid Name="' this._TN(n, "ImagePathRow") '" Grid.Row="3" Grid.Column="2" Width="228" HorizontalAlignment="Left">'
             . '<Grid.ColumnDefinitions>'
@@ -630,34 +622,6 @@ class SearchComboGui {
         this._Bind(this._TN(n, "EndPosY"), "LostFocus", ObjBindMethod(this, "RefreshPreviewArea"))
         this._Bind(this._TN(n, "ScreenshotBtn"), "Click", ObjBindMethod(this, "OnScreenShotBtnClick", n))
         this._Bind(this._TN(n, "ImageSelectBtn"), "Click", ObjBindMethod(this, "OnClickSetPicBtn", n))
-        this._Bind(this._TN(n, "AdaptiveBtn"), "Click", ObjBindMethod(this, "OnToggleAdaptive", n))
-    }
-
-    ; 自适应匹配开关：只在图片类搜索上显示；关掉时行为与老版本完全一致
-    OnToggleAdaptive(n, state := "", ctrl := "", event := "") {
-        if (!IsObject(this.ui) || n > this.TargetList.Length)
-            return
-        cur := ObjHasOwnProp(this.TargetList[n], "Adaptive") ? this.TargetList[n].Adaptive : 0
-        on := (cur == 1 || cur == "1" || cur == true)
-        this.TargetList[n].Adaptive := on ? 0 : 1
-        this._SyncAdaptiveBtn(n, !on)
-    }
-
-    _SyncAdaptiveBtn(n, on) {
-        if (!IsObject(this.ui))
-            return
-        btn := this._TN(n, "AdaptiveBtn")
-        on := (on == true || on == 1 || on == "1" || on == "true")
-        try this.ui.Update(btn, "Tag", on ? "1" : "0")
-        if (on) {
-            try this.ui.Update(btn, "Background", "{DynamicResource ActionBg}")
-            try this.ui.Update(btn, "BorderBrush", "{DynamicResource ActionStroke}")
-            try this.ui.Update(btn, "Foreground", "{DynamicResource ActionText}")
-        } else {
-            try this.ui.Update(btn, "Background", "{DynamicResource ControlBg}")
-            try this.ui.Update(btn, "BorderBrush", "{DynamicResource ControlBorder}")
-            try this.ui.Update(btn, "Foreground", "{DynamicResource TextMain}")
-        }
     }
 
     _FillTargetCard(n) {
@@ -671,7 +635,6 @@ class SearchComboGui {
         this._SetCombo(this._TN(n, "StartPosY"), this.DLVariableArr, t.StartPosY)
         this._SetCombo(this._TN(n, "EndPosX"), this.DLVariableArr, t.EndPosX)
         this._SetCombo(this._TN(n, "EndPosY"), this.DLVariableArr, t.EndPosY)
-        this._SyncAdaptiveBtn(n, ObjHasOwnProp(t, "Adaptive") ? t.Adaptive : 0)
         this._SetImage(n, t.SearchImagePath)
         this._SetCombo(this._TN(n, "ImagePath"), this.DLVariableArr, t.SearchImagePath)
         this._SetCombo(this._TN(n, "Color"), this.DLVariableArr, t.SearchColor)
@@ -776,9 +739,6 @@ class SearchComboGui {
         this.ui.Update(tn "ImagePathTip", "Visibility", isImage ? "Visible" : "Hidden")
         this.ui.Update(tn "ImagePathRow", "Visibility", isImage ? "Visible" : "Hidden")
         this.ui.Update(tn "ImagePreviewHost", "Visibility", isImage ? "Visible" : "Hidden")
-        ; 自适应只对 OpenCV 识别有效，RMT识图 那条路没有缩放能力
-        isOcv := isImage && SearchImageDefaultType() == 1
-        this.ui.Update(tn "AdaptiveBtn", "Visibility", isOcv ? "Visible" : "Hidden")
         this.ui.Update(tn "ColorTipLabel", "Visibility", isColor ? "Visible" : "Hidden")
         this.ui.Update(tn "ColorRow", "Visibility", isColor ? "Visible" : "Hidden")
         this.ui.Update(tn "TextTipLabel", "Visibility", isText ? "Visible" : "Hidden")

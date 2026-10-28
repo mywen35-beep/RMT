@@ -168,7 +168,7 @@ class MacroEditGui {
         this._undoBatch := 0             ; >0 时 _PushUndo 静默（内部批量组合操作只记一次）
         ; §13 左侧指令面板：按类型分类 + 收藏星标 + 分类展开状态（持久化到 INI）
         this.CmdCategory := [
-            {name: "键鼠/手柄", icon: Chr(0xE765), cmds: ["按键", "后台按键", "后台鼠标", "鼠标移动", "鼠标移动Pro", "增量移动", "手柄", "按键检测", "手柄检测"]},
+            {name: "键鼠/手柄", icon: Chr(0xE765), cmds: ["按键", "手柄", "移动", "移动Pro", "增量移动", "后台按键", "后台鼠标", "按键检测", "手柄检测"]},
             {name: "搜索/识图", icon: Chr(0xE721), cmds: ["搜索", "搜索Pro", "搜索Combo"]},
             {name: "输入/输出", icon: Chr(0xE8A1), cmds: ["输入", "输出"]},
             {name: "变量/数据", icon: Chr(0xE8EF), cmds: ["变量", "变量提取", "运算", "数组", "文本处理"]},
@@ -206,8 +206,8 @@ class MacroEditGui {
     }
 
     InitCommandConfigs() {
-        ; §20 指令改名：移动→鼠标移动、移动Pro→鼠标移动Pro、新增 增量移动（原游戏视角）
-        this.CMDStrArr := GetLangArr(["间隔", "时间", "按键", "手柄", "搜索", "搜索Pro", "搜索Combo", "鼠标移动", "鼠标移动Pro", "增量移动", "输入", "输出", "循环", "宏操作", "变量", "变量提取",
+        ; 指令名称：移动、移动Pro、增量移动（原游戏视角）
+        this.CMDStrArr := GetLangArr(["间隔", "时间", "按键", "手柄", "搜索", "搜索Pro", "搜索Combo", "移动", "移动Pro", "增量移动", "输入", "输出", "循环", "宏操作", "变量", "变量提取",
             "如果", "如果Pro", "运算", "运行", "运行Pro", "文件读写", "Excel", "文本处理", "数组", "RMT指令", "后台鼠标", "后台按键", "窗口管理", "按键检测", "手柄检测", "等待", "等待确定", "倒计时", "注释", "抓图", "跳转"])
 
         this.CMDIconFileArr := ["Images\Soft\Interval.png", "Images\Soft\Time.png", "Images\Soft\Key.png", "Images\Soft\Joy.png",
@@ -226,7 +226,7 @@ class MacroEditGui {
             "Images\Soft\Interval.png", "Images\Soft\Comment.png", "Images\Soft\ScreenShot.png", "Images\Soft\FlowJump.png"]
 
         this.IconMap := Map(GetLang("间隔"), "Icon1", GetLang("按键"), "Icon2", GetLang("手柄"), "Icon38", GetLang("搜索"), "Icon3",
-        GetLang("搜索Pro"), "Icon4", GetLang("搜索Combo"), "Icon39", GetLang("鼠标移动"), "Icon5", GetLang("鼠标移动Pro"), "Icon6", GetLang("增量移动"), "Icon34", GetLang("输出"), "Icon7",
+        GetLang("搜索Pro"), "Icon4", GetLang("搜索Combo"), "Icon39", GetLang("移动"), "Icon5", GetLang("移动Pro"), "Icon6", GetLang("增量移动"), "Icon34", GetLang("输出"), "Icon7",
         GetLang("运行"), "Icon8", GetLang("运行Pro"), "Icon40", GetLang("循环"), "Icon9", GetLang("宏操作"), "Icon10", GetLang("变量"), "Icon11",
         GetLang("变量提取"), "Icon12", GetLang("如果"), "Icon13", GetLang("如果Pro"), "Icon14", GetLang("运算"), "Icon15",
         GetLang("RMT指令"), "Icon16", GetLang("后台鼠标"), "Icon17", GetLang("后台按键"), "Icon18", GetLang("真"), "Icon19",
@@ -264,6 +264,8 @@ class MacroEditGui {
 
         ; 指令名 → 图标文件（XAML 树节点 Image.Source 用）
         this.CmdIconFileMap := Map()
+        this.IconMap[GetLang("鼠标移动")] := "Icon5"
+        this.IconMap[GetLang("鼠标移动Pro")] := "Icon6"
         for name, iconN in this.IconMap
             this.CmdIconFileMap[name] := this.IconFileByNumber.Get(iconN, "")
     }
@@ -276,8 +278,8 @@ class MacroEditGui {
             {class: SearchGui, name: "搜索", icon: "Images\Soft\Search.png", propName: "SearchGui"},
             {class: SearchProGui, name: "搜索Pro", icon: "Images\Soft\SearchPro.png", propName: "SearchProGui"},
             {class: SearchComboGui, name: "搜索Combo", icon: "Images\Soft\SearchCombo.png", propName: "SearchComboGui"},
-            {class: MouseMoveGui, name: "鼠标移动", icon: "Images\Soft\Move.png", propName: "MouseMoveGui"},
-            {class: MMProGui, name: "鼠标移动Pro", icon: "Images\Soft\MovePro.png", propName: "MMProGui"},
+            {class: MouseMoveGui, name: "移动", icon: "Images\Soft\Move.png", propName: "MouseMoveGui"},
+            {class: MMProGui, name: "移动Pro", icon: "Images\Soft\MovePro.png", propName: "MMProGui"},
             {class: DeltaMoveGui, name: "增量移动", icon: "Images\Soft\DeltaMove.png", propName: "DeltaMoveGui"},
             {class: InputGui, name: "输入", icon: "Images\Soft\Input.png", propName: "InputGui"},
             {class: OutputGui, name: "输出", icon: "Images\Soft\Output.png", propName: "OutputGui"},
@@ -317,6 +319,8 @@ class MacroEditGui {
                 guiInstance.CmdKey := "Excel"
             guiInstance.SureBtnAction := (CommandStr) => this.OnSubGuiSureBtnClick(CommandStr)
             this.SubGuiMap.Set(GetLang(config.name), guiInstance)
+            if (config.name == "移动" || config.name == "移动Pro")
+                this.SubGuiMap.Set(GetLang("鼠标" config.name), guiInstance)
             this.%config.propName% := guiInstance
         }
     }
@@ -635,10 +639,12 @@ class MacroEditGui {
     ; 从 INI 读收藏集与分类展开状态
     _LoadCmdPanelState() {
         this._favSet := Map()
-        ; §20 默认收藏用新名「鼠标移动」（旧配置 CmdFav 含「移动」时忽略不匹配项）
-        favStr := CfgRead(SettingFile, SettingSection, "CmdFav", "间隔,按键,搜索,鼠标移动")
+        ; 默认收藏用「移动」，旧名称收藏映射到当前名称。
+        favStr := CfgRead(SettingFile, SettingSection, "CmdFav", "间隔,按键,搜索,移动")
         for name in StrSplit(favStr, ",") {
             name := Trim(name)
+            if (name == "鼠标移动" || name == "鼠标移动Pro")
+                name := StrReplace(name, "鼠标", "")
             if (name != "")
                 this._favSet[name] := true
         }

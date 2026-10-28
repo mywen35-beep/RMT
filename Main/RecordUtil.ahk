@@ -507,7 +507,7 @@ RecordConsumeRI() {
             MainSoftData.RecordLastTime := item["t"]
             suffix := (item["type"] == "move") ? "_2" : ""
             MainSoftData.RecordMacroStr .= GetLang("间隔") "_" span ","
-            MainSoftData.RecordMacroStr .= GetLang("鼠标移动") "_" item["ax"] "_" item["ay"] suffix ","
+            MainSoftData.RecordMacroStr .= GetLang("移动") "_" item["ax"] "_" item["ay"] suffix ","
         }
         else {
             isDown := item["state"] == GetLang("按下")
@@ -634,7 +634,7 @@ FilterMoveCmd(macroStr) {
 
     trailMode := MainSoftData.RecordMouseTrail
     ; §20 改名兼容：旧名「移动」/新名「鼠标移动」都识别（录制出的新宏用新名）
-    moveKey := GetLang("鼠标移动")
+    moveKey := GetLang("移动")
     spanKey := GetLang("间隔")
     CmdArr := SplitMacro(macroStr)
 
@@ -676,7 +676,7 @@ FilterMoveCmd(macroStr) {
 }
 
 CompressFullMoves(CmdArr) {
-    moveKey := GetLang("鼠标移动")
+    moveKey := GetLang("移动")
     resultArr := []
     accX := 0
     accY := 0
@@ -708,7 +708,7 @@ CompressFullMoves(CmdArr) {
 }
 
 FillMoveSpeed(CmdArr, spd) {
-    moveKey := GetLang("鼠标移动")
+    moveKey := GetLang("移动")
     resultArr := []
     loop CmdArr.Length {
         cmd := CmdArr[A_Index]
@@ -732,7 +732,7 @@ FillMoveSpeed(CmdArr, spd) {
 }
 
 ConvertToRelative(CmdArr, spd?) {
-    moveKey := GetLang("鼠标移动")
+    moveKey := GetLang("移动")
     lastX := 0
     lastY := 0
     isFirst := true

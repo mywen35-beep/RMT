@@ -826,8 +826,8 @@
       "搜索": "Search.png",
       "搜索Pro": "SearchPro.png",
       "搜索Combo": "SearchCombo.png",
-      "鼠标移动": "Move.png",
-      "鼠标移动Pro": "MovePro.png",
+      "移动": "Move.png",
+      "移动Pro": "MovePro.png",
       "增量移动": "DeltaMove.png",
       "输出": "Output.png",
       "运行": "Run.png",
@@ -868,7 +868,7 @@
       "搜索Multi": "SearchCombo.png"
     };
     const CATS = [
-      { name: "键鼠/手柄", icon: "&#xE765;", cmds: ["按键", "后台按键", "后台鼠标", "鼠标移动", "鼠标移动Pro", "增量移动", "手柄", "按键检测", "手柄检测"] },
+      { name: "键鼠/手柄", icon: "&#xE765;", cmds: ["按键", "手柄", "移动", "移动Pro", "增量移动", "后台按键", "后台鼠标", "按键检测", "手柄检测"] },
       { name: "搜索/识图", icon: "&#xE721;", cmds: ["搜索", "搜索Pro"] },
       { name: "输入/输出", icon: "&#xE8A1;", cmds: ["输入", "输出", "文件读写"] },
       { name: "变量/数据", icon: "&#xE8EF;", cmds: ["变量", "变量提取", "运算", "数组", "文本处理"] },
@@ -884,7 +884,7 @@
     ];
 
     const state = {
-      favs: new Set(["间隔", "按键", "搜索", "鼠标移动"]),
+      favs: new Set(["间隔", "按键", "搜索", "移动"]),
       cats: Object.fromEntries(CATS.map(c => [c.name, true])),
       favOpen: true,
       mode: "tree",
@@ -903,7 +903,7 @@
           { id: "n4", name: "循环", text: "循环(3)", open: true, kids: [
             { id: "n4c", name: "循环次数", text: "循环次数", open: true, kids: [] },
             { id: "n4b", name: "循环体", text: "循环体", open: true, kids: [
-              { id: "n5", name: "鼠标移动", text: "鼠标移动(320, 180)", open: true, cur: true, kids: [] },
+              { id: "n5", name: "移动", text: "移动(320, 180)", open: true, cur: true, kids: [] },
               { id: "n6", name: "输出", text: "输出(找到目标)", open: true, kids: [] }
             ]}
           ]}

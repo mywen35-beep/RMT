@@ -32,6 +32,7 @@
 #Include "..\Plugins\IbInputSimulator.ahk"
 #Include "..\Plugins\MouseControl.ahk"
 #Include Util\MouseMoveUtil.ahk
+#Include Util\MouseMovePreview.ahk
 #Include Util\TomlUtil.ahk
 #Include Util\ConfigUtil.ahk
 
@@ -750,6 +751,7 @@ LoadMainSetting() {
     MainSoftData.MacroStopType := Integer(CfgRead(SettingFile, SettingSection, "MacroStopType", 1))
     if (MainSoftData.MacroStopType != 1 && MainSoftData.MacroStopType != 2)
         MainSoftData.MacroStopType := 1
+    MainSoftData.SearchImageAdaptive := CfgRead(SettingFile, SettingSection, "SearchImageAdaptive", false)
     MainSoftData.SearchImageType := Integer(CfgRead(SettingFile, SettingSection, "SearchImageType", 1))
     if (MainSoftData.SearchImageType != 1 && MainSoftData.SearchImageType != 2)
         MainSoftData.SearchImageType := 1

@@ -975,6 +975,8 @@ class MacroGraphDataMixin {
                 if (IsObject(data)) {
                     d.posVarX := data.PosVarX
                     d.posVarY := data.PosVarY
+                    d.endPosVarX := data.HasOwnProp("EndPosVarX") ? data.EndPosVarX : 200
+                    d.endPosVarY := data.HasOwnProp("EndPosVarY") ? data.EndPosVarY : 200
                     d.speed := data.Speed
                     d.actionType := data.ActionType
                     d.mmmode := data.MouseMoveMode

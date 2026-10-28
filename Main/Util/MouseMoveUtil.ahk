@@ -260,3 +260,39 @@ SearchMouseActionByStrategy(keyMode, actionType, x, y, speed := 90, clickCount :
     Click(Format("{} {} {}", Round(x), Round(y), n))
     return true
 }
+
+; 拖拽统一入口：绝对模式先定位起点，相对模式从当前位置按偏移拖动。
+; 按下后始终在 finally 松开，避免移动异常导致左键保持按下。
+MouseDragByStrategy(keyMode, moveMode, x, y, endX, endY, speed := 90, isHuman := false) {
+    keyMode := Integer(keyMode)
+    if (!EnsureMouseBackend(keyMode))
+        return false
+    if (moveMode == 0 && !MouseMoveAbsByKeyMode(keyMode, x, y, speed, false))
+        return false
+    if (keyMode == 3 && !InitLogitechGHubNew())
+        return false
+    try {
+        MouseDragButtonByKeyMode(keyMode, true)
+        return (moveMode == 1)
+            ? MouseMoveRelByKeyMode(keyMode, x, y, speed, isHuman)
+            : MouseMoveAbsByKeyMode(keyMode, endX, endY, speed, isHuman)
+    }
+    finally {
+        MouseDragButtonByKeyMode(keyMode, false)
+    }
+}
+
+MouseDragButtonByKeyMode(keyMode, isDown) {
+    if (keyMode == 3)
+        IbClick(isDown ? "Down" : "Up")
+    else if (keyMode == 4) {
+        if (isDown)
+            AhiMouseDown("L")
+        else
+            AhiMouseUp("L")
+    }
+    else {
+        SendMode("Event")
+        Click(isDown ? "Down" : "Up")
+    }
+}
