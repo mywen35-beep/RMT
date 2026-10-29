@@ -1123,6 +1123,13 @@ class SearchData {
         this.SearchText := GetLang("检索文本")
         this.SearchImagePath := ""
         this.Similar := 90 ; 图片搜索模糊匹配度100  - 50
+        this.MultiPointData := []   ;多点找图：模板相对坐标与取样颜色
+        this.MultiPointSeedData := []
+        this.SuperMultiPointSeedData := []
+        this.SuperMultiPointIgnoreData := ""
+        this.MultiPointTolerance := 8
+        this.SuperMultiPointTolerance := 8
+        this.MultiPointMode := ""
         this.OCRType := 1   ;1中文  2英文
         this.SearchImageType := SearchImageDefaultType() ; 1 OpenCV  2 RMT搜图
         this.StartPosX := 0

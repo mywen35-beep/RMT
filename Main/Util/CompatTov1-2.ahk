@@ -147,10 +147,24 @@ CompatMergeTomlKeys(srcPath, destPath) {
 }
 
 CompatPath(FilePath, Data) {
-    if (!ObjHasOwnProp(Data, "SearchImagePath") || Data.SearchImagePath == "")
+    if (!IsObject(Data))
+        return false
+    SplitPath FilePath, , &settingDir
+
+    changed := CompatPathTarget(settingDir, Data)
+    if (ObjHasOwnProp(Data, "SearchTargetArr") && IsObject(Data.SearchTargetArr)) {
+        for target in Data.SearchTargetArr {
+            if (IsObject(target))
+                changed := CompatPathTarget(settingDir, target) || changed
+        }
+    }
+    return changed
+}
+
+CompatPathTarget(settingDir, Data) {
+    if (!IsObject(Data) || !ObjHasOwnProp(Data, "SearchImagePath") || Data.SearchImagePath == "")
         return false
     ; 包内图片相对于实际导入目录定位，合并导入的临时目录也适用。
-    SplitPath FilePath, , &settingDir
     if (RegExMatch(Data.SearchImagePath, "i)(?:^|[\\/])Images[\\/](.+)$", &m)) {
         newPath := settingDir "\Images\" m[1]
         if (FileExist(newPath) && newPath != Data.SearchImagePath) {

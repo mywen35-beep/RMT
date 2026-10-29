@@ -58,10 +58,9 @@ extern "C" IMAGEFINDER_API int __cdecl FindWinImage(                // 窗口图
     int* x,                     // 匹配到的X坐标
     int* y);                    // 匹配到的Y坐标
 
-// ---- 1.2.2 自适应匹配（跨分辨率 / 跨 DPI / 透明底模板）----
-// 只在不勾「自适应」时走旧函数，勾了才走下面两个；GetApiVersion 用来让 AHK 判断
-// 当前 dll 是否已经重编译（老 dll 没有这些导出，AHK 会捕获异常并回退旧接口）。
-extern "C" IMAGEFINDER_API int __cdecl GetApiVersion();            // 2 = 支持自适应匹配，3 = 边缘图比例判断 + 原分辨率细调
+// ---- 自适应匹配与多点找图 ----
+// GetApiVersion 用于让 AHK 判断 DLL 是否包含相应接口。
+extern "C" IMAGEFINDER_API int __cdecl GetApiVersion();            // 11 = 超多点候选粗搜、局部复核及忽略蒙版
 
 extern "C" IMAGEFINDER_API int __cdecl FindScreenImageAdaptive(     // 屏幕自适应图片匹配
     const char* targetPath,
@@ -83,3 +82,68 @@ extern "C" IMAGEFINDER_API int __cdecl FindWinImageAdaptive(        // 窗口自
     int matchThreshold,
     int* x,
     int* y);
+
+// 多点找图（原始比例）；matchThreshold 表示命中点位占比，tolerance 为每个颜色通道的容差。
+// points 格式："x,y,RRGGBB;x,y,RRGGBB"，坐标相对模板左上角。
+extern "C" IMAGEFINDER_API int __cdecl FindScreenImageMultiPoint(
+    const wchar_t* targetPath,
+    int searchX, int searchY, int searchW, int searchH,
+    int matchThreshold, const wchar_t* points, int tolerance,
+    int* x, int* y);
+
+extern "C" IMAGEFINDER_API int __cdecl FindWinImageMultiPoint(
+    const wchar_t* targetPath,
+    int hwnd,
+    int searchX, int searchY, int searchW, int searchH,
+    int matchThreshold, const wchar_t* points, int tolerance,
+    int* x, int* y);
+
+// 超多点：由基准色自动选最多 256 个点粗搜候选，再以全部有效像素局部复核。
+extern "C" IMAGEFINDER_API int __cdecl FindScreenImageMultiPointSuper(
+    const wchar_t* targetPath,
+    int searchX, int searchY, int searchW, int searchH,
+    int matchThreshold, const wchar_t* seedPoints, int tolerance, const wchar_t* ignoreData,
+    int* x, int* y);
+
+extern "C" IMAGEFINDER_API int __cdecl FindWinImageMultiPointSuper(
+    const wchar_t* targetPath,
+    int hwnd,
+    int searchX, int searchY, int searchW, int searchH,
+    int matchThreshold, const wchar_t* seedPoints, int tolerance, const wchar_t* ignoreData,
+    int* x, int* y);
+
+// 使用手动选中的基准点颜色自动补齐点位；密集度范围 0~100。
+extern "C" IMAGEFINDER_API int __cdecl AutoSelectImageMultiPoints(
+    const wchar_t* targetPath,
+    const wchar_t* existingPoints,
+    int density,
+    int tolerance,
+    const wchar_t* ignoreData,
+    wchar_t* output,
+    int outputCapacity);
+
+// 预览接口按 seedPoints 的颜色容差压暗右侧预览中的未命中像素；空点集时左右显示原图。
+// seedPoints 格式："x,y,RRGGBB;x,y,RRGGBB"，tolerance 为各颜色通道的绝对差值上限。
+extern "C" IMAGEFINDER_API int __cdecl RenderImagePreview(
+    const wchar_t* targetPath,
+    int maxW, int maxH,
+    int viewX, int viewY, int viewW, int viewH,
+    int rectX, int rectY, int rectW, int rectH,
+    int showGrid, int zoomPercent,
+    const wchar_t* seedPoints, int tolerance,
+    const wchar_t* outOrigPath, const wchar_t* outPreviewPath,
+    int* validPixels, int* totalPixels,
+    int* previewW, int* previewH, int* origW, int* origH,
+    int* bboxX, int* bboxY, int* bboxW, int* bboxH);
+
+extern "C" IMAGEFINDER_API int __cdecl CropImageFile(
+    const wchar_t* srcPath, int x, int y, int w, int h,
+    const wchar_t* dstPath);
+
+extern "C" IMAGEFINDER_API int __cdecl GetImagePixelAt(
+    const wchar_t* path, int x, int y, int* r, int* g, int* b);
+
+extern "C" IMAGEFINDER_API int __cdecl GetImagePixelAtEx(
+    const wchar_t* path, int x, int y, int* r, int* g, int* b, int* a);
+
+extern "C" IMAGEFINDER_API const wchar_t* __cdecl GetImageLastError();
