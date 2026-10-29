@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Threading;
@@ -124,47 +123,5 @@ namespace RMT
             return await response.Content.ReadAsStringAsync().ConfigureAwait(false) ?? "";
         }
 
-        /// <summary>
-        /// 同步上传文件到服务器
-        /// </summary>
-        public string UploadFile(string filePath)
-        {
-            string uploadUrl = "https://rmt.ruomengtu.com/upload";
-            string formDataName = "file";
-            string deviceId = Device.GetDeviceId();
-
-            if (string.IsNullOrEmpty(filePath))
-                return "文件路径不能为空";
-
-            if (!File.Exists(filePath))
-                return "文件不存在: " + filePath;
-
-            if (deviceId == "")
-                return "信息不完整，请通过软件交流群共享上传配置";
-
-            try
-            {
-                using (var formData = new MultipartFormDataContent())
-                using (var fileStream = File.OpenRead(filePath))
-                {
-                    var fileContent = new StreamContent(fileStream);
-                    string fileName = Path.GetFileName(filePath);
-                    formData.Add(fileContent, formDataName, fileName);
-                    formData.Add(new StringContent(deviceId), "deviceId");
-
-                    var response = SharedClient.PostAsync(uploadUrl, formData).ConfigureAwait(false).GetAwaiter().GetResult();
-                    response.EnsureSuccessStatusCode();
-                    return response.Content.ReadAsStringAsync().ConfigureAwait(false).GetAwaiter().GetResult();
-                }
-            }
-            catch (AggregateException ex)
-            {
-                throw new Exception("网络请求失败: " + (ex.InnerException != null ? ex.InnerException.Message : ex.Message), ex);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("上传文件时发生错误: " + ex.Message, ex);
-            }
-        }
     }
 }

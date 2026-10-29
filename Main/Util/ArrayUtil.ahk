@@ -2,133 +2,113 @@
 
 GetArrayStr(DataArray) {
     ResText := ""
-    loop DataArray.Length {
-        if (IsObject(DataArray[A_Index])) {
-            ResText .= "[" GetArrayStr(DataArray[A_Index]) "]"
-        }
+    for Index, Value in DataArray {
+        if (Index > 1)
+            ResText .= ","
+        if (Value is Array)
+            ResText .= "[" GetArrayStr(Value) "]"
+        else if (Value == "" && DataArray.Length == 1)
+            ; 区分空数组与仅有一个空字符串的数组；字面量 \e 的反斜杠会先转义。
+            ResText .= "\e"
         else {
-            curText := StrReplace(DataArray[A_Index], ",", "\,")
-            curText := StrReplace(curText, "[", "\[")
-            curText := StrReplace(curText, "]", "\]")
-            curText := StrReplace(curText, "，", "\，")
-            curText := StrReplace(curText, "【", "\【")
-            curText := StrReplace(curText, "】", "\】")
+            curText := StrReplace(Value, "\", "\\")
+            for Char in [",", "，", "[", "]", "【", "】"]
+                curText := StrReplace(curText, Char, "\" Char)
             ResText .= curText
         }
-        ResText .= ","
     }
-    ResText := Trim(ResText, ",")
     return ResText
 }
 
 GetArray(Text) {
-    Text := StrReplace(Text, "\\", "\⎖")
     ResArr := []
-    LastSplitPos := 0
-    Pos := GetNextSplitPos(Text, LastSplitPos)
-    while (Pos != 0) {
-        CurText := SubStr(Text, LastSplitPos + 1, Pos - LastSplitPos - 1)
-        if (CurText == "") {
-            ResArr.Push("")
-        }
-        else {
-            IsArrayStart := SubStr(CurText, 1, 1) == "[" || SubStr(CurText, 1, 1) == "【"
-            if (IsArrayStart) {
-                ArrayEndPos := GetArrayEndPos(Text, LastSplitPos)
-                ArrayText := SubStr(Text, LastSplitPos + 2, ArrayEndPos - LastSplitPos - 2)
-                ResArr.Push(GetArray(ArrayText))
-                Pos := ArrayEndPos + 1
-            }
-            else {
-                CurText := GetEscapeValue(CurText)
-                ResArr.Push(CurText)
-            }
-        }
-        LastSplitPos := Pos
-        Pos := GetNextSplitPos(Text, LastSplitPos)
-    }
-
     if (Text == "")
         return ResArr
-    else if (LastSplitPos == StrLen(Text)) {
-        ResArr.Push("")
-        return
-    }
-    else if (LastSplitPos < StrLen(Text)) {
-        LastValue := SubStr(Text, LastSplitPos + 1)
-        IsArrayStart := SubStr(LastValue, 1, 1) == "[" || SubStr(LastValue, 1, 1) == "【"
-        IsArrayEnd := SubStr(LastValue, StrLen(LastValue)) == "]" || SubStr(LastValue, StrLen(LastValue)) == "】"
-        if (IsArrayStart && IsArrayEnd) {
-            ; 整段为 [ ... ]：解析内部为子数组，避免 "[a]" 被误做成 ["[a]"]
-            ArrayText := SubStr(LastValue, 2, StrLen(LastValue) - 2)
-            ResArr.Push(GetArray(ArrayText))
+    Pos := 1
+    Length := StrLen(Text)
+    while (Pos <= Length) {
+        Char := SubStr(Text, Pos, 1)
+        if (Char == "[" || Char == "【") {
+            EndPos := GetArrayEndPos(Text, Pos - 1)
+            if (!EndPos)
+                throw ValueError("数组括号未闭合或不匹配",, Text)
+            ResArr.Push(GetArray(SubStr(Text, Pos + 1, EndPos - Pos - 1)))
+            Pos := EndPos + 1
+            if (Pos <= Length && !InStr(",，", SubStr(Text, Pos, 1)))
+                throw ValueError("子数组后缺少分隔符",, Text)
         } else {
-            ResArr.Push(GetEscapeValue(LastValue))
+            EndPos := GetNextSplitPos(Text, Pos - 1)
+            if (!EndPos)
+                EndPos := Length + 1
+            ResArr.Push(GetEscapeValue(SubStr(Text, Pos, EndPos - Pos)))
+            Pos := EndPos
         }
+        ; 每次处理一个完整元素；末尾分隔符保留一个空元素。
+        if (Pos == Length)
+            ResArr.Push("")
+        Pos++
     }
     return ResArr
 }
 
+IsArrayEscapeChar(Char) {
+    return Char != "" && InStr("\,，[]【】e", Char, true) != 0
+}
+
 GetNextSplitPos(Text, StartPos) {
-    EPos := InStr(Text, ",", false, StartPos + 1)
-    CPos := InStr(Text, "，", false, StartPos + 1)
-    Pos := (EPos == 0 || CPos == 0) ? Max(EPos, CPos) : Min(EPos, CPos)
-    if (Pos == 0)
-        return 0
-
-    if (Pos == StartPos + 1)
-        return Pos
-
-    LastStr := SubStr(Text, Pos - 1, 1)
-    while (LastStr == "\") {
-        StartPos := Pos
-        EPos := InStr(Text, ",", false, StartPos + 1)
-        CPos := InStr(Text, "，", false, StartPos + 1)
-        Pos := (EPos == 0 || CPos == 0) ? Max(EPos, CPos) : Min(EPos, CPos)
-        if (Pos == 0)
-            return 0
-
-        if (Pos == StartPos + 1)
+    Pos := StartPos + 1
+    while (Pos <= StrLen(Text)) {
+        Char := SubStr(Text, Pos, 1)
+        if (Char == "\" && IsArrayEscapeChar(SubStr(Text, Pos + 1, 1)))
+            Pos += 2
+        else if (Char == "," || Char == "，")
             return Pos
-
-        LastStr := SubStr(Text, Pos - 1, 1)
+        else
+            Pos++
     }
-
-    return Pos
+    return 0
 }
 
 GetArrayEndPos(Text, StartPos) {
-    EPos := InStr(Text, "]", false, StartPos + 1)
-    CPos := InStr(Text, "】", false, StartPos + 1)
-    Pos := (EPos == 0 || CPos == 0) ? Max(EPos, CPos) : Min(EPos, CPos)
-    if (Pos == 0)
-        return 0
-
-    LastStr := SubStr(Text, Pos - 1, 1)
-    while (LastStr == "\") {
-        StartPos := Pos
-        EPos := InStr(Text, ",", false, StartPos + 1)
-        CPos := InStr(Text, "，", false, StartPos + 1)
-        Pos := (EPos == 0 || CPos == 0) ? Max(EPos, CPos) : Min(EPos, CPos)
-        if (Pos == 0)
-            return 0
-
-        LastStr := SubStr(Text, Pos - 1, 1)
+    Closers := []
+    Pos := StartPos + 1
+    while (Pos <= StrLen(Text)) {
+        Char := SubStr(Text, Pos, 1)
+        if (Char == "\" && IsArrayEscapeChar(SubStr(Text, Pos + 1, 1))) {
+            Pos += 2
+            continue
+        }
+        if (Char == "[" || Char == "【")
+            Closers.Push(Char == "[" ? "]" : "】")
+        else if (Char == "]" || Char == "】") {
+            if (!Closers.Length || Closers.Pop() != Char)
+                return 0
+            if (!Closers.Length)
+                return Pos
+        }
+        Pos++
     }
-
-    return Pos
+    return 0
 }
 
-;获取转义后的值
+; 一次扫描完成反转义，不用占位符，避免真实文本 ⎖ 或二次替换损坏数据。
 GetEscapeValue(Value) {
-    Value := StrReplace(Value, "\,", ",")
-    Value := StrReplace(Value, "\，", "，")
-    Value := StrReplace(Value, "\[", "[")
-    Value := StrReplace(Value, "\【", "【")
-    Value := StrReplace(Value, "\]", "]")
-    Value := StrReplace(Value, "\】", "】")
-    Value := StrReplace(Value, "\⎖", "\")
-    return Value
+    if (Value == "\e")
+        return ""
+    Result := ""
+    Pos := 1
+    while (Pos <= StrLen(Value)) {
+        Char := SubStr(Value, Pos, 1)
+        NextChar := SubStr(Value, Pos + 1, 1)
+        if (Char == "\" && NextChar != "e" && IsArrayEscapeChar(NextChar)) {
+            Result .= NextChar
+            Pos += 2
+        } else {
+            Result .= Char
+            Pos++
+        }
+    }
+    return Result
 }
 
 GetGuiArrNameArr() {

@@ -238,8 +238,13 @@ OpenCvAdaptiveReady() {
 }
 
 ; OpenCV屏幕图片识别
-; Adaptive=true 且 dll 支持时走跨分辨率匹配；否则与原行为完全一致
-FindScreenImage(ResXPtr, ResYPtr, targetPath, X1, Y1, X2, Y2, matchThreshold, Adaptive := false) {
+; API 12 将颜色匹配与相似度分离，旧 DLL 不能静默按 95% 切换算法。
+OpenCvExplicitImageReady() {
+    if (DllCall("RMT_OpenCV.dll\GetApiVersion", "Cdecl Int") < 12)
+        throw Error("OpenCV 图片识别插件版本过旧，请更新 RMT_OpenCV.dll（需要 API 12）。")
+}
+
+FindScreenImage(ResXPtr, ResYPtr, targetPath, X1, Y1, X2, Y2, matchThreshold, Adaptive := false, ColorMatch := false) {
     if (A_PtrSize != 8) ;非64位不可用，直接退出
         return false
     if (OpenCvEnsure() != "")
@@ -249,21 +254,14 @@ FindScreenImage(ResXPtr, ResYPtr, targetPath, X1, Y1, X2, Y2, matchThreshold, Ad
     searchY := Y1
     searchW := X2 - X1
     searchH := Y2 - Y1
-    if (Adaptive && OpenCvAdaptiveReady()) {
-        try {
-            return DllCall("RMT_OpenCV.dll\FindScreenImageAdaptive", "AStr", targetPath, "Int", searchX,
-                "Int", searchY, "Int", searchW, "Int", searchH, "Int", matchThreshold, "Int*", ResXPtr, "Int*", ResYPtr,
-                "Cdecl Int")
-        } catch {
-        }
-    }
-    return DllCall("RMT_OpenCV.dll\FindScreenImage", "AStr", targetPath, "Int", searchX,
-        "Int", searchY, "Int", searchW, "Int", searchH, "Int", matchThreshold, "Int*", ResXPtr, "Int*", ResYPtr,
+    OpenCvExplicitImageReady()
+    return DllCall("RMT_OpenCV.dll\FindScreenImageEx", "AStr", targetPath, "Int", searchX,
+        "Int", searchY, "Int", searchW, "Int", searchH, "Int", matchThreshold, "Int", ColorMatch ? 1 : 0, "Int", Adaptive ? 1 : 0, "Int*", ResXPtr, "Int*", ResYPtr,
         "Cdecl Int")
 }
 
 ; OpenCV窗口图片识别    返回窗口的坐标
-FindWinImage(ResXPtr, ResYPtr, targetPath, hwnd, X1, Y1, X2, Y2, matchThreshold, Adaptive := false) {
+FindWinImage(ResXPtr, ResYPtr, targetPath, hwnd, X1, Y1, X2, Y2, matchThreshold, Adaptive := false, ColorMatch := false) {
     if (A_PtrSize != 8) ;非64位不可用，直接退出
         return false
     if (OpenCvEnsure() != "")
@@ -273,16 +271,9 @@ FindWinImage(ResXPtr, ResYPtr, targetPath, hwnd, X1, Y1, X2, Y2, matchThreshold,
     searchY := Y1
     searchW := X2 - X1
     searchH := Y2 - Y1
-    if (Adaptive && OpenCvAdaptiveReady()) {
-        try {
-            return DllCall("RMT_OpenCV.dll\FindWinImageAdaptive", "AStr", targetPath, "Int", hwnd, "Int", searchX,
-                "Int", searchY, "Int", searchW, "Int", searchH, "Int", matchThreshold, "Int*", ResXPtr, "Int*", ResYPtr,
-                "Cdecl Int")
-        } catch {
-        }
-    }
-    return DllCall("RMT_OpenCV.dll\FindWinImage", "AStr", targetPath, "Int", hwnd, "Int", searchX,
-        "Int", searchY, "Int", searchW, "Int", searchH, "Int", matchThreshold, "Int*", ResXPtr, "Int*", ResYPtr,
+    OpenCvExplicitImageReady()
+    return DllCall("RMT_OpenCV.dll\FindWinImageEx", "AStr", targetPath, "Int", hwnd, "Int", searchX,
+        "Int", searchY, "Int", searchW, "Int", searchH, "Int", matchThreshold, "Int", ColorMatch ? 1 : 0, "Int", Adaptive ? 1 : 0, "Int*", ResXPtr, "Int*", ResYPtr,
         "Cdecl Int")
 }
 

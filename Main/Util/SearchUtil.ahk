@@ -59,6 +59,7 @@ GetSearchTargetArr(Data) {
         MultiPointMode: ObjHasOwnProp(Data, "MultiPointMode") ? Data.MultiPointMode : "",
         OCRType:      ObjHasOwnProp(Data, "OCRType") ? Data.OCRType : 1,
         SearchImageType: ObjHasOwnProp(Data, "SearchImageType") ? Data.SearchImageType : SearchImageDefaultType(),
+        ColorMatch:   SearchColorMatchOn(Data) ? 1 : 0,
         Adaptive:     ObjHasOwnProp(Data, "Adaptive") ? Data.Adaptive : 0,
         StartPosX:    ObjHasOwnProp(Data, "StartPosX") ? Data.StartPosX : 0,
         StartPosY:    ObjHasOwnProp(Data, "StartPosY") ? Data.StartPosY : 0,
@@ -298,6 +299,10 @@ BuildMultiPointSeedText(points) {
     }
     return text
 }
+SearchColorMatchOn(Data) {
+    return ObjHasOwnProp(Data, "ColorMatch") && (Data.ColorMatch == 1 || Data.ColorMatch == "true")
+}
+
 SearchAdaptiveOn(Data) {
     ; 所有搜索目标统一使用全局设置，忽略旧指令中的 Adaptive 字段。
     if (!IsSet(MainSoftData) || !MainSoftData.HasProp("SearchImageAdaptive"))
@@ -345,7 +350,7 @@ SearchImage(Data, X1, Y1, X2, Y2, ImagePath, &ResX, &ResY) {
             ShowOpenCvInstallPrompt(ocvReason)
             return false
         }
-        return FindScreenImage(&ResX, &ResY, ImagePath, X1, Y1, X2, Y2, Data.Similar, SearchAdaptiveOn(Data))
+        return FindScreenImage(&ResX, &ResY, ImagePath, X1, Y1, X2, Y2, Data.Similar, SearchAdaptiveOn(Data), SearchColorMatchOn(Data))
     }
     else {
         Similar := Integer(-2.55 * Data.Similar + 255)
@@ -394,7 +399,7 @@ SearchWinImage(Data, hwndList, X1, Y1, X2, Y2, ImagePath, &ResXList, &ResYList, 
             isFound := multiPointText != "" ? FindWinImageMultiPoint(&ResX, &ResY, ImagePath, hwnd
                 , X1, Y1, X2, Y2, Data.Similar, multiPointText, Data.MultiPointTolerance) : false
         else
-            isFound := FindWinImage(&ResX, &ResY, ImagePath, hwnd, X1, Y1, X2, Y2, Data.Similar, SearchAdaptiveOn(Data))
+            isFound := FindWinImage(&ResX, &ResY, ImagePath, hwnd, X1, Y1, X2, Y2, Data.Similar, SearchAdaptiveOn(Data), SearchColorMatchOn(Data))
         if (isFound) {
             found := true
             ResHwndList.Push(hwnd)

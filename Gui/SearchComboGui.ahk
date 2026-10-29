@@ -423,6 +423,7 @@ class SearchComboGui {
             Similar: ObjHasOwnProp(Data, "Similar") ? Data.Similar : 90,
             OCRType: ObjHasOwnProp(Data, "OCRType") ? Data.OCRType : 1,
             SearchImageType: ObjHasOwnProp(Data, "SearchImageType") ? Data.SearchImageType : SearchImageDefaultType(),
+            ColorMatch: SearchColorMatchOn(Data) ? 1 : 0,
             Adaptive: ObjHasOwnProp(Data, "Adaptive") ? Data.Adaptive : 0,
             MultiPointData: ObjHasOwnProp(Data, "MultiPointData") && IsObject(Data.MultiPointData) ? Data.MultiPointData : [],
             MultiPointSeedData: ObjHasOwnProp(Data, "MultiPointSeedData") && IsObject(Data.MultiPointSeedData) ? Data.MultiPointSeedData : [],
@@ -451,6 +452,7 @@ class SearchComboGui {
         lastN := this.TargetList.Length
         fs := XAMLHost.FontSize()
         xaml := '<ListBoxItem ' ns ' Tag="' n '">'
+            . '<ListBoxItem.Resources><Style x:Key="ColorMatchSwitch" TargetType="CheckBox"><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="50"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border x:Name="Track" Width="42" Height="24" CornerRadius="12" Background="{DynamicResource ControlBorder}" BorderBrush="{DynamicResource OutlineStroke}" BorderThickness="1"><Grid><TextBlock x:Name="OffGlyph" Text="×" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource TextSub}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,7,1"/><Ellipse x:Name="Thumb" Width="18" Height="18" Fill="{DynamicResource ControlBg}" HorizontalAlignment="Left" Margin="2"/></Grid></Border><ContentPresenter Grid.Column="1" VerticalAlignment="Center"/></Grid><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Track" Property="Background" Value="{DynamicResource ActionBg}"/><Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/><Setter TargetName="OffGlyph" Property="Visibility" Value="Collapsed"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style></ListBoxItem.Resources>'
             . '<Border Margin="0,1,0,1" Padding="8,6,8,6" BorderBrush="{DynamicResource InputStroke}" BorderThickness="1" CornerRadius="4" Background="Transparent">'
             . '<Grid>'
             . '<Grid>'
@@ -520,20 +522,23 @@ class SearchComboGui {
             . '<TextBox Name="' this._TN(n, "Similar") '" Grid.Row="0" Grid.Column="6" Height="28" MinHeight="28" MinWidth="80"'
             . ' HorizontalAlignment="Stretch" VerticalContentAlignment="Center" Padding="2,0" TextAlignment="Center" FontSize="' fs '"'
             . ' Foreground="{DynamicResource InputText}" Background="{DynamicResource InputBg}" BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1"/>'
+            . '<StackPanel Name="' this._TN(n, "ColorMatchHost") '" Grid.Row="1" Grid.Column="4" Grid.ColumnSpan="3" Orientation="Horizontal" VerticalAlignment="Center">'
+            . '<TextBlock Text="' GetLang("颜色匹配") '：" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="{DynamicResource TextMain}"/>'
+            . '<CheckBox Name="' this._TN(n, "ColorMatch") '" Style="{StaticResource ColorMatchSwitch}" IsChecked="False" VerticalAlignment="Center" ToolTip="' GetLang("颜色匹配") '"/>'
+            . '</StackPanel>'
             . '</Grid>'
             . '<Border Name="' this._TN(n, "ImagePreviewHost") '" Grid.Row="2" Grid.Column="4" Width="64" Height="64" MinWidth="64" MinHeight="64" MaxWidth="64" MaxHeight="64"'
             . ' HorizontalAlignment="Left" VerticalAlignment="Center" ClipToBounds="True"'
             . ' Background="{DynamicResource ControlBg}" BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1">'
-            . '<Image Name="' this._TN(n, "Image") '" Stretch="Uniform" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>'
-            . '</Border>'
-            . '<Button Name="' this._TN(n, "ProcessBtn") '" Grid.Row="3" Grid.Column="4" Width="64" Height="28" MinHeight="28"'
-            . ' Padding="0" VerticalAlignment="Center" HorizontalAlignment="Stretch" Cursor="Hand" FontSize="11"'
-            . ' Content="' GetLang("图片处理") '"'
+            . '<Grid><Image Name="' this._TN(n, "Image") '" Stretch="Uniform" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>'
+            . '<Button Name="' this._TN(n, "ProcessBtn") '" Width="22" Height="22" MinHeight="22"'
+            . ' Padding="0" Margin="0,1,1,0" VerticalAlignment="Top" HorizontalAlignment="Right" Cursor="Hand" FontSize="12"'
+            . ' FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Content="' Chr(0xE70F) '"'
             . ' ToolTip="' GetLang("图片处理：多点选点、裁剪或重命名模板") '"'
             . ' Foreground="{DynamicResource TextMain}" Background="{DynamicResource ControlBg}"'
             . ' BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1">'
             . this._ThemeHoverBtnStyle()
-            . '</Button>'
+            . '</Button></Grid></Border>'
             . '<TextBlock Name="' this._TN(n, "ImagePathTip") '" Grid.Row="3" Grid.Column="0" Text="' GetLang("图片路径：") '" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="{DynamicResource TextMain}" FontSize="' fs '"/>'
             . '<Grid Name="' this._TN(n, "ImagePathRow") '" Grid.Row="3" Grid.Column="2" Width="264" HorizontalAlignment="Left">'
             . '<Grid.ColumnDefinitions>'
@@ -651,9 +656,7 @@ class SearchComboGui {
         on := matchMode == "super"
             || (matchMode == "multi" && points.Length >= 1)
         btn := this._TN(n, "ProcessBtn")
-        label := matchMode == "super" ? GetLang("超多点")
-            : (matchMode == "multi" ? GetLang("多点") : GetLang("图片处理"))
-        try this.ui.Update(btn, "Content", label)
+        try this.ui.Update(btn, "Content", Chr(0xE70F))
         try this.ui.Update(btn, "Tag", on ? "1" : "0")
         try this.ui.Update(btn, "ToolTip", on
             ? (matchMode == "super"
@@ -761,6 +764,7 @@ class SearchComboGui {
             this.ui.Update(this._TN(n, "ColorTip"), "Background", "#" t.SearchColor)
         this._SetCombo(this._TN(n, "Text"), this.DLVariableArr, t.SearchText)
         this.ui.Update(this._TN(n, "Similar"), "Text", t.Similar)
+        this.ui.Update(this._TN(n, "ColorMatch"), "IsChecked", SearchColorMatchOn(t) ? "True" : "False")
         this.OnTargetTypeChanged(n)
     }
 
@@ -803,6 +807,7 @@ class SearchComboGui {
             Similar: last.Similar,
             OCRType: last.OCRType,
             SearchImageType: last.SearchImageType,
+            ColorMatch: SearchColorMatchOn(last) ? 1 : 0,
             Adaptive: ObjHasOwnProp(last, "Adaptive") ? last.Adaptive : 0,
             MultiPointData: ObjHasOwnProp(last, "MultiPointData") && IsObject(last.MultiPointData) ? last.MultiPointData.Clone() : [],
             MultiPointSeedData: ObjHasOwnProp(last, "MultiPointSeedData") && IsObject(last.MultiPointSeedData) ? last.MultiPointSeedData.Clone() : [],
@@ -871,6 +876,7 @@ class SearchComboGui {
         this.ui.Update(tn "TextRow", "Visibility", isText ? "Visible" : "Hidden")
         this.ui.Update(tn "SimilarRow", "Visibility", isText ? "Hidden" : "Visible")
         this.ui.Update(tn "Similar", "Visibility", isText ? "Hidden" : "Visible")
+        this.ui.Update(tn "ColorMatchHost", "Visibility", isImage && SearchImageDefaultType() == 1 ? "Visible" : "Collapsed")
         if (n == this.CurTarget)
             this.RefreshPreviewArea()
     }
@@ -1119,16 +1125,7 @@ class SearchComboGui {
         curPath := this.ui.Query(tn "ImagePath")
         path := FileSelect(1, curPath, GetLang("选择图片"), "PNG Files (*.png)")
         if (path != "") {
-            SplitPath path, &name, &dir, &ext, &name_no_ext, &drive
-            newPath := A_WorkingDir "\Setting\" MySoftData.CurSettingName "\Images\ScreenShot\" name
-            if (path != newPath) {
-                if (FileExist(newPath)) {
-                    imageSerial := GetNextImageSerial()
-                    newPath := A_WorkingDir "\Setting\" MySoftData.CurSettingName "\Images\ScreenShot\" imageSerial ".png"
-                }
-                FileCopy(path, newPath)
-                path := newPath
-            }
+            path := StoreSearchImage(path)
             this._ResetTargetProcess(n)
             this._SetImage(n, path)
             this.TargetList[n].SearchImagePath := path
@@ -1173,6 +1170,10 @@ class SearchComboGui {
     }
 
     OnGetArea(x1, y1, x2, y2) {
+        if (this._TargetType(this._CurTarget()) >= 4) {
+            this.OnF1SetAreaAction(x1, y1, x2, y2)
+            return
+        }
         AreaX1 := Max(0, x1 - 20)
         AreaX2 := Min(A_ScreenWidth, x2 + 20)
         AreaY1 := Max(0, y1 - 20)
@@ -1271,8 +1272,11 @@ class SearchComboGui {
         n := this._CurTarget()
         curType := this._TargetType(n)
         isWin := curType == 4 || curType == 5 || curType == 6
-        Point1 := isWin ? GetWinPos(x1, y1) : [x1, y1]
-        Point2 := isWin ? GetWinPos(x2, y2) : [x2, y2]
+        hwndList := isWin ? GetHwndList(this.ui.Query(this._TN(n, "WinInfo"))) : []
+        if (isWin && hwndList.Length == 0)
+            return
+        Point1 := isWin ? GetWinPos(x1, y1, hwndList[1]) : [x1, y1]
+        Point2 := isWin ? GetWinPos(x2, y2, hwndList[1]) : [x2, y2]
         this.ui.Update(this._TN(n, "StartPosX"), "Text", Point1[1])
         this.ui.Update(this._TN(n, "StartPosY"), "Text", Point1[2])
         this.ui.Update(this._TN(n, "EndPosX"), "Text", Point2[1])
@@ -1319,6 +1323,7 @@ class SearchComboGui {
                 Similar: this.ui.Query(tn "Similar"),
                 OCRType: 1,   ; v6 统一多语言模型，不再区分
                 SearchImageType: SearchImageDefaultType(),
+                ColorMatch: this._ToggleInt(this.ui.Query(tn "ColorMatch")),
                 Adaptive: ObjHasOwnProp(this.TargetList[n], "Adaptive") ? this.TargetList[n].Adaptive : 0,
                 MultiPointData: ObjHasOwnProp(this.TargetList[n], "MultiPointData") && IsObject(this.TargetList[n].MultiPointData)
                     ? this.TargetList[n].MultiPointData : [],
@@ -1346,6 +1351,7 @@ class SearchComboGui {
                 data.Similar := t.Similar
                 data.OCRType := t.OCRType
                 data.SearchImageType := t.SearchImageType
+                data.ColorMatch := t.ColorMatch
                 data.Adaptive := t.Adaptive
                 data.MultiPointData := t.MultiPointData
                 data.MultiPointSeedData := t.MultiPointSeedData

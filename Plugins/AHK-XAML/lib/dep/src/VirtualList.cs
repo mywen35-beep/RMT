@@ -1317,8 +1317,8 @@ public class VListRow : VLItem
     public string TimingConfigVis { get; set; }
     public bool HasTimingConfig { get { return _HasTimingConfig; } set { Set(ref _HasTimingConfig, value, "HasTimingConfig"); } } private bool _HasTimingConfig;
     // 触发键按钮内部：文本 / 键盘字形 / 图片缩略图 / 时钟 / 秒表 的可见性（直接绑 Visibility）。
-    public string TKTextVis { get; set; }
-    public string TKGlyphVis { get; set; }
+    public string TKTextVis { get { return _TKTextVis; } set { Set(ref _TKTextVis, value, "TKTextVis"); } } private string _TKTextVis;
+    public string TKGlyphVis { get { return _TKGlyphVis; } set { Set(ref _TKGlyphVis, value, "TKGlyphVis"); } } private string _TKGlyphVis;
     public string PhotoVis { get; set; }
     public string TKThumbVis { get; set; }
     public string ClockVis { get; set; }

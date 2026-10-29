@@ -248,11 +248,8 @@ class ShareExportUtil {
         try {
             if (FileExist(rmtPath))
                 FileDelete(rmtPath)
-            ; 询问包密码（可留空 = 不加密）
-            if (!FolderPackager.PackFolderWithPassword(outDir, rmtPath)) {
-                try DirDelete(outDir, true)
-                return
-            }
+            ; 论坛分享直接生成普通分享包，不再询问加密密码。
+            FolderPackager.PackFolder(outDir, rmtPath)
         } catch as e {
             try DirDelete(outDir, true)
             throw e

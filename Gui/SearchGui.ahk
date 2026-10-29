@@ -467,6 +467,7 @@ class SearchGui {
         curPath := this.Data.SearchImagePath
         path := FileSelect(1, curPath, GetLang("选择图片"), "PNG Files (*.png)")
         if (path != "") {
+            path := StoreSearchImage(path)
             this._SetImage(path)
             this.Data.SearchImagePath := path
         }

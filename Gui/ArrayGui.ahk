@@ -459,6 +459,11 @@ class ArrayGui {
             || t == GetLang("移除") || t == GetLang("移除最后") || t == GetLang("包含") || t == GetLang("反转")
         if (showResult && !CheckVarNameIfValid(this.ui.Query("SaveNameCon")))
             return false
+        try GetArray(this.ui.Query("InitArrCon"))
+        catch ValueError as e {
+            RMTErrorShow(e.Message, RMT_LV_WARN, "数组")
+            return false
+        }
         return true
     }
 

@@ -91,6 +91,8 @@ class MacroEditGui {
         this._dragTarget := ""
         this._dragSlot := ""
         this._lastDragTip := ""            ; 拖拽提示缓存，防 ToolTip 每帧重建闪烁
+        this._dragReleaseAt := 0
+        this._dragWatchdog := ObjBindMethod(this, "_CheckDragRelease")
         this._treeClickCoord := ""
         this._rightClickCoord := ""
         this._hkIds := []
@@ -442,6 +444,8 @@ class MacroEditGui {
 
     SetSideActive(active) {
         this._sideActive := !!active
+        if (!active)
+            this._DragEndReset()
     }
 
     LoadSideMacro(MacroStr, bpStr := "") {
@@ -484,6 +488,7 @@ class MacroEditGui {
         this._BindTreeUiEvent(this.treeName, "PreviewMouseLeftButtonUp", ObjBindMethod(this, "_OnTreeDragDrop"))
         this._BindTreeUiEvent("Window", "PreviewMouseMove", ObjBindMethod(this, "_OnTreeDragMove"))
         this._BindTreeUiEvent("Window", "PreviewMouseLeftButtonUp", ObjBindMethod(this, "_OnTreeDragDrop"))
+        this._BindTreeUiEvent("Window", "Deactivated", ObjBindMethod(this, "_OnDragFocusLost"))
     }
 
     _BindTreeContextMenuEvents() {
@@ -1483,8 +1488,7 @@ class MacroEditGui {
         if (this.OwnerHwnd != "" && MainSoftData.IsModalSubGui) {
             try SafeGuiFromHwnd(this.OwnerHwnd).Opt("-Disabled")
         }
-        this._dragActive := false
-        this._dragCandidate := ""
+        this._DragEndReset()
         this._dragSource := ""
         if (IsObject(this.MacroTreeViewCon))
             this.MacroTreeViewCon._suppressRender := false
@@ -1501,6 +1505,7 @@ class MacroEditGui {
     _CloseWindow() {
         this._revealed := true
         this._closed := true
+        this._DragEndReset()
         if (this._hkIds.Length > 0) {
             WinHotkey.UnregisterAll(this._hkIds)
             this._hkIds := []
@@ -2149,10 +2154,8 @@ class MacroEditGui {
             this._OnTreeDoubleClick(state, ctrl, event)
             return
         }
-        ; 新按下：清掉上次可能残留的拖拽激活态
-        this._dragActive := false
-        this._dragTarget := ""
-        this._dragSlot := ""
+        ; 新按下：连同旧幽灵与清理定时器一起复位。
+        this._DragEndReset()
         coord := this._EventCoord(state, this.treeName)
         CoordMode("Mouse", "Screen")
         MouseGetPos(&sx, &sy)
@@ -2175,6 +2178,7 @@ class MacroEditGui {
                 source := ""
         }
         this._dragCandidate := {fromLeft: false, gui: "", name: "", source: source, sx: sx, sy: sy}
+        SetTimer(this._dragWatchdog, 50)
         this._treeClickCoord := coord
         SetTimer(ObjBindMethod(this, "_ProcessTreeLeftClick"), -20)
     }
@@ -2183,12 +2187,11 @@ class MacroEditGui {
     _OnPanelDragStart(guiInstance, displayName, state, ctrl, event) {
         if (this.EditModeCon.Value != 1 || !IsObject(this.ui))
             return
-        this._dragActive := false
-        this._dragTarget := ""
-        this._dragSlot := ""
+        this._DragEndReset()
         CoordMode("Mouse", "Screen")
         MouseGetPos(&sx, &sy)
         this._dragCandidate := {fromLeft: true, gui: guiInstance, name: displayName, source: "", sx: sx, sy: sy}
+        SetTimer(this._dragWatchdog, 50)
     }
 
     ; 窗口级鼠标移动：检测拖拽启动；命中树得插入线位置（不重建树）
@@ -2198,10 +2201,12 @@ class MacroEditGui {
         if (!IsObject(this._dragCandidate))
             return
         lbtnDown := GetKeyState("LButton", "P")
+        if (!lbtnDown) {
+            ; 松开可能发生在弹窗或窗口外：不再显示幽灵，保留候选给已排队的松开事件。
+            this._HideDragGhost()
+            return
+        }
         if (!this._dragActive) {
-            ; 异步回调可能晚于物理松开：尚未进入拖拽则不再启动
-            if (!lbtnDown)
-                return
             cand := this._dragCandidate
             CoordMode("Mouse", "Screen")
             MouseGetPos(&cx, &cy)
@@ -2237,7 +2242,7 @@ class MacroEditGui {
 
     ; 跟鼠标幽灵：仅指令文本（对齐宏配置 VL：Popup Absolute + 屏幕 DIP）
     _ShowDragGhost(text) {
-        if (!IsObject(this.ui))
+        if (!IsObject(this.ui) || !this._dragActive || !GetKeyState("LButton", "P"))
             return
         dip := this._CursorDip()
         if (dip.Length < 2)
@@ -2320,8 +2325,31 @@ class MacroEditGui {
         return (wc[1] - pp[1]) ";" (wc[2] - pp[2])
     }
 
+    _OnDragFocusLost(*) {
+        this._DragEndReset()
+    }
+
+    ; MouseUp 被子窗口/系统吞掉时兜底取消；短暂宽限让正常异步 Drop 先处理。
+    _CheckDragRelease() {
+        if (!IsObject(this._dragCandidate) || !IsObject(this.ui) || (this._sideMode && !this._sideActive)) {
+            this._DragEndReset()
+            return
+        }
+        if (GetKeyState("LButton", "P")) {
+            this._dragReleaseAt := 0
+            return
+        }
+        this._HideDragGhost()
+        if (!this._dragReleaseAt)
+            this._dragReleaseAt := A_TickCount
+        if (A_TickCount - this._dragReleaseAt >= 150)
+            this._DragEndReset()
+    }
+
     ; 拖拽结束/取消统一复位：恢复渲染、隐藏插入线、清幽灵
     _DragEndReset() {
+        SetTimer(this._dragWatchdog, 0)
+        this._dragReleaseAt := 0
         this._dragActive := false
         this._dragCandidate := ""
         this._dragTarget := ""
@@ -2339,8 +2367,10 @@ class MacroEditGui {
     _OnTreeDragDrop(state, ctrl, event) {
         if (this._sideMode && !this._sideActive)
             return
-        if (!this._dragActive || !IsObject(this._dragCandidate))
+        if (!this._dragActive || !IsObject(this._dragCandidate)) {
+            this._DragEndReset()
             return
+        }
         cand := this._dragCandidate
         treeCoord := this._TreeMouseLocal()
         overTree := false

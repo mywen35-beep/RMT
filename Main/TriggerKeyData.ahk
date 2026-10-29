@@ -19,6 +19,7 @@ class TriggerKeyData {
         this.DblClickArr := []
 
         this.LastKeyDownTime := 0  ;上次按下时间（用于双击检测）
+        this.DblClickKeyDown := false  ; 同一次按住期间只计一次，避免重复按下通知被当成双击
         this.DblClickInterval := 300  ;双击间隔时间（毫秒）
         this.NeedReleaseBeforeRetrigger := false  ; 连续触发关闭时：需先松开才能再次触发
         this.LastDownWasStop := false  ; 本次按下是否为「关闭开关宏」动作（见 OnTriggerKeyDown）
@@ -149,16 +150,22 @@ class TriggerKeyData {
     }
 
     OnTriggerKeyDown() {
+        ; 普通键必须经历「按下→松开→按下」才能组成双击。
+        ; 组合键未注册 up，脉冲键也没有 up，继续按独立按下事件计数。
+        isOnlyDownKey := this.IsOnlyDownKey()
+        isNewPress := !this.DblClickKeyDown || isOnlyDownKey || InStr(this.Key, " & ")
+        this.DblClickKeyDown := true
         this.UpdataArr()
 
         ;双击检测逻辑
         currentTime := A_TickCount
-        isDblClick := (currentTime - this.LastKeyDownTime) <= this.DblClickInterval && this.LastKeyDownTime != 0
-        this.LastKeyDownTime := currentTime
+        isDblClick := isNewPress && this.LastKeyDownTime != 0
+            && (currentTime - this.LastKeyDownTime) <= this.DblClickInterval
+        if (isNewPress)
+            this.LastKeyDownTime := isDblClick ? 0 : currentTime
 
         ; 连续触发关闭时：按下/开关/长按需先松开触发键才能再次触发。
         ; 滚轮等脉冲键没有松开事件，必须始终允许下一次独立脉冲。
-        isOnlyDownKey := this.IsOnlyDownKey()
         blockRetrigger := !isOnlyDownKey && !MainSoftData.ContinuousTrigger && this.NeedReleaseBeforeRetrigger
         ; 本帧是否有「关闭开关宏」动作（由 Action() 置位），用于结尾跳过「先松开」锁定
         this.LastDownWasStop := false
@@ -203,6 +210,7 @@ class TriggerKeyData {
     }
 
     OnTriggerKeyUp() {
+        this.DblClickKeyDown := false
         this.UpdataArr()
         this.NeedReleaseBeforeRetrigger := false
         this.StopReleaseWatch()

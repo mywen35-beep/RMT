@@ -1,4 +1,4 @@
-;按键宏命令
+﻿;按键宏命令
 OnTriggerMacroKeyAndInit(tableItem, macro, index) {
     item := tableItem.Items[index]
     if (!item)
@@ -984,10 +984,9 @@ GetLoopState(tableItem, cmd, index, Data) {
         CompareType := Data.CompareTypeArr[A_Index]
         hasComparison := DoCompare(&currentComparison, tableItem, index, CompareType, Data.NameArr[A_Index], Data.VariableArr[
             A_Index])
-        if (!hasComparison) {
-            result := false
-            break
-        }
+        ; 取值失败不是比较结果为假；退出条件不能将失败取反成继续循环。
+        if (!hasComparison)
+            return false
 
         if (Data.LogicType == 1) {
             result := result && currentComparison
@@ -1903,19 +1902,14 @@ OnFileIO(tableItem, cmd, index) {
     }
 }
 
-; 将模糊的窗口标题条件解析为可见窗口的精确句柄
-; 仅当 winTitle 为纯进程名匹配（ahk_exe）时才做筛选，
-; 精确句柄(ahk_id/ahk_group)或带标题/类名的匹配直接原样返回
+; 将标题、类名、进程名条件解析为可见窗口的精确句柄。
+; 显式句柄/窗口组保留原意；多个可见匹配项仍按窗口层叠顺序选第一个。
 ResolveVisibleWinHandle(winTitle) {
     ; 已是精确句柄或句柄组，用户明确指定了目标，不做干预
     if (InStr(winTitle, "ahk_id ") || InStr(winTitle, "ahk_group "))
         return winTitle
 
-    ; 纯标题匹配（不包含ahk_exe和ahk_class），不需要额外筛选
-    if (!InStr(winTitle, "ahk_exe") && !InStr(winTitle, "ahk_class"))
-        return winTitle
-
-    ; 包含进程名或类名匹配，需要筛选出可见窗口避免命中隐藏窗口导致黑屏
+    ; 全局启用了 DetectHiddenWindows，纯标题匹配也必须排除隐藏窗口。
     try {
         detectedHwnds := WinGetList(winTitle)
         for hwnd in detectedHwnds {
@@ -1928,6 +1922,38 @@ ResolveVisibleWinHandle(winTitle) {
         }
     }
     return ""
+}
+
+MaximizeManagedWindow(winTitle) {
+    SetManagedWindowState(winTitle, 1)
+}
+
+SetManagedWindowState(winTitle, state) {
+    ; 先固定目标，兼容显式窗口组，避免最大化改变层叠顺序后重新匹配到其它窗口。
+    hwnds := WinGetList(winTitle)
+    for hwnd in hwnds {
+        try {
+            target := "ahk_id " hwnd
+            restoreFromMinimized := state == 0 && WinGetMinMax(target) == -1
+            switch state {
+                case 1: WinMaximize(target)
+                case -1: WinMinimize(target)
+                case 0: WinRestore(target)
+            }
+            ; 部分自绘窗口不响应 ShowWindow，改用对应的系统命令。
+            ; 无需先 WinActivate，也不向其它匹配窗口重试。
+            currentState := WinGetMinMax(target)
+            if (currentState != state && !(restoreFromMinimized && currentState == 1)) {
+                command := state == 1 ? 0xF030 : state == -1 ? 0xF020 : 0xF120
+                PostMessage(0x0112, command, 0, , target) ; WM_SYSCOMMAND
+                ; 等待异步命令生效，避免后续移动、点击抢在状态切换之前执行。
+                deadline := A_TickCount + 250
+                while (WinExist(target) && WinGetMinMax(target) != state
+                    && !(restoreFromMinimized && WinGetMinMax(target) == 1) && A_TickCount < deadline)
+                    Sleep(10)
+            }
+        }
+    }
 }
 
 OnWindowManage(tableItem, cmd, index) {
@@ -1944,47 +1970,58 @@ OnWindowManage(tableItem, cmd, index) {
     if (winTitle == "")
         return
 
-    try {
-        switch Data.ActionType {
-            case "激活窗口":
-                WinActivate(winTitle)
-            case "最大化窗口":
-                WinMaximize(winTitle)
-            case "最小化窗口":
-                WinMinimize(winTitle)
-            case "还原窗口":
-                WinRestore(winTitle)
-            case "关闭窗口":
-                WinClose(winTitle)
-            case "移动窗口":
-                hasPosX := TryGetTabVarValue(&PosX, tableItem, index, Data.PosX)
-                hasPosY := TryGetTabVarValue(&PosY, tableItem, index, Data.PosY)
-                if (hasPosX && hasPosY) {
-                    WinMove(Integer(PosX), Integer(PosY), , , winTitle)
-                }
-            case "调整大小":
-                hasWidth := TryGetTabVarValue(&Width, tableItem, index, Data.Width)
-                hasHeight := TryGetTabVarValue(&Height, tableItem, index, Data.Height)
-                if (hasWidth && hasHeight) {
-                    WinMove(, , Integer(Width), Integer(Height), winTitle)
-                }
-            case "置顶窗口":
-                WinSetAlwaysOnTop(1, winTitle)
-            case "取消置顶":
-                WinSetAlwaysOnTop(0, winTitle)
-            case "修改标题":
-                newTitle := GetReplaceVarText(tableItem, index, Data.NewTitle)
-                WinSetTitle(newTitle, winTitle)
-            case "修改透明度":
-                hasTransparency := TryGetTabVarValue(&Transparency, tableItem, index, Data.Transparency)
-                if (hasTransparency) {
-                    alphaValue := Round(255 * Integer(Transparency) / 100)
-                    WinSetTransparent(alphaValue, winTitle)
-                }
-            case "开启鼠标穿透":
-                WinSetExStyle("+0x20", winTitle)
-            case "关闭鼠标穿透":
-                WinSetExStyle("-0x20", winTitle)
+    ; 激活只选最上面的一个目标；其它操作对显式窗口组逐个处理。
+    if (Data.ActionType == "激活窗口") {
+        try WinActivate(winTitle)
+        return
+    }
+    hwnds := WinGetList(winTitle)
+    for hwnd in hwnds {
+        try {
+            winTitle := "ahk_id " hwnd
+            switch Data.ActionType {
+                case "最大化窗口":
+                    MaximizeManagedWindow(winTitle)
+                case "最小化窗口":
+                    SetManagedWindowState(winTitle, -1)
+                case "还原窗口":
+                    SetManagedWindowState(winTitle, 0)
+                case "关闭窗口":
+                    WinClose(winTitle)
+                case "移动窗口":
+                    hasPosX := TryGetTabVarValue(&PosX, tableItem, index, Data.PosX)
+                    hasPosY := TryGetTabVarValue(&PosY, tableItem, index, Data.PosY)
+                    if (hasPosX && hasPosY) {
+                        WinMove(Integer(PosX), Integer(PosY), , , winTitle)
+                    }
+                case "调整大小":
+                    hasWidth := TryGetTabVarValue(&Width, tableItem, index, Data.Width)
+                    hasHeight := TryGetTabVarValue(&Height, tableItem, index, Data.Height)
+                    if (hasWidth && hasHeight) {
+                        WinMove(, , Integer(Width), Integer(Height), winTitle)
+                    }
+                case "置顶窗口":
+                    WinSetAlwaysOnTop(1, winTitle)
+                case "取消置顶":
+                    WinSetAlwaysOnTop(0, winTitle)
+                case "修改标题":
+                    newTitle := GetReplaceVarText(tableItem, index, Data.NewTitle)
+                    WinSetTitle(newTitle, winTitle)
+                case "修改透明度":
+                    hasTransparency := TryGetTabVarValue(&Transparency, tableItem, index, Data.Transparency)
+                    if (hasTransparency) {
+                        alphaValue := Round(255 * Integer(Transparency) / 100)
+                        WinSetTransparent(alphaValue, winTitle)
+                    }
+                case "开启鼠标穿透":
+                    ; 普通窗口需启用分层样式，才能向其它进程的窗口透传鼠标。
+                    ; 已有的透明度/分层绘制效果保持原样。
+                    if (!(WinGetExStyle(winTitle) & 0x80000))
+                        WinSetTransparent(255, winTitle)
+                    WinSetExStyle("+0x20", winTitle)
+                case "关闭鼠标穿透":
+                    WinSetExStyle("-0x20", winTitle)
+            }
         }
     }
 }

@@ -150,11 +150,11 @@ class MacroTreeAdapter {
             return
         node := this.nodes[id]
         needsRender := false
-        if (newText != "" && node.text != newText) {
+        if (newText != "") {
             node.text := newText
             ; 增量更新文本块，不整树重建
             if (IsObject(this.ui)) {
-                this.ui.Update("Txt_" id, "Text", CmdStripDebug(newText))
+                this.ui.Update("Txt_" id, "Text", this._DisplayText(newText))
                 try this.ui.Update("Dbg_" id, "Visibility", CmdIsDebug(newText) ? "Visible" : "Collapsed")
             }
             this._UpdateCheckMark(id)
@@ -851,7 +851,8 @@ class MacroTreeAdapter {
         dbgVis := CmdIsDebug(node.text) ? "Visible" : "Collapsed"
         curVis := (node.HasProp("debugCur") && node.debugCur) ? "Visible" : "Collapsed"
         brkVis := (node.HasProp("debugBp") && node.debugBp) ? "Visible" : "Collapsed"
-        dispText := this._EscapeXml(CmdStripDebug(node.text))
+        dispText := this._EscapeXml(this._DisplayText(node.text))
+        dispText := StrReplace(StrReplace(dispText, "`r", "&#13;"), "`n", "&#10;")
         xml := '<Border Name="CardBd_' node.id '" Tag="' node.id '" CornerRadius="0" BorderThickness="0" Background="' cardBg '" Margin="0" Padding="' this._CardPad() '" HorizontalAlignment="Stretch">'
             . '<StackPanel Name="CardInner_' node.id '" Orientation="Horizontal" VerticalAlignment="Stretch" MinHeight="28" Opacity="' skipOp '">'
             . prefix
@@ -883,6 +884,22 @@ class MacroTreeAdapter {
             . ' Tag="' node.id '" Background="Transparent" BorderThickness="0" Padding="0" Margin="0" HorizontalContentAlignment="Stretch">'
             . this._BuildCardInnerXml(node, depth, flatIdx, false)
             . '</ListBoxItem>'
+    }
+
+    ; 注释正文以配置 Content 为准；只替换视图文字，保留节点原始指令供执行、复制和保存。
+    _DisplayText(text) {
+        displayText := CmdStripDebug(text)
+        head := StrSplit(displayText, "_", , 2)[1]
+        serial := GetCmdStr(CmdStripCurPos(head))
+        if (GetCmdOnlyText(serial) != GetLang("注释") || !RegExMatch(serial, "\d+$"))
+            return displayText
+        try {
+            data := GetMacroCMDData(serial)
+            if (IsObject(data) && data.HasOwnProp("Content"))
+                return head "_" data.Content
+        }
+        ; 缺失或损坏的配置不妨碍显示原指令。
+        return displayText
     }
 
     _EscapeXml(s) {

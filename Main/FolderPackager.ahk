@@ -170,39 +170,6 @@ class FolderPackager {
         throw Error(GetLang("密码错误次数过多，已取消导入"))
     }
 
-    static UploadFile(selectedFile) {
-        tempPath := outputFolder := A_WorkingDir "\Temp"
-        FolderPackager.UnpackFile(selectedFile, tempPath)
-
-        MyUseExplainGui.Mode := 2
-        MyUseExplainGui.ModeAction := FolderPackager.VerifyOperation.Bind(FolderPackager, selectedFile)
-        MyUseExplainGui.ShowGui(tempPath)
-    }
-
-    ;1确定   0关闭验证
-    static VerifyOperation(selectedFile, isSure, isChange) {
-        tempPath := outputFolder := A_WorkingDir "\Temp"
-        if (isSure) {
-            if (isChange) {
-                FolderPackager.PackFolder(tempPath, selectedFile)
-            }
-
-            if (!RmtDialog.Confirm(GetLang("共享上传文件：") selectedFile, GetLang("提示")))
-                return
-
-            global RMT_Http, RMT_HasDotNet
-            if (!RMT_HasDotNet || RMT_Http == "") {
-                RmtDialog.Info(GetLang("缺少.NET环境，无法使用共享上传功能"), GetLang("提示"))
-                return
-            }
-
-            result := RMT_Http.UploadFile(selectedFile)
-            RmtDialog.Info(result, GetLang("提示"))
-        }
-        if (DirExist(tempPath))
-            DirDelete(tempPath, true)
-    }
-
     ; 私有方法
     static _CreateHeader() {
         header := Buffer(16)

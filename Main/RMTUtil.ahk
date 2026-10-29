@@ -328,7 +328,6 @@ InitRMTHttpPlugin() {
     global RMT_Ai := ""
     global RMT_ASM := ""
     global RMT_Discourse := ""
-    global RMT_IsForbidUpdate := false
     global RMT_Sponsors := []
     global RMT_HasDotNet := HasDotNetFramework()
     global RMT_StatusPollFn := ""
@@ -489,13 +488,11 @@ SetShareAuth(apiUser, apiKey) {
 }
 
 ApplyRMTServerRsp(rspStr) {
-    global RMT_IsForbidUpdate, RMT_Sponsors, MyMainWin
+    global RMT_Sponsors, MyMainWin
     if (rspStr = "")
         return
     try {
         rsp := JSON.parse(rspStr)
-        if (rsp.Has("isForbidUpdate"))
-            RMT_IsForbidUpdate := !!rsp["isForbidUpdate"]
         if (rsp.Has("sponsors"))
             RMT_Sponsors := ParseSponsorList(rsp["sponsors"])
         if (IsObject(MyMainWin))
@@ -1321,9 +1318,11 @@ OnToolTextCheckScreenShot() {
 }
 
 TogGetSelectArea(isEnable, action := "") {
+    global SelectAreaState
     if (isEnable && action != "") {
+        SelectAreaState := {breakFlag: false, winPos: "", firstPos: false, sx: 0, sy: 0}
         MainSoftData.GetAreaAction := action
-        ; §18 自动吸附：升级为拖动中实时框选绘制（复用 SelectAreaDraw），窗口/控件边缘自动吸附
+        ; 透传左键事件给外部截图工具，记录屏幕坐标并绘制辅助框。
         ToolTipContent(GetLang("请框选搜索范围"))
         SetSystemCursor("CROSS")
         Hotkey("~*LButton", OnGetSelectAreaDown, "On")
@@ -1344,22 +1343,20 @@ TogGetSelectArea(isEnable, action := "") {
 }
 
 OnGetSelectAreaDown(*) {
-    global SelectAreaState
-    SelectAreaState.winPos := ""
-    SelectAreaState.firstPos := false
-    CoordMode("Mouse", "Screen")
-    MouseGetPos(&startX, &startY)
-    MainSoftData.StartAreaPosX := startX
-    MainSoftData.StartAreaPosY := startY
+    ; 外部截图工具自行框选，不叠加 RMT 的边缘吸附。
+    BeginSelectArea(false)
     SetTimer(SelectAreaDraw, 30)
 }
 
 OnGetSelectAreaUp(*) {
-    action := MainSoftData.GetAreaAction
-    TogGetSelectArea(false)
-    if (action == "")
-        return
     global SelectAreaState
+    SetTimer(SelectAreaDraw, 0)
+    UpdateSelectAreaPosition()
+    action := MainSoftData.GetAreaAction
+    started := SelectAreaState.firstPos
+    TogGetSelectArea(false)
+    if (action == "" || !started)
+        return
     if (SelectAreaState.winPos != "" && ObjHasOwnProp(SelectAreaState.winPos, "W") && SelectAreaState.winPos.W > 0 && SelectAreaState.winPos.H > 0) {
         x1 := SelectAreaState.winPos.X
         y1 := SelectAreaState.winPos.Y
@@ -1417,15 +1414,15 @@ TogSelectArea(isEnable, action := "") {
 }
 
 SelectAreaDown(*) {
-    global SelectAreaState
-    SelectAreaState.winPos := ""
-    SelectAreaState.firstPos := false
+    BeginSelectArea(true)
     SetTimer(SelectAreaDraw, 30)
 }
 
 SelectAreaUp(*) {
     global SelectAreaState
     SetTimer(SelectAreaDraw, 0)
+    UpdateSelectAreaPosition()
+    SelectAreaHo.Hide()
 
     action := MainSoftData.SelectAreaAction
     if (action != "") {
@@ -1444,36 +1441,44 @@ SelectAreaUp(*) {
 
 SelectAreaCancel(*) {
     global SelectAreaState
+    SetTimer(SelectAreaDraw, 0)
     SelectAreaState.winPos := ""
-    SelectAreaUp()
+    SelectAreaState.firstPos := false
+    SelectAreaState.breakFlag := true
+    SelectAreaHo.Hide()
+}
+
+BeginSelectArea(snapToEdges) {
+    global SelectAreaState
+    CoordMode("Mouse", "Screen")
+    MouseGetPos(&sx, &sy)
+    SelectAreaState.sx := sx
+    SelectAreaState.sy := sy
+    SelectAreaState.firstPos := true
+    SelectAreaState.snapToEdges := snapToEdges
+    SelectAreaState.winPos := {X: sx, Y: sy, W: 0, H: 0}
+    MainSoftData.StartAreaPosX := sx
+    MainSoftData.StartAreaPosY := sy
+}
+
+UpdateSelectAreaPosition() {
+    global SelectAreaState
+    if (!SelectAreaState.firstPos)
+        return
+    CoordMode("Mouse", "Screen")
+    MouseGetPos(&ex, &ey)
+    if (SelectAreaState.snapToEdges) {
+        _snap := SnapPointToCandidates(ex, ey, 6)
+        ex := _snap.X
+        ey := _snap.Y
+    }
+    sx := SelectAreaState.sx, sy := SelectAreaState.sy
+    SelectAreaState.winPos := {X: Min(sx, ex), Y: Min(sy, ey), W: Abs(ex - sx), H: Abs(ey - sy)}
 }
 
 SelectAreaDraw(*) {
     global SelectAreaState
-    CoordMode("Mouse")
-    if (!SelectAreaState.firstPos) {
-        SelectAreaState.firstPos := true
-        mx := 0, my := 0
-        MouseGetPos(&mx, &my)
-        SelectAreaState.sx := mx
-        SelectAreaState.sy := my
-    } else {
-        ex := 0, ey := 0
-        MouseGetPos(&ex, &ey)
-        ; §18 框选自动吸附：当前光标位置吸附到 光标下窗口/控件 的边缘（容差内生效，保留手动拖拽）
-        _snap := SnapPointToCandidates(ex, ey, 6)
-        ex := _snap.X
-        ey := _snap.Y
-        sx := SelectAreaState.sx, sy := SelectAreaState.sy
-        if (sx <= ex && sy <= ey)
-            SelectAreaState.winPos := {X: sx, Y: sy, W: ex - sx, H: ey - sy}
-        else if (sx > ex && sy <= ey)
-            SelectAreaState.winPos := {X: ex, Y: sy, W: sx - ex, H: ey - sy}
-        else if (sx <= ex && sy > ey)
-            SelectAreaState.winPos := {X: sx, Y: ey, W: ex - sx, H: sy - ey}
-        else if (sx > ex && sy > ey)
-            SelectAreaState.winPos := {X: ex, Y: ey, W: sx - ex, H: ey - sy}
-    }
+    UpdateSelectAreaPosition()
     if (SelectAreaState.winPos != "" && ObjHasOwnProp(SelectAreaState.winPos, "W") && SelectAreaState.winPos.W > 0 && SelectAreaState.winPos.H > 0) {
         x1 := SelectAreaState.winPos.X
         y1 := SelectAreaState.winPos.Y

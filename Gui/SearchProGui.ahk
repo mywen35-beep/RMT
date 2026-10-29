@@ -211,7 +211,7 @@ class SearchProGui {
         imgPanel := typeHost.Add("Grid").Name("ImagePanel").Height(136).VerticalAlignment("Top")
         imgPanel.Rows("32", "32", "72")
         imgRow0 := imgPanel.Add("Grid").Grid_Row(0)
-        imgRow0.Cols("Auto", "6", "56")
+        imgRow0.Cols("Auto", "6", "56", "10", "Auto", "*")
         imgRow0.Add("TextBlock").Grid_Column(0).Name("SimilarTipCon").Text(GetLang("相似度(%)：")).VerticalAlignment("Center")
             .Foreground("{DynamicResource TextMain}").FontSize("12")
         imgRow0.Add("TextBox").Grid_Column(2).Name("SimilarCon").Height(28).MinHeight(28)
@@ -219,6 +219,12 @@ class SearchProGui {
             .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}")
             .BorderBrush("{DynamicResource ControlBorder}").BorderThickness("1")
         imgRow1 := imgPanel.Add("Grid").Grid_Row(1)
+        colorMatch := imgRow0.Add("StackPanel").Grid_Column(4).Name("ColorMatchHost").Orientation("Horizontal").VerticalAlignment("Center")
+        colorMatch.InjectResources('<Style x:Key="ColorMatchSwitch" TargetType="CheckBox"><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="50"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border x:Name="Track" Width="42" Height="24" CornerRadius="12" Background="{DynamicResource ControlBorder}" BorderBrush="{DynamicResource OutlineStroke}" BorderThickness="1"><Grid><TextBlock x:Name="OffGlyph" Text="×" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource TextSub}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,7,1"/><Ellipse x:Name="Thumb" Width="18" Height="18" Fill="{DynamicResource ControlBg}" HorizontalAlignment="Left" Margin="2"/></Grid></Border><ContentPresenter Grid.Column="1" VerticalAlignment="Center"/></Grid><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Track" Property="Background" Value="{DynamicResource ActionBg}"/><Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/><Setter TargetName="OffGlyph" Property="Visibility" Value="Collapsed"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>')
+        colorMatch.Add("TextBlock").Text(GetLang("颜色匹配") "：").Margin("0,0,6,0")
+            .VerticalAlignment("Center").Foreground("{DynamicResource TextMain}")
+        colorMatch.Add("CheckBox").Name("ColorMatchCon").Style("{StaticResource ColorMatchSwitch}")
+            .VerticalAlignment("Center").IsChecked("False").ToolTip(GetLang("颜色匹配"))
         imgRow1.Cols("*", "8", "28", "8", "28")
         imgRow1.Add("ComboBox").Grid_Column(0).Name("ImagePathCon").Height(28).MinHeight(28)
             .HorizontalAlignment("Stretch").VerticalAlignment("Center").IsEditable("True").FontSize("11")
@@ -239,9 +245,9 @@ class SearchProGui {
         imgPrev.Add("Image").Name("ImageCon").Stretch("Uniform")
             .HorizontalAlignment("Stretch").VerticalAlignment("Stretch")
         imgPanel.Add("Button").Grid_Row(2).Name("ImageProcessBtn").Uid("gm:Search.ImageProcess")
-            .Width(76).Height(28).MinHeight(28).Padding("0").Cursor("Hand")
-            .HorizontalAlignment("Left").VerticalAlignment("Top").Margin("72,6,0,0")
-            .Content(GetLang("图片处理")).FontSize("11").Tag("0")
+            .Width(22).Height(22).MinHeight(22).Padding("0").Cursor("Hand")
+            .HorizontalAlignment("Left").VerticalAlignment("Top").Margin("72,4,0,0")
+            .FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets").Content(Chr(0xE70F)).FontSize("12").Tag("0")
             .ToolTip(GetLang("图片处理：多点选点、裁剪或重命名模板"))
             .Foreground("{DynamicResource TextMain}").Background("{DynamicResource ControlBg}")
             .BorderBrush("{DynamicResource ControlBorder}").BorderThickness("1")
@@ -538,9 +544,7 @@ class SearchProGui {
             || (matchMode == "super" && this.SuperMultiPointSeedData.Length < 1))
             matchMode := ""
         on := matchMode == "multi" || matchMode == "super"
-        label := matchMode == "super" ? GetLang("超多点")
-            : (matchMode == "multi" ? GetLang("多点") : GetLang("图片处理"))
-        try this.ui.Update("ImageProcessBtn", "Content", label)
+        try this.ui.Update("ImageProcessBtn", "Content", Chr(0xE70F))
         try this.ui.Update("ImageProcessBtn", "Tag", on ? "1" : "0")
         try this.ui.Update("ImageProcessBtn", "ToolTip", on
             ? (matchMode == "super"
@@ -580,6 +584,7 @@ class SearchProGui {
         st := (IsNumber(this.Data.SearchType) && this.Data.SearchType >= 1 && this.Data.SearchType <= 6) ? Integer(this.Data.SearchType) : 1
         this.ui.Update("SearchTypeCon", "SelectedIndex", String(st - 1))
         this.ui.Update("SimilarCon", "Text", this.Data.Similar)
+        this.ui.Update("ColorMatchCon", "IsChecked", SearchColorMatchOn(this.Data) ? "True" : "False")
         this.ui.Update("ColorSimilarCon", "Text", this.Data.Similar)
         this.ui.Update("WinInfoCon", "Text", this.Data.WinInfo)
         this.MultiPointData := ObjHasOwnProp(this.Data, "MultiPointData") && IsObject(this.Data.MultiPointData)
@@ -628,7 +633,7 @@ class SearchProGui {
         if (!ObjHasOwnProp(data, "SearchTargetArr") || !IsObject(data.SearchTargetArr) || data.SearchTargetArr.Length < 1)
             return
         t := data.SearchTargetArr[1]
-        for key in ["SearchType", "WinInfo", "SearchColor", "SearchText", "SearchImagePath", "Similar", "OCRType", "SearchImageType", "Adaptive", "StartPosX", "StartPosY", "EndPosX", "EndPosY"] {
+        for key in ["SearchType", "WinInfo", "SearchColor", "SearchText", "SearchImagePath", "Similar", "ColorMatch", "OCRType", "SearchImageType", "Adaptive", "StartPosX", "StartPosY", "EndPosX", "EndPosY"] {
             if (ObjHasOwnProp(t, key))
                 data.%key% := t.%key%
         }
@@ -730,6 +735,7 @@ class SearchProGui {
         data.Similar := (this._TypeIndex() == 2 || this._TypeIndex() == 5) ? this.ui.Query("ColorSimilarCon") : this.ui.Query("SimilarCon")
         data.OCRType := 1
         data.SearchImageType := SearchImageDefaultType()
+        data.ColorMatch := this._IsChecked("ColorMatchCon") ? 1 : 0
         data.MultiPointData := this.MultiPointData
         data.MultiPointSeedData := this.MultiPointSeedData
         data.SuperMultiPointSeedData := this.SuperMultiPointSeedData
@@ -820,6 +826,7 @@ class SearchProGui {
         isWin := curType == 4 || curType == 5 || curType == 6
         isInfinite := this.ui.Query("SearchCountCon") == GetLang("无限")
         this.SetConArrState(this.ImageVariArr, false, isImage)
+        this.ui.Update("ColorMatchHost", "Visibility", isImage && SearchImageDefaultType() == 1 ? "Visible" : "Collapsed")
         this.SetConArrState(this.ColorArr, false, isColor)
         this.SetConArrState(this.TextArr, false, isText)
         if (isColor)
@@ -920,16 +927,7 @@ class SearchProGui {
         path := FileSelect(1, curPath, GetLang("选择图片"), "PNG Files (*.png)")
         if (path == "")
             return
-        SplitPath path, &name, &dir, &ext, &name_no_ext, &drive
-        newPath := A_WorkingDir "\Setting\" MySoftData.CurSettingName "\Images\ScreenShot\" name
-        if (path != newPath) {
-            if (FileExist(newPath)) {
-                imageSerial := GetNextImageSerial()
-                newPath := A_WorkingDir "\Setting\" MySoftData.CurSettingName "\Images\ScreenShot\" imageSerial ".png"
-            }
-            FileCopy(path, newPath)
-            path := newPath
-        }
+        path := StoreSearchImage(path)
         this._ResetImageProcessForNewImage()
         this._SetImage(path)
         this.Data.SearchImagePath := path
@@ -972,6 +970,10 @@ class SearchProGui {
     }
 
     OnGetArea(x1, y1, x2, y2) {
+        if (this._TypeIndex() >= 4) {
+            this.OnF1SetAreaAction(x1, y1, x2, y2)
+            return
+        }
         this.OnSetSearchArea(Max(0, x1 - 20), Max(0, y1 - 20), Min(A_ScreenWidth, x2 + 20), Min(A_ScreenHeight, y2 + 20))
     }
 
@@ -1054,8 +1056,11 @@ class SearchProGui {
 
     OnF1SetAreaAction(x1, y1, x2, y2) {
         isWin := this._TypeIndex() >= 4
-        Point1 := isWin ? GetWinPos(x1, y1) : [x1, y1]
-        Point2 := isWin ? GetWinPos(x2, y2) : [x2, y2]
+        hwndList := isWin ? GetHwndList(this.ui.Query("WinInfoCon")) : []
+        if (isWin && hwndList.Length == 0)
+            return
+        Point1 := isWin ? GetWinPos(x1, y1, hwndList[1]) : [x1, y1]
+        Point2 := isWin ? GetWinPos(x2, y2, hwndList[1]) : [x2, y2]
         this.OnSetSearchArea(Point1[1], Point1[2], Point2[1], Point2[2])
     }
 

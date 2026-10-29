@@ -1,8 +1,8 @@
-#Requires AutoHotkey v2.0
+﻿#Requires AutoHotkey v2.0
 
 ; =====================================================================
-; é´éç¼è¾å¨ ââ XAML è¿ç§»çï¼ç¬ç«å®ç°ï¼
-; å¬å¼æ¥å£ä¿æï¼ShowGui(cmd) / SureBtnAction / OwnerHwnd / ParentTile
+; 间隔编辑器 —— XAML 迁移版（独立实现）
+; 公开接口保持：ShowGui(cmd) / SureBtnAction / OwnerHwnd / ParentTile
 ; =====================================================================
 
 class IntervalGui {
@@ -46,7 +46,7 @@ class IntervalGui {
         return s
     }
 
-    ; batching ä¸­å¥éï¼_flushBatch ä¸æ¬¡æ§ BatchUpdateï¼åå¹¶ Init çå¤æ¬¡ Update ä¸ºä¸æ¬¡ IPCï¼
+    ; batching 中入队，_flushBatch 一次性 BatchUpdate（合并 Init 的多次 Update 为一次 IPC）
     _ComboPush(comboName, propertyName, value) {
         if (this._batching)
             this._batch.Push({ControlName: comboName, PropertyName: propertyName, Value: value})
@@ -65,7 +65,7 @@ class IntervalGui {
     _BuildAndShow() {
         global MySoftData
         this._closed := false
-        title := this.ParentTile GetLang("é´éç¼è¾å¨")
+        title := this.ParentTile GetLang("间隔编辑器")
         this._title := title
         titleHeight := XAMLHost.CmdTitleBarHeight()
 
@@ -83,29 +83,29 @@ class IntervalGui {
         form.Rows("34", "34", "34", "34")
         form.Cols("80", "*")
 
-        form.Add("TextBlock").Grid_Row(0).Grid_Column(0).Text(GetLang("å¤æ³¨ï¼")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
+        form.Add("TextBlock").Grid_Row(0).Grid_Column(0).Text(GetLang("备注：")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
         form.Add("TextBox").Grid_Row(0).Grid_Column(1).Name("RemarkCon").Height(26).MinHeight(26)
             .VerticalContentAlignment("Center").FontSize("11").Padding("2,0")
             .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}")
             .BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
 
-        form.Add("TextBlock").Grid_Row(1).Grid_Column(0).Text(GetLang("ç±»åï¼")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
+        form.Add("TextBlock").Grid_Row(1).Grid_Column(0).Text(GetLang("类型：")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
         combo := form.Add("ComboBox").Grid_Row(1).Grid_Column(1).Name("TypeCombo").Height(26).MinHeight(26).SelectedIndex("0")
             .VerticalContentAlignment("Center").FontSize("11").Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}").BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
-        combo.Add("ComboBoxItem").Content(GetLang("åºå®")).Tag("1")
-        combo.Add("ComboBoxItem").Content(GetLang("éæº")).Tag("2")
+        combo.Add("ComboBoxItem").Content(GetLang("固定")).Tag("1")
+        combo.Add("ComboBoxItem").Content(GetLang("随机")).Tag("2")
 
-        form.Add("TextBlock").Grid_Row(2).Grid_Column(0).Name("TimeTip1").Text(GetLang("æ¶é´Aï¼")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
+        form.Add("TextBlock").Grid_Row(2).Grid_Column(0).Name("TimeTip1").Text(GetLang("时间A：")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
         form.Add("ComboBox").Grid_Row(2).Grid_Column(1).Name("TimeVarCon1").Height(26).MinHeight(26).IsEditable("True")
             .VerticalContentAlignment("Center").FontSize("11").Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}").BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
 
         timeRow2 := form.Add("Grid").Name("TimeRow2").Grid_Row(3).Grid_ColumnSpan(2).Visibility("Collapsed")
         timeRow2.Cols("80", "*")
-        timeRow2.Add("TextBlock").Grid_Column(0).Text(GetLang("æ¶é´Bï¼")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
+        timeRow2.Add("TextBlock").Grid_Column(0).Text(GetLang("时间B：")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
         timeRow2.Add("ComboBox").Grid_Column(1).Name("TimeVarCon2").Height(26).MinHeight(26).IsEditable("True")
             .VerticalContentAlignment("Center").FontSize("11").Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}").BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
 
-        body.Add("TextBlock").Grid_Row(1).Margin("2,6,2,0").Text(GetLang("åä½ï¼æ¯«ç§"))
+        body.Add("TextBlock").Grid_Row(1).Margin("2,6,2,0").Text(GetLang("单位：毫秒"))
             .Foreground("{DynamicResource TextSub}").FontSize("11")
 
         btnRow := body.Add("StackPanel").Grid_Row(2).Orientation("Horizontal").HorizontalAlignment("Center").VerticalAlignment("Top").Margin("0,4,0,8")
@@ -152,7 +152,7 @@ class IntervalGui {
         this._closed := true
     }
 
-    ; è®¾ç½®å¯ç¼è¾ ComboBox åéé¡¹ + å½åææ¬
+    ; 设置可编辑 ComboBox 候选项 + 当前文本
     _SetCombo(comboName, items, text) {
         if (!IsObject(this.ui))
             return
@@ -189,7 +189,7 @@ class IntervalGui {
             this._SetCombo("TimeVarCon1", DLVarArr, "500")
             this._SetCombo("TimeVarCon2", DLVarArr, "1000")
         } else {
-            ; é´é_æ¶é´A_å¤æ³¨  /  é´é_æ¶é´A~æ¶é´B_å¤æ³¨
+            ; 间隔_时间A_备注  /  间隔_时间A~时间B_备注
             timePart := cmdArr[2]
             remark := ""
             if (cmdArr.Length >= 3) {
@@ -212,11 +212,11 @@ class IntervalGui {
         this.OnTypeChange()
     }
 
-    ; é´é_æ¶é´A_å¤æ³¨  /  é´é_æ¶é´A~æ¶é´B_å¤æ³¨
+    ; 间隔_时间A_备注  /  间隔_时间A~时间B_备注
     GetCmdStr() {
         time1 := this.ui.Query("TimeVarCon1")
         timePart := this._TypeValue() == 2 ? time1 "~" this.ui.Query("TimeVarCon2") : time1
-        return CorrectRemark(GetLang("é´é") "_" timePart, Trim(this.ui.Query("RemarkCon")))
+        return CorrectRemark(GetLang("间隔") "_" timePart, Trim(this.ui.Query("RemarkCon")))
     }
 
     OnTypeChange(state := "", ctrl := "", event := "") {
@@ -232,7 +232,7 @@ class IntervalGui {
         timeText := this.ui.Query("TimeVarCon1")
         if (IsNumber(timeText)) {
             if (IsFloat(timeText) || timeText < 0) {
-                MsgBox(GetLang("è¯·è¾å¥å¤§äº0çæ´æ°"))
+                MsgBox(GetLang("请输入大于0的整数"))
                 return
             }
         }
@@ -241,14 +241,14 @@ class IntervalGui {
             timeText := this.ui.Query("TimeVarCon2")
             if (IsNumber(timeText)) {
                 if (IsFloat(timeText) || timeText < 0) {
-                    MsgBox(GetLang("è¯·è¾å¥å¤§äº0çæ´æ°"))
+                    MsgBox(GetLang("请输入大于0的整数"))
                     return
                 }
             }
 
             if (IsNumber(this.ui.Query("TimeVarCon1")) && IsNumber(this.ui.Query("TimeVarCon2"))) {
                 if (this.ui.Query("TimeVarCon1") >= this.ui.Query("TimeVarCon2")) {
-                    MsgBox(GetLang("æ¶é´A éè¦å°äº æ¶é´B"))
+                    MsgBox(GetLang("时间A 需要小于 时间B"))
                     return
                 }
             }

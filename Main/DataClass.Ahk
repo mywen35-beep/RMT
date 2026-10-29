@@ -1132,6 +1132,7 @@ class SearchData {
         this.MultiPointMode := ""
         this.OCRType := 1   ;1中文  2英文
         this.SearchImageType := SearchImageDefaultType() ; 1 OpenCV  2 RMT搜图
+        this.ColorMatch := 0 ; OpenCV 图片匹配是否比较颜色，独立于相似度
         this.StartPosX := 0
         this.StartPosY := 0
         this.EndPosX := A_ScreenWidth
@@ -1320,7 +1321,7 @@ class LoopData {
     __New() {
         this.SerialStr := ""
         this.LoopCount := 10    ;循环次数
-        this.CondiType := 1     ;条件类型 1：无 2：退出条件 3：继续条件
+        this.CondiType := 1     ;条件类型 1：无 2：继续条件 3：退出条件
         this.LogicType := 1     ;逻辑关系  1：且    2：或
         this.ToggleArr := [1, 0]
         this.NameArr := ["Var1", "Var2"]

@@ -16,6 +16,7 @@
 #Include Util\ExpressUtil.ahk
 #Include Util\InputUtil.ahk
 #Include Util\SearchUtil.ahk
+#Include Util\SearchImageAssetUtil.ahk
 #Include Util\FileIOUtil.ahk
 #Include Util\HumanMouse.ahk
 #Include Util\MacroUtil.ahk
@@ -134,16 +135,23 @@ GetParamsWinInfoStr(infoStr) {
 
     if (InStr(infoStr, "❖")) {
         infoStr := StrReplace(infoStr, "❖")
-        groupName := "UIGroup_" infoStr
+        if (infoStr == "")
+            return ""
         static groupCache := Map()
-        if (!groupCache.Has(groupName)) {
+        if (!groupCache.Has(infoStr)) {
+            ; 窗口组名称只允许字母、数字和下划线，不能直接包含句柄分隔符 |。
+            groupName := "UIGroup_" (groupCache.Count + 1)
             hwndList := StrSplit(infoStr, "|")
-            for index, hwnd in hwndList {
-                GroupAdd(groupName, "ahk_id " hwnd)
+            for hwnd in hwndList {
+                if (!RegExMatch(Trim(hwnd), "i)^(?:0x[0-9a-f]+|[0-9]+)$") || Integer(Trim(hwnd)) == 0)
+                    return ""
             }
-            groupCache[groupName] := true
+            for index, hwnd in hwndList {
+                GroupAdd(groupName, "ahk_id " Trim(hwnd))
+            }
+            groupCache[infoStr] := groupName
         }
-        ResStr := "ahk_group " groupName
+        ResStr := "ahk_group " groupCache[infoStr]
         return ResStr
     }
 

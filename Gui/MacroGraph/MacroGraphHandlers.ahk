@@ -1144,6 +1144,7 @@ class MacroGraphHandlersMixin {
         path := FileSelect(1, data.SearchImagePath, GetLang("选择图片"), "PNG Files (*.png)")
         if (path == "")
             return
+        path := StoreSearchImage(path)
         data.SearchImagePath := path
         SaveMacroCMDData(data)
         this._RefreshSearchInline(id)

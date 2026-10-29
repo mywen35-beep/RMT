@@ -60,7 +60,12 @@ extern "C" IMAGEFINDER_API int __cdecl FindWinImage(                // 窗口图
 
 // ---- 自适应匹配与多点找图 ----
 // GetApiVersion 用于让 AHK 判断 DLL 是否包含相应接口。
-extern "C" IMAGEFINDER_API int __cdecl GetApiVersion();            // 11 = 超多点候选粗搜、局部复核及忽略蒙版
+extern "C" IMAGEFINDER_API int __cdecl GetApiVersion();            // 12 = 独立颜色匹配参数
+
+extern "C" IMAGEFINDER_API int __cdecl FindScreenImageEx(const char* path,
+    int sx, int sy, int sw, int sh, int threshold, int colorMatch, int adaptive, int* x, int* y);
+extern "C" IMAGEFINDER_API int __cdecl FindWinImageEx(const char* path, int hwnd,
+    int sx, int sy, int sw, int sh, int threshold, int colorMatch, int adaptive, int* x, int* y);
 
 extern "C" IMAGEFINDER_API int __cdecl FindScreenImageAdaptive(     // 屏幕自适应图片匹配
     const char* targetPath,

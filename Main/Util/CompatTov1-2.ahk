@@ -172,6 +172,16 @@ CompatPathTarget(settingDir, Data) {
             return true
         }
     }
+    ; 旧版“选择图片”只记录外部绝对路径。原图尚在时收进配置，导出才会携带。
+    ; 变量名/表达式不按文件处理，缺失的原图也不伪造替代路径。
+    if (RegExMatch(Data.SearchImagePath, "i)^(?:[a-z]:[\\/]|\\\\)")
+        && FileExist(Data.SearchImagePath) && !DirExist(Data.SearchImagePath)) {
+        newPath := StoreSearchImage(Data.SearchImagePath, settingDir)
+        if (newPath != Data.SearchImagePath) {
+            Data.SearchImagePath := newPath
+            return true
+        }
+    }
     return false
 }
 

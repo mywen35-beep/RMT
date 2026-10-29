@@ -4008,7 +4008,8 @@ class MainWin {
         }
         remarkGroupW := 24 + 6 + this._foldFieldW
         frontGroupW := 12 + 4 + this._foldFrontW + 4 + 24 + 4 + 24
-        toolbarW := 3 * (24 + 4) + 24
+        ; 四个带右间距的按钮 + 最右侧删除按钮，防止删除被列宽裁掉。
+        toolbarW := 4 * (24 + 4) + 24
         return '<ColumnDefinition Width="' remarkGroupW '"/>' gapCol
             . '<ColumnDefinition Width="' frontGroupW '"/>' gapCol
             . '<ColumnDefinition Width="' toolbarW '"/>' lastCol
@@ -5173,7 +5174,7 @@ class MainWin {
             . this._BuildFoldIconBtn("FoldPasteMacro", "FoldPasteMacro", t, f, "&#xE77F;", GetLang("粘贴宏"), vlMode)
             . this._BuildFoldIconBtn("FoldShare", "FoldShare", t, f, "&#xE898;", GetLang("分享到论坛"), vlMode)
             . this._BuildFoldForbidBtnXaml(t, f, forbidState, vlMode)
-            . this._BuildFoldIconBtn("FoldDel", "FoldDel", t, f, "&#xE74D;", GetLang("删除"), vlMode, true, true)
+            . this._BuildFoldIconBtn("FoldDel", "FoldDel", t, f, "&#xE74D;", GetLang("删除模块"), vlMode, true, true)
     }
 
     ; 禁用：RmtFoldForbidBtn 悬停走主题 ActionHover；非 VL 由 SyncFoldForbidBtnUI 同步激活态
@@ -6427,7 +6428,7 @@ class MainWin {
         this.MarkSettingDirty(ctrl)
     }
 
-    ; 共享上传：退出登录 —— 清空本机凭据（论坛侧那条密钥不撤销，用户可自行去 个人设置 → 应用 撤销）
+    ; 论坛分享：退出登录 —— 清空本机凭据（论坛侧那条密钥不撤销，用户可自行去 个人设置 → 应用 撤销）
     OnShareLogoutClick(state, ctrl, event) {
         if (this._shareLoginTick != "") {              ; 正在等授权：一并取消
             SetTimer(this._shareLoginTick, 0)
@@ -6438,7 +6439,7 @@ class MainWin {
         this._SetShareLoginState(this._ShareLoginStateText())
     }
 
-    ; ---- 共享上传：浏览器授权登录（Discourse /user-api-key/new） ----
+    ; ---- 论坛分享：浏览器授权登录（Discourse /user-api-key/new） ----
     ; 点按钮 → C# 起本地固定端口监听 + 打开浏览器授权页 → 轮询 GetAuthState()，
     ; 2 = 已用 RSA 私钥解出 key → 写 ini → 再用 key 打 /session/current.json 校验并显示用户名。
     ; 前置条件：站点后台 allowed_user_api_auth_redirects 必须逐字包含

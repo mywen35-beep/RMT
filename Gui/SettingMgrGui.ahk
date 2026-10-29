@@ -68,11 +68,11 @@ class SettingMgrGui {
         scrollViewer := body.Add("ScrollViewer").VerticalScrollBarVisibility("Auto").HorizontalScrollBarVisibility("Disabled")
         panel := scrollViewer.Add("StackPanel").Margin("16, 8, 16, 12")
 
-        ; 顶部右侧按钮区：迁入宽 = 重命名 + 间距 + 配置校准，左右分别对齐
-        renameW := 80
-        repairW := 80
+        ; 顶部入口与当前配置操作按钮的宽度
+        renameW := 28
+        repairW := 28
         topBtnGap := 8
-        replaceW := renameW + topBtnGap + repairW
+        replaceW := 168
 
         ; 组内操作行：与「配置选项 + 下拉」同宽，左右按钮分别贴齐两端
         optLabelW := 78
@@ -81,13 +81,12 @@ class SettingMgrGui {
         operRowW := optLabelW + comboMargin + comboW
         operBtnW := 100
 
-        ; 所有配置 + 迁入
-        rowAll := panel.Add("Grid").Margin("0,2,0,0")
-        rowAll.Cols("*", "Auto")
-        rowAll.Add("TextBlock").Text(GetLang("所有配置："))
-            .Foreground("{DynamicResource TextMain}").FontSize(13).FontWeight("SemiBold")
-            .VerticalAlignment("Center").Grid_Column(0)
-        this._AddBtn(rowAll, "BtnReplace", GetLang("迁入配置文件夹"), replaceW)
+        ; 共享仓库和旧版配置升级并排显示
+        rowTop := panel.Add("Grid").Margin("0,2,0,0")
+        rowTop.Cols("*", "Auto")
+        this._AddBtn(rowTop, "BtnOpenRepo", GetLang("共享仓库"), replaceW)
+            .Grid_Column(0).HorizontalAlignment("Left")
+        this._AddBtn(rowTop, "BtnReplace", GetLang("升级旧版配置"), replaceW)
             .Grid_Column(1).HorizontalAlignment("Right")
 
         ; 当前配置 + 重命名 / 校准
@@ -101,28 +100,28 @@ class SettingMgrGui {
         ; 当前配置名：剩余宽度内 Viewbox 仅缩小不放大；颜色跟随主题主文字
         curNameBox := curLeft.Add("Viewbox").Grid_Column(1).Margin("4,0,8,0")
             .Stretch("Uniform").StretchDirection("DownOnly")
-            .HorizontalAlignment("Stretch").VerticalAlignment("Center")
+            .HorizontalAlignment("Left").VerticalAlignment("Center")
         curNameBox.Add("TextBlock").Name("CurSettingCon").Text("")
             .Foreground("{DynamicResource TextMain}").FontSize(13)
             .VerticalAlignment("Center").TextAlignment("Left").TextWrapping("NoWrap")
         curRight := rowCur.Add("StackPanel").Orientation("Horizontal").Grid_Column(1)
-            .HorizontalAlignment("Right").VerticalAlignment("Center").Width(replaceW)
+            .HorizontalAlignment("Right").VerticalAlignment("Center").Width(renameW + topBtnGap + repairW)
         this._AddBtn(curRight, "BtnRename", GetLang("重命名"), renameW).Margin("0,0," topBtnGap ",0")
         this._AddBtn(curRight, "BtnRepair", GetLang("配置校准"), repairW)
 
         ; 新增与导入
-        addGroup := panel.Add("GroupBox").Header(GetLang("新增与导入")).Margin("0,12,0,0")
-            .BorderBrush("{DynamicResource ControlBorder}").BorderThickness("1")
-            .Foreground("{DynamicResource TextMain}")
+        addGroup := panel.Add("Border").Margin("0,12,0,0")
+            .BorderBrush("{DynamicResource OutlineStroke}").BorderThickness("1.5").CornerRadius("4")
+            .Background("Transparent")
         addInner := addGroup.Add("StackPanel").Orientation("Horizontal").Margin("12, 10, 12, 10").HorizontalAlignment("Center")
         this._AddBtn(addInner, "BtnAdd", GetLang("新增配置"), 100).Margin("0,0,10,0")
         this._AddBtn(addInner, "BtnUnpack", GetLang("导入配置"), 100).Margin("0,0,10,0")
         this._AddBtn(addInner, "BtnMerge", GetLang("合并导入"), 100)
 
         ; 配置操作
-        operGroup := panel.Add("GroupBox").Header(GetLang("配置操作")).Margin("0,10,0,0")
-            .BorderBrush("{DynamicResource ControlBorder}").BorderThickness("1")
-            .Foreground("{DynamicResource TextMain}")
+        operGroup := panel.Add("Border").Margin("0,10,0,0")
+            .BorderBrush("{DynamicResource OutlineStroke}").BorderThickness("1.5").CornerRadius("4")
+            .Background("Transparent")
         operInner := operGroup.Add("StackPanel").Margin("12, 8, 12, 10")
 
         rowOpt := operInner.Add("StackPanel").Orientation("Horizontal").Margin("0,2,0,0")
@@ -133,26 +132,17 @@ class SettingMgrGui {
         rowOpt.Add("ComboBox").Name("OperSettingCon").Width(comboW).Height(26).MinHeight(26)
             .Margin(comboMargin ",0,0,0")
 
-        this._AddPairBtnRow(operInner, "BtnLoad", GetLang("加载配置"), "BtnDel", GetLang("删除配置"),
+        this._AddPairBtnRow(operInner, "BtnLoad", GetLang("加载配置"), "BtnPack", GetLang("导出配置"),
             operRowW, operBtnW, "0,12,0,0")
-        this._AddPairBtnRow(operInner, "BtnCourse", GetLang("使用说明"), "BtnPack", GetLang("导出配置"),
+        this._AddPairBtnRow(operInner, "BtnCourse", GetLang("使用说明"), "BtnDel", GetLang("删除配置"),
             operRowW, operBtnW, "0,10,0,0")
-
-        ; 仓库配置（与配置操作行同宽对齐）
-        repoGroup := panel.Add("GroupBox").Header(GetLang("仓库配置")).Margin("0,10,0,0")
-            .BorderBrush("{DynamicResource ControlBorder}").BorderThickness("1")
-            .Foreground("{DynamicResource TextMain}")
-        repoInner := repoGroup.Add("StackPanel").Margin("12, 10, 12, 10")
-        this._AddPairBtnRow(repoInner, "BtnOpenRepo", GetLang("打开仓库"), "BtnUpload", GetLang("共享上传"),
-            operRowW, operBtnW, "0,0,0,0")
 
         tmp := StrReplace(XAML_TEMPLATE, "%CaptionHeight%", titleHeight)
         this.ui := XAMLHost(StrReplace(tmp, "%app%", main.ToString()), "", "")
-        this.ui.xaml := StrReplace(this.ui.xaml, 'Width="940" Height="700"', 'Title="' title '" ShowInTaskbar="True" Width="440" Height="460" Opacity="0"')
+        this.ui.xaml := StrReplace(this.ui.xaml, 'Width="940" Height="700"', 'Title="' title '" ShowInTaskbar="True" Width="440" Height="340" Opacity="0"')
         this.ui.xaml := StrReplace(this.ui.xaml, 'CornerRadius="{DynamicResource WindowRadius}"', 'CornerRadius="{DynamicResource PanelRadius}"')
         this.ui.xaml := StrReplace(this.ui.xaml, 'FontFamily="Segoe UI Variable Display, Segoe UI, sans-serif"', 'FontFamily="' MainSoftData.FontType '"')
-        groupBoxStyle := '<Style TargetType="GroupBox"><Setter Property="BorderBrush" Value="{DynamicResource ControlBorder}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Foreground" Value="{DynamicResource TextMain}"/></Style>'
-        this.ui.xaml := StrReplace(this.ui.xaml, '%resources%', '<CornerRadius x:Key="PanelRadius">8</CornerRadius>' groupBoxStyle)
+        this.ui.xaml := StrReplace(this.ui.xaml, '%resources%', '<CornerRadius x:Key="PanelRadius">8</CornerRadius>')
 
         this.ui.OnEvent("Window", "Closing", ObjBindMethod(this, "OnWindowClosing"))
         this.ui.OnEvent("Window", "LoadedHwnd", ObjBindMethod(this, "OnWindowLoad"))
@@ -171,7 +161,6 @@ class SettingMgrGui {
         this.ui.OnEvent("BtnCourse", "Click", ObjBindMethod(this, "OnCourseBtnClick"))
         this.ui.OnEvent("BtnPack", "Click", ObjBindMethod(this, "OnPackBtnClick"))
         this.ui.OnEvent("BtnOpenRepo", "Click", ObjBindMethod(this, "OnOpenRMTSettingBtnClick"))
-        this.ui.OnEvent("BtnUpload", "Click", ObjBindMethod(this, "OnRMTUploadBtnClick"))
 
         this._revealed := false
         ; Show 前入队配置：LoadedHwnd 时引擎先 flush _updateQueue 再调 OnWindowLoad，首帧已有文案
@@ -183,11 +172,31 @@ class SettingMgrGui {
     }
 
     _AddBtn(parent, name, content, width) {
-        btn := parent.Add("Button").Name(name).Content(content)
+        icons := Map("BtnOpenRepo", 0xE753, "BtnReplace", 0xE898,
+            "BtnRename", 0xE8AC, "BtnRepair", 0xE90F,
+            "BtnAdd", 0xE710, "BtnUnpack", 0xE8B5, "BtnMerge", 0xE8EA,
+            "BtnLoad", 0xE8E5, "BtnPack", 0xE8B6,
+            "BtnCourse", 0xE8A5, "BtnDel", 0xE74D)
+        btn := parent.Add("Button").Name(name)
             .Background("{DynamicResource EditBg}").Foreground("{DynamicResource EditText}")
             .BorderBrush("{DynamicResource EditStroke}").BorderThickness("1")
             .FontSize(12).Cursor("Hand").Width(width).Height(28)
-        btn.InjectResources(this._btnStyle)
+        btnStyle := this._btnStyle
+        if (name == "BtnDel") {
+            btn.Background("#C42B1C").Foreground("#FFFFFF").BorderBrush("#C42B1C")
+            btnStyle := StrReplace(btnStyle, "{DynamicResource EditHoverBg}", "#A4262C")
+            btnStyle := StrReplace(btnStyle, "{DynamicResource EditHoverStroke}", "#A4262C")
+        }
+        btn.InjectResources(btnStyle)
+        iconOnly := (name == "BtnRename" || name == "BtnRepair")
+        if (iconOnly)
+            btn.ToolTip(content).SetProp("AutomationProperties.Name", content)
+        contentPanel := btn.Add("StackPanel").Orientation("Horizontal").VerticalAlignment("Center")
+        contentPanel.Add("TextBlock").Text(Chr(icons[name]))
+            .FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets").FontSize(12)
+            .Margin(iconOnly ? "0" : "0,0,6,0").VerticalAlignment("Center")
+        if (!iconOnly)
+            contentPanel.Add("TextBlock").Text(content).VerticalAlignment("Center")
         return btn
     }
 
@@ -408,41 +417,7 @@ class SettingMgrGui {
     }
 
     OnOpenRMTSettingBtnClick(state, ctrl, event) {
-        ShareCenterGui.ShowGui()
-    }
-
-    OnRMTUploadBtnClick(state, ctrl, event) {
-        global RMT_Http, RMT_HasDotNet, RMT_IsForbidUpdate
-        if (!RMT_HasDotNet || RMT_Http == "") {
-            RmtDialog.Info(GetLang("缺少.NET环境，无法使用共享上传功能"), GetLang("提示"), this.ui.wpfHwnd)
-            return
-        }
-        if (RMT_IsForbidUpdate) {
-            RmtDialog.Info(Format("{}`n{}`n{}", GetLang("因为以下原因配置无法上传："), GetLang("服务器没有启动"), GetLang("今日上传次数太多")), GetLang("提示"), this.ui.wpfHwnd)
-            return
-        }
-        selectedFile := FileSelect(1, , GetLang("选择要共享上传的 RMT 文件"), "RMT Files (*.rmt)")
-        if selectedFile == ""
-            return
-
-        SplitPath selectedFile, &fileName, , &fileExt, &fileNameNoExt
-        if fileExt != "rmt" {
-            RmtDialog.Info(GetLang("请选择 .rmt 文件！"), GetLang("错误"), this.ui.wpfHwnd)
-            return
-        }
-
-        if (fileNameNoExt == GetLang("RMT默认配置")) {
-            RmtDialog.Info(GetLang("请重命名配置文件后再上传（配置名需要与功能相关）"), GetLang("提示"), this.ui.wpfHwnd)
-            return
-        }
-
-        isVaild := this.IsValidFolderName(fileNameNoExt)
-        if (!isVaild) {
-            RmtDialog.Info(GetLang("配置名不符合文件目录命名规则，请修改"), GetLang("提示"), this.ui.wpfHwnd)
-            return
-        }
-
-        FolderPackager.UploadFile(selectedFile)
+        Run("https://forum.ruomengtu.com/c/shared-repository")
     }
 
     OnPackBtnClick(state, ctrl, event) {
@@ -524,7 +499,6 @@ class SettingMgrGui {
 
     OnCourseBtnClick(state, ctrl, event) {
         folderPath := A_WorkingDir "\Setting\" this._GetSelectedSetting(state)
-        MyUseExplainGui.Mode := 1
         MyUseExplainGui.ShowGui(folderPath)
     }
 

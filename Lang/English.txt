@@ -953,6 +953,7 @@ as=None
 目标点保存=Save Target
 目标窗口信息不能为空=Target window info required
 相似度(%)：=Match(%):
+颜色匹配=Color match
 相关选项：=Related Options:
 相对位移=Relative
 真=True
@@ -2033,3 +2034,6 @@ Unix时间戳=Unix Timestamp
 使用说明：=Usage:
 多点：选取基准点后可自动补点，也可手动添加或移除匹配点。最多选择256个点。=Multi-point: select a seed point to add points automatically, or add and remove match points manually. Up to 256 points.
 超多点：选取基准色并设置容差；忽略蒙版中的涂抹区域不参与匹配。=Super multi-point: select seed colors and set a tolerance. Painted areas in the ignore mask are excluded from matching.
+
+共享仓库=Shared Repository
+升级旧版配置=Upgrade Old Configs

@@ -142,17 +142,29 @@ global IPC_REC := Chr(2)
 global IPC_ESC := Chr(3)
 
 EscapeIPC(str) {
-    str := StrReplace(str, IPC_SEP, IPC_ESC IPC_SEP)
-    str := StrReplace(str, IPC_REC, IPC_ESC IPC_REC)
+    ; 数据中不能再保留分隔符本身：接收端先 StrSplit，再反转义。
+    ; 必须先转义 ESC，否则真实的 ESC + 数字会与编码冲突。
+    str := StrReplace(str, IPC_ESC, IPC_ESC "3")
+    str := StrReplace(str, IPC_SEP, IPC_ESC "1")
+    str := StrReplace(str, IPC_REC, IPC_ESC "2")
     return str
 }
 
 UnescapeIPC(str) {
-    if InStr(str, IPC_ESC) {
-        str := StrReplace(str, IPC_ESC IPC_REC, IPC_REC)
-        str := StrReplace(str, IPC_ESC IPC_SEP, IPC_SEP)
+    result := ""
+    pos := 1
+    while (pos <= StrLen(str)) {
+        char := SubStr(str, pos, 1)
+        nextChar := SubStr(str, pos + 1, 1)
+        if (char == IPC_ESC && (nextChar == "1" || nextChar == "2" || nextChar == "3")) {
+            result .= nextChar == "1" ? IPC_SEP : (nextChar == "2" ? IPC_REC : IPC_ESC)
+            pos += 2
+        } else {
+            result .= char
+            pos++
+        }
     }
-    return str
+    return result
 }
 
 EncodeCommand(opcode, args*) {

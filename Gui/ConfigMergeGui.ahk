@@ -642,11 +642,8 @@ class ConfigMergeGui {
         try {
             if (FileExist(rmtPath))
                 FileDelete(rmtPath)
-            ; 询问包密码（弹窗挂在配置合并窗口上，取消 = 不导出）
-            if (!FolderPackager.PackFolderWithPassword(outDir, rmtPath, this.ui.wpfHwnd)) {
-                try DirDelete(outDir, true)
-                return
-            }
+            ; 供论坛发布的分享包使用普通格式。
+            FolderPackager.PackFolder(outDir, rmtPath)
         } catch as e {
             RmtDialog.Info(GetLang("打包失败: ") e.Message, GetLang("错误"), this.ui.wpfHwnd)
             return

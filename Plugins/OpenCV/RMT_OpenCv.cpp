@@ -16,9 +16,11 @@
 #include <memory>
 #include <mutex>
 #include <cstdarg>
+#include <iostream>
 #include <cstdio>
 #include <cwchar>
 #include <cstdlib>
+#include "WindowCapture.h"
 #pragma comment(lib, "Dwmapi.lib")
 
 // 兜底：某些 SDK/config 仍会在别处引入 min/max 宏
@@ -149,12 +151,6 @@ cv::Mat captureScreen(int hwnd, int x, int y, int width, int height) {
     if (!targetHwnd || !IsWindow(targetHwnd))
         return cv::Mat();
 
-    ThumbnailCache* cache = GetOrCreateCache(targetHwnd);
-    if (!cache) return cv::Mat();
-
-    HWND dstWin = cache->dstWin;
-    HTHUMBNAIL thumbnail = cache->thumbnail;
-
     // 客户区尺寸：缩略图源/目的都用客户区，与 AHK 侧 ScreenToClient 客户区坐标严格 1:1。
     // 目的若仍用整窗尺寸，客户区内容会被拉伸到整窗大小，造成残差偏移（#266 只修了裁剪区域，没修目的尺寸）。
     RECT clientRect;
@@ -165,6 +161,22 @@ cv::Mat captureScreen(int hwnd, int x, int y, int width, int height) {
     if (clientW <= 0 || clientH <= 0)
         return cv::Mat();
 
+    // Invalid/partially outside ROIs must not silently return the full client image.
+    const long capWidth = width <= 0 ? clientW : width;
+    const long capHeight = height <= 0 ? clientH : height;
+    if (x < 0 || y < 0 || capWidth > clientW || capHeight > clientH
+        || x > clientW - capWidth || y > clientH - capHeight)
+        return cv::Mat();
+    const RECT roi{ x, y, x + capWidth, y + capHeight };
+    cv::Mat gpu = CaptureGpuWindow(targetHwnd, roi);
+    if (!gpu.empty()) return gpu;
+
+    // Retain the previous DWM path for unsupported systems and minimized windows.
+    ThumbnailCache* cache = GetOrCreateCache(targetHwnd);
+    if (!cache) return cv::Mat();
+    HWND dstWin = cache->dstWin;
+    HTHUMBNAIL thumbnail = cache->thumbnail;
+
     // 菜单栏高度补偿：DWM 客户区含菜单栏，AHK 客户区不含，源区域需从菜单栏下方开始
     const int menuH = GetMenuBarHeight(targetHwnd);
 
@@ -174,7 +186,7 @@ cv::Mat captureScreen(int hwnd, int x, int y, int width, int height) {
     SetWindowPos(dstWin, nullptr, 0, 0, clientW, clientH,
         SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER);
 
-    DWM_THUMBNAIL_PROPERTIES props;
+    DWM_THUMBNAIL_PROPERTIES props{};
     props.dwFlags = DWM_TNP_RECTSOURCE | DWM_TNP_RECTDESTINATION | DWM_TNP_VISIBLE |
         DWM_TNP_SOURCECLIENTAREAONLY | DWM_TNP_OPACITY;
     // 客户区抓取，与 AHK 侧客户区坐标系一致，避免标题栏/边框算进截图
@@ -207,13 +219,12 @@ cv::Mat captureScreen(int hwnd, int x, int y, int width, int height) {
         bi.bmiHeader.biBitCount = 32;
         bi.bmiHeader.biCompression = BI_RGB;
 
-        GetDIBits(cDC, cBmp, 0, clientH, result.data, &bi, DIB_RGB_COLORS);
+        SelectObject(cDC, oldBmp);
+        if (GetDIBits(cDC, cBmp, 0, clientH, result.data, &bi, DIB_RGB_COLORS) != clientH)
+            result.release();
 
         // 裁剪指定区域
-        const long capWidth = (width <= 0) ? clientW : width;
-        const long capHeight = (height <= 0) ? clientH : height;
-        if ((x > 0 || y > 0 || capWidth < clientW || capHeight < clientH)
-            && x >= 0 && y >= 0 && x + capWidth <= clientW && y + capHeight <= clientH) {
+        if (!result.empty()) {
             result = result(cv::Rect(x, y, capWidth, capHeight)).clone();
         }
     }
@@ -486,8 +497,7 @@ extern "C" IMAGEFINDER_API int __cdecl FindScreenImage(
 		return 0;
 	}
 
-	// 通道数不一致时统一（4 通道 PNG 模板 + 3 通道截屏会让 matchTemplate 直接断言失败，
-	// 相似度 ≥95 不走灰度的那条分支最容易踩到）
+	// 通道数不一致时统一（4 通道 PNG 模板 + 3 通道截屏）。
 	if (templateImage.channels() != capturedImage.channels())
 	{
 		if (templateImage.channels() == 4 && capturedImage.channels() == 3)
@@ -498,17 +508,9 @@ extern "C" IMAGEFINDER_API int __cdecl FindScreenImage(
 
 	// 2. 转换为灰度图（提高处理速度）
 	cv::Mat grayLarge, graySmall;
-	// 相似度95及其以上，不做灰度处理
-	if (matchThreshold >= 95)
-	{
-		grayLarge = capturedImage;
-		graySmall = templateImage;
-	}
-	else
-	{
-		cv::cvtColor(capturedImage, grayLarge, cv::COLOR_BGR2GRAY);
-		cv::cvtColor(templateImage, graySmall, cv::COLOR_BGR2GRAY);
-	}
+	// 旧接口固定灰度；颜色匹配由 Ex 接口的独立参数控制。
+	cv::cvtColor(capturedImage, grayLarge, cv::COLOR_BGR2GRAY);
+	cv::cvtColor(templateImage, graySmall, cv::COLOR_BGR2GRAY);
 
 	// 3. 模板匹配
 	cv::Mat result;
@@ -610,18 +612,10 @@ extern "C" IMAGEFINDER_API int __cdecl FindWinImage(
 			cv::cvtColor(templateImage, templateImage, cv::COLOR_BGR2BGRA);
 	}
 
-	// 3. 转灰度（非高分相似度）
+	// 3. 旧接口固定灰度，不再根据相似度切换颜色模式。
 	cv::Mat grayLarge, graySmall;
-	if (matchThreshold >= 95)
-	{
-		grayLarge = capturedImage;
-		graySmall = templateImage;
-	}
-	else
-	{
-		cv::cvtColor(capturedImage, grayLarge, cv::COLOR_BGR2GRAY);
-		cv::cvtColor(templateImage, graySmall, cv::COLOR_BGR2GRAY);
-	}
+	cv::cvtColor(capturedImage, grayLarge, cv::COLOR_BGR2GRAY);
+	cv::cvtColor(templateImage, graySmall, cv::COLOR_BGR2GRAY);
 
 	// 4. 模板匹配
 	cv::Mat result;
@@ -952,7 +946,74 @@ static int findImageAdaptiveCore(const cv::Mat& captured, const cv::Mat& tpl, in
 
 extern "C" IMAGEFINDER_API int __cdecl GetApiVersion()
 {
-	return 11;  // 11 = 超多点支持可编辑忽略蒙版
+	return 12;  // 12 = 颜色匹配独立参数（屏幕、窗口及自适应）
+}
+
+// Ex 接口保留旧导出 ABI；颜色模式沿用原彩色模板的相似度算法，
+// 不允许灰度/边缘回退绕过颜色检查。未勾选时沿用灰度匹配。
+static int findImageExplicitCore(const cv::Mat& captured, const cv::Mat& tpl,
+	int threshold, bool colorMatch, bool adaptive, const char* key, cv::Point* pt)
+{
+	if (captured.empty() || tpl.empty()) return 0;
+	threshold = std::max(0, std::min(100, threshold));
+	if (!colorMatch && adaptive)
+		return findImageAdaptiveCore(captured, tpl, threshold, key, pt);
+	cv::Mat image, templ, mask;
+	if (colorMatch) {
+		if (captured.channels() == 4) cv::cvtColor(captured, image, cv::COLOR_BGRA2BGR);
+		else if (captured.channels() == 1) cv::cvtColor(captured, image, cv::COLOR_GRAY2BGR);
+		else image = captured;
+		if (tpl.channels() == 4) cv::cvtColor(tpl, templ, cv::COLOR_BGRA2BGR);
+		else if (tpl.channels() == 1) cv::cvtColor(tpl, templ, cv::COLOR_GRAY2BGR);
+		else templ = tpl;
+	} else {
+		toGrayMat(captured, image);
+		toGrayMat(tpl, templ);
+	}
+	bool useMask = buildAlphaMask(tpl, mask);
+	std::vector<double> scales = {1.0};
+	if (adaptive && colorMatch) {
+		const double ladder[] = {1.25, 0.8, 1.5, 0.6667, 1.75, 0.5714, 2.0, 0.5};
+		for (double scale : ladder) scales.push_back(scale);
+		for (double scale : ladder)
+			for (int delta = -3; delta <= 3; ++delta)
+				if (delta) scales.push_back(scale * (1.0 + delta * 0.02));
+	}
+	for (double scale : scales) {
+		cv::Mat candidate = resizeMat(templ, scale, false);
+		if (candidate.cols > image.cols || candidate.rows > image.rows) continue;
+		cv::Mat candidateMask = useMask ? resizeMat(mask, scale, true) : cv::Mat();
+		cv::Point location;
+		double score = matchBest(image, candidate, candidateMask, &location);
+		if (score >= threshold / 100.0) { *pt = location; return 1; }
+	}
+	return 0;
+}
+
+extern "C" IMAGEFINDER_API int __cdecl FindScreenImageEx(const char* path,
+	int sx, int sy, int sw, int sh, int threshold, int colorMatch, int adaptive, int* x, int* y)
+{
+	if (!path || !x || !y || sw <= 0 || sh <= 0) return 0;
+	try {
+		cv::Mat tpl = cv::imread(path, cv::IMREAD_UNCHANGED);
+		cv::Mat image = captureScreen(sx, sy, sw, sh);
+		cv::Point pt;
+		if (!findImageExplicitCore(image, tpl, threshold, colorMatch != 0, adaptive != 0, path, &pt)) return 0;
+		*x = sx + pt.x; *y = sy + pt.y; return 1;
+	} catch (const cv::Exception&) { return 0; }
+}
+
+extern "C" IMAGEFINDER_API int __cdecl FindWinImageEx(const char* path, int hwnd,
+	int sx, int sy, int sw, int sh, int threshold, int colorMatch, int adaptive, int* x, int* y)
+{
+	if (!path || !x || !y || sw <= 0 || sh <= 0) return 0;
+	try {
+		cv::Mat tpl = cv::imread(path, cv::IMREAD_UNCHANGED);
+		cv::Mat image = captureScreen(hwnd, sx, sy, sw, sh);
+		cv::Point pt;
+		if (!findImageExplicitCore(image, tpl, threshold, colorMatch != 0, adaptive != 0, path, &pt)) return 0;
+		*x = sx + pt.x; *y = sy + pt.y; return 1;
+	} catch (const cv::Exception&) { return 0; }
 }
 
 extern "C" IMAGEFINDER_API int __cdecl FindScreenImageAdaptive(

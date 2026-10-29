@@ -2,7 +2,7 @@
 
 ; =====================================================================
 ; 使用说明编辑器 —— XAML 迁移版（独立实现）
-; 公开接口保持：ShowGui(SettingPath) / Mode / ModeAction
+; 公开接口：ShowGui(SettingPath)
 ; ListView 图片列表迁 ListBox（缩略图 + 文件名，双击打开、右键删除，用桥接 ListBox 命中测试）
 ; =====================================================================
 
@@ -19,9 +19,6 @@ class UseExplainGui {
         this.ImagePathArr := []
         this.CheckClipboardAction := () => this.CheckClipboard()
         this.SettingPath := ""
-        this.Mode := 1  ;1查看模式  2上传确认模式
-        this.HasChange := false
-        this.ModeAction := ""
         this.RowNumber := 0
         this._closed := true
     }
@@ -112,9 +109,6 @@ class UseExplainGui {
         this.ui.OnEvent("Window", "Closing", ObjBindMethod(this, "OnWindowClosing"))
         this.ui.OnEvent("Window", "LoadedHwnd", ObjBindMethod(this, "OnWindowLoad"))
         this.ui.OnEvent("BtnClosePanel", "Click", ObjBindMethod(this, "OnCancelClick"))
-        this.ui.OnEvent("AuthorCon", "TextChanged", ObjBindMethod(this, "OnValueChange"))
-        this.ui.OnEvent("EffectCon", "TextChanged", ObjBindMethod(this, "OnValueChange"))
-        this.ui.OnEvent("OperCon", "TextChanged", ObjBindMethod(this, "OnValueChange"))
         this.ui.OnEvent("BtnSelectImage", "Click", ObjBindMethod(this, "OnSelectImage"))
         this.ui.OnEvent("BtnScreenShot", "Click", ObjBindMethod(this, "OnScreenShot"))
         this.ui.OnEvent("BtnSure", "Click", ObjBindMethod(this, "OnClickSureBtn"))
@@ -163,7 +157,6 @@ class UseExplainGui {
         if (tagSlot == "")
             return
         path := StrSplit(tagSlot, "|")[1]
-        this.OnValueChange()
         run path
     }
 
@@ -175,7 +168,6 @@ class UseExplainGui {
         if (tagSlot == "")
             return
         path := StrSplit(tagSlot, "|")[1]
-        this.OnValueChange()
         this.RowNumber := 0
         for i, p in this.ImagePathArr {
             if (p == path) {
@@ -209,7 +201,6 @@ class UseExplainGui {
     Init(SettingPath) {
         this.SettingPath := SettingPath
         this.ImagePathArr := []
-        this.HasChange := false
         OperFilePath := SettingPath "\使用说明&署名.txt"
         ExplainSection := "Instructions for Use & Attribution"
         AuthorText := CfgRead(OperFilePath, ExplainSection, "Author", "")
@@ -235,7 +226,6 @@ class UseExplainGui {
         if (path == "")
             return
 
-        this.OnValueChange()
         SplitPath path, &name, &dir, &ext, &name_no_ext, &drive
         newPath := this.SettingPath "\Images\UseExplain\" name
         if (FileExist(newPath)) {
@@ -250,7 +240,6 @@ class UseExplainGui {
     }
 
     OnScreenShot(state, ctrl, event) {
-        this.OnValueChange()
         if (MainSoftData.ScreenShotType == 1) {
             SetClipboard("")
             Run("ms-screenclip:")
@@ -297,45 +286,7 @@ class UseExplainGui {
         this.RefreshLV()
     }
 
-    CheckIfValid() {
-        if (this.Mode == 1)
-            return true
-
-        if (Trim(this.ui.Query("AuthorCon")) == "") {
-            RmtDialog.Info(GetLang("请完善作者信息，若不想留名请输入匿名"), GetLang("提示"), this.Hwnd())
-            return false
-        }
-
-        if (Trim(this.ui.Query("EffectCon")) == "") {
-            RmtDialog.Info(GetLang("请完善配置作用信息，简要的介绍配置的作用"), GetLang("提示"), this.Hwnd())
-            return false
-        }
-
-        if (Trim(this.ui.Query("OperCon")) == "") {
-            RmtDialog.Info(GetLang("请完善操作说明信息，详细说明配置对应的操作"), GetLang("提示"), this.Hwnd())
-            return false
-        }
-
-        return true
-    }
-
-    OnValueChange(*) {
-        this.HasChange := true
-    }
-
-    OnTriggerModeAction(isSure, isChange) {
-        if (this.ModeAction == "")
-            return
-        action := this.ModeAction
-        action(isSure, isChange)
-        this.ModeAction := ""
-    }
-
     OnClickSureBtn(state, ctrl, event) {
-        isValid := this.CheckIfValid()
-        if (!isValid)
-            return
-
         OperFilePath := this.SettingPath "\使用说明&署名.txt"
         ExplainSection := "Instructions for Use & Attribution"
         AuthorText := StrReplace(this.ui.Query("AuthorCon"), "`n", "⫶")
@@ -345,7 +296,6 @@ class UseExplainGui {
         CfgWrite(EffectText, OperFilePath, ExplainSection, "Effect")
         CfgWrite(OperText, OperFilePath, ExplainSection, "Operation")
 
-        this.OnTriggerModeAction(true, this.HasChange)
         this._CloseWindow()
     }
 
