@@ -285,3 +285,92 @@ FindWinImage(ResXPtr, ResYPtr, targetPath, hwnd, X1, Y1, X2, Y2, matchThreshold,
         "Int", searchY, "Int", searchW, "Int", searchH, "Int", matchThreshold, "Int*", ResXPtr, "Int*", ResYPtr,
         "Cdecl Int")
 }
+
+; 多点找图 API
+MultiPointApiReady() {
+    if (A_PtrSize != 8)
+        return false
+    if (OpenCvEnsure() != "")
+        return false
+    try {
+        return DllCall("RMT_OpenCV.dll\GetApiVersion", "CDecl Int") >= 11
+    } catch {
+        return false
+    }
+}
+
+AutoSelectPointsApiReady() {
+    if (A_PtrSize != 8)
+        return false
+    if (OpenCvEnsure() != "")
+        return false
+    try {
+        return DllCall("RMT_OpenCV.dll\GetApiVersion", "CDecl Int") >= 11
+    } catch {
+        return false
+    }
+}
+
+MultiPointSuperApiReady() {
+    if (A_PtrSize != 8)
+        return false
+    if (OpenCvEnsure() != "")
+        return false
+    try {
+        return DllCall("RMT_OpenCV.dll\GetApiVersion", "CDecl Int") >= 11
+    } catch {
+        return false
+    }
+}
+
+FindScreenImageMultiPoint(ResXPtr, ResYPtr, targetPath, X1, Y1, X2, Y2, matchThreshold, points, tolerance := 8) {
+    if (A_PtrSize != 8)
+        return -6
+    if (OpenCvEnsure() != "")
+        return -5
+    return DllCall("RMT_OpenCV.dll\FindScreenImageMultiPoint", "Str", targetPath
+        , "Int", X1, "Int", Y1, "Int", X2 - X1, "Int", Y2 - Y1
+        , "Int", matchThreshold, "Str", points, "Int", tolerance
+        , "Int*", ResXPtr, "Int*", ResYPtr, "CDecl Int")
+}
+
+FindWinImageMultiPoint(ResXPtr, ResYPtr, targetPath, hwnd, X1, Y1, X2, Y2, matchThreshold, points, tolerance := 8) {
+    if (A_PtrSize != 8)
+        return -6
+    if (OpenCvEnsure() != "")
+        return -5
+    return DllCall("RMT_OpenCV.dll\FindWinImageMultiPoint", "Str", targetPath, "Int", hwnd
+        , "Int", X1, "Int", Y1, "Int", X2 - X1, "Int", Y2 - Y1
+        , "Int", matchThreshold, "Str", points, "Int", tolerance
+        , "Int*", ResXPtr, "Int*", ResYPtr, "CDecl Int")
+}
+
+FindScreenImageMultiPointSuper(ResXPtr, ResYPtr, targetPath, X1, Y1, X2, Y2, matchThreshold, seedPoints, tolerance := 8, ignoreData := "") {
+    if (!MultiPointSuperApiReady())
+        return -5
+    return DllCall("RMT_OpenCV.dll\FindScreenImageMultiPointSuper", "Str", targetPath
+        , "Int", X1, "Int", Y1, "Int", X2 - X1, "Int", Y2 - Y1
+        , "Int", matchThreshold, "Str", seedPoints, "Int", tolerance, "Str", ignoreData
+        , "Int*", ResXPtr, "Int*", ResYPtr, "CDecl Int")
+}
+
+FindWinImageMultiPointSuper(ResXPtr, ResYPtr, targetPath, hwnd, X1, Y1, X2, Y2, matchThreshold, seedPoints, tolerance := 8, ignoreData := "") {
+    if (!MultiPointSuperApiReady())
+        return -5
+    return DllCall("RMT_OpenCV.dll\FindWinImageMultiPointSuper", "Str", targetPath, "Int", hwnd
+        , "Int", X1, "Int", Y1, "Int", X2 - X1, "Int", Y2 - Y1
+        , "Int", matchThreshold, "Str", seedPoints, "Int", tolerance, "Str", ignoreData
+        , "Int*", ResXPtr, "Int*", ResYPtr, "CDecl Int")
+}
+
+; 最近一次 OpenCV 图片处理错误。
+GetImageLastErrorText() {
+    if (OpenCvEnsure() != "")
+        return ""
+    try {
+        pBuf := DllCall("RMT_OpenCV.dll\GetImageLastError", "CDecl Ptr")
+        return pBuf ? StrGet(pBuf, "UTF-16") : ""
+    } catch {
+        return ""
+    }
+}

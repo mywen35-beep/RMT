@@ -50,6 +50,13 @@ GetSearchTargetArr(Data) {
         SearchText:   ObjHasOwnProp(Data, "SearchText") ? Data.SearchText : "",
         SearchImagePath: ObjHasOwnProp(Data, "SearchImagePath") ? Data.SearchImagePath : "",
         Similar:      ObjHasOwnProp(Data, "Similar") ? Data.Similar : 90,
+        MultiPointData: ObjHasOwnProp(Data, "MultiPointData") && IsObject(Data.MultiPointData) ? Data.MultiPointData : [],
+        MultiPointSeedData: ObjHasOwnProp(Data, "MultiPointSeedData") && IsObject(Data.MultiPointSeedData) ? Data.MultiPointSeedData : [],
+        SuperMultiPointSeedData: ObjHasOwnProp(Data, "SuperMultiPointSeedData") && IsObject(Data.SuperMultiPointSeedData) ? Data.SuperMultiPointSeedData : [],
+        SuperMultiPointIgnoreData: SearchSuperMultiPointIgnoreData(Data),
+        MultiPointTolerance: ObjHasOwnProp(Data, "MultiPointTolerance") ? Data.MultiPointTolerance : 8,
+        SuperMultiPointTolerance: ObjHasOwnProp(Data, "SuperMultiPointTolerance") ? Data.SuperMultiPointTolerance : 8,
+        MultiPointMode: ObjHasOwnProp(Data, "MultiPointMode") ? Data.MultiPointMode : "",
         OCRType:      ObjHasOwnProp(Data, "OCRType") ? Data.OCRType : 1,
         SearchImageType: ObjHasOwnProp(Data, "SearchImageType") ? Data.SearchImageType : SearchImageDefaultType(),
         Adaptive:     ObjHasOwnProp(Data, "Adaptive") ? Data.Adaptive : 0,
@@ -225,6 +232,72 @@ DoSearch(Data, X1, Y1, X2, Y2, Text, ImagePath, &ResX, &ResY, &ResXList, &ResYLi
 }
 
 ; 设置中的全局图片识别自适应开关（跨分辨率找图）
+SearchMultiPointOn(Data) {
+    if (SearchMatchMode(Data) != "multi")
+        return false
+    return ObjHasOwnProp(Data, "MultiPointData") && IsObject(Data.MultiPointData)
+        && Data.MultiPointData.Length >= 1
+}
+
+SearchSuperMultiPointSeedData(Data) {
+    if (ObjHasOwnProp(Data, "SuperMultiPointSeedData") && IsObject(Data.SuperMultiPointSeedData))
+        return Data.SuperMultiPointSeedData
+    return []
+}
+
+SearchSuperMultiPointIgnoreData(Data) {
+    return ObjHasOwnProp(Data, "SuperMultiPointIgnoreData")
+        ? String(Data.SuperMultiPointIgnoreData) : ""
+}
+
+SearchMultiPointSuperOn(Data) {
+    return SearchMatchMode(Data) == "super"
+        && SearchSuperMultiPointSeedData(Data).Length >= 1
+}
+
+SearchMatchMode(Data) {
+    points := ObjHasOwnProp(Data, "MultiPointData") && IsObject(Data.MultiPointData)
+        ? Data.MultiPointData : []
+    superSeeds := SearchSuperMultiPointSeedData(Data)
+    mode := ObjHasOwnProp(Data, "MultiPointMode") ? Data.MultiPointMode : ""
+    if (mode == "super")
+        return superSeeds.Length > 0 ? "super" : ""
+    if (mode == "multi")
+        return points.Length > 0 ? "multi" : ""
+    return ""
+}
+
+BuildMultiPointText(points) {
+    if (!IsObject(points) || points.Length < 1)
+        return ""
+    text := ""
+    for point in points {
+        if (!IsObject(point) || !ObjHasOwnProp(point, "X") || !ObjHasOwnProp(point, "Y")
+            || !ObjHasOwnProp(point, "Color"))
+            return ""
+        color := StrUpper(RegExReplace(String(point.Color), "^#|^0[xX]"))
+        if (!RegExMatch(color, "^[0-9A-F]{6}$") || !IsNumber(point.X) || !IsNumber(point.Y))
+            return ""
+        text .= (text == "" ? "" : ";") Integer(point.X) "," Integer(point.Y) "," color
+    }
+    return text
+}
+
+BuildMultiPointSeedText(points) {
+    if (!IsObject(points) || points.Length < 1)
+        return ""
+    text := ""
+    for point in points {
+        if (!IsObject(point) || !ObjHasOwnProp(point, "X") || !ObjHasOwnProp(point, "Y")
+            || !ObjHasOwnProp(point, "Color"))
+            return ""
+        color := StrUpper(RegExReplace(String(point.Color), "^#|^0[xX]"))
+        if (!RegExMatch(color, "^[0-9A-F]{6}$") || !IsNumber(point.X) || !IsNumber(point.Y))
+            return ""
+        text .= (text == "" ? "" : ";") Integer(point.X) "," Integer(point.Y) "," color
+    }
+    return text
+}
 SearchAdaptiveOn(Data) {
     ; 所有搜索目标统一使用全局设置，忽略旧指令中的 Adaptive 字段。
     if (!IsSet(MainSoftData) || !MainSoftData.HasProp("SearchImageAdaptive"))
@@ -236,6 +309,36 @@ SearchAdaptiveOn(Data) {
 }
 
 SearchImage(Data, X1, Y1, X2, Y2, ImagePath, &ResX, &ResY) {
+    if (SearchMultiPointSuperOn(Data)) {
+        if (!MultiPointSuperApiReady()) {
+            SearchDebugLog("超多点匹配不可用：OpenCV 插件不支持超多点接口")
+            return false
+        }
+        seeds := BuildMultiPointSeedText(SearchSuperMultiPointSeedData(Data))
+        tolerance := ObjHasOwnProp(Data, "SuperMultiPointTolerance")
+            ? Data.SuperMultiPointTolerance : 8
+        ignoreData := SearchSuperMultiPointIgnoreData(Data)
+        ret := seeds != "" ? FindScreenImageMultiPointSuper(&ResX, &ResY, ImagePath, X1, Y1, X2, Y2
+            , Data.Similar, seeds, tolerance, ignoreData) : -4
+        if (ret != 1)
+            SearchDebugLog(Format("超多点匹配未命中 区域=({},{})-({},{}) 基准点数={} 返回={} 详情={}"
+                , X1, Y1, X2, Y2, SearchSuperMultiPointSeedData(Data).Length, ret, GetImageLastErrorText()))
+        return ret == 1
+    }
+    if (SearchMultiPointOn(Data)) {
+        if (!MultiPointApiReady()) {
+            SearchDebugLog("多点找图不可用：OpenCV 插件不支持多点接口")
+            return false
+        }
+        points := BuildMultiPointText(Data.MultiPointData)
+        ret := points != "" ? FindScreenImageMultiPoint(&ResX, &ResY, ImagePath, X1, Y1, X2, Y2
+            , Data.Similar, points, Data.MultiPointTolerance) : -4
+        if (ret != 1)
+            SearchDebugLog(Format("多点找图未命中 区域=({},{})-({},{}) 点数={} 返回={} 详情={}"
+                , X1, Y1, X2, Y2, Data.MultiPointData.Length, ret, GetImageLastErrorText()))
+        return ret == 1
+    }
+
     if (SearchImageDefaultType() == 1) {
         ocvReason := OpenCvEnsure()
         if (ocvReason != "") {
@@ -263,11 +366,35 @@ SearchText(Data, X1, Y1, X2, Y2, &ResX, &ResY, Text) {
 }
 
 SearchWinImage(Data, hwndList, X1, Y1, X2, Y2, ImagePath, &ResXList, &ResYList, &ResHwndList) {
+    useSuper := SearchMultiPointSuperOn(Data)
+    useMultiPoint := useSuper || SearchMultiPointOn(Data)
+    if (useSuper && !MultiPointSuperApiReady()) {
+        SearchDebugLog("超多点匹配不可用：OpenCV 插件不支持超多点接口")
+        return false
+    }
+    if (useMultiPoint && !useSuper && !MultiPointApiReady()) {
+        SearchDebugLog("多点找图不可用：OpenCV 插件不支持多点接口")
+        return false
+    }
+    superSeeds := useSuper ? SearchSuperMultiPointSeedData(Data) : []
+    multiPointText := useSuper ? BuildMultiPointSeedText(superSeeds)
+        : (useMultiPoint ? BuildMultiPointText(Data.MultiPointData) : "")
+    superIgnoreData := useSuper ? SearchSuperMultiPointIgnoreData(Data) : ""
+
     found := false
     ResXList := [], ResYList := [], ResHwndList := []
     for i, hwnd in hwndList {
         ResX := 0, ResY := 0
-        isFound := FindWinImage(&ResX, &ResY, ImagePath, hwnd, X1, Y1, X2, Y2, Data.Similar, SearchAdaptiveOn(Data))
+        if (useSuper)
+            isFound := multiPointText != "" ? FindWinImageMultiPointSuper(&ResX, &ResY, ImagePath, hwnd
+                , X1, Y1, X2, Y2, Data.Similar, multiPointText
+                , ObjHasOwnProp(Data, "SuperMultiPointTolerance") ? Data.SuperMultiPointTolerance : 8
+                , superIgnoreData) : false
+        else if (useMultiPoint)
+            isFound := multiPointText != "" ? FindWinImageMultiPoint(&ResX, &ResY, ImagePath, hwnd
+                , X1, Y1, X2, Y2, Data.Similar, multiPointText, Data.MultiPointTolerance) : false
+        else
+            isFound := FindWinImage(&ResX, &ResY, ImagePath, hwnd, X1, Y1, X2, Y2, Data.Similar, SearchAdaptiveOn(Data))
         if (isFound) {
             found := true
             ResHwndList.Push(hwnd)

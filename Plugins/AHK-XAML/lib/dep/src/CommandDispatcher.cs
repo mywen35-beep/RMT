@@ -3813,7 +3813,11 @@ public partial class AhkWpfEngine
                         else if (pt == "CornerRadius") val = new System.Windows.CornerRadiusConverter().ConvertFromString(parts[2]);
                         else if (pt == "ImageSource")
                         {
-                            if (parts[2].StartsWith("HICON:"))
+                            if (string.IsNullOrWhiteSpace(parts[2]))
+                            {
+                                val = null;
+                            }
+                            else if (parts[2].StartsWith("HICON:"))
                             {
                                 IntPtr hIcon = new IntPtr(long.Parse(parts[2].Substring(6)));
                                 val = System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(hIcon, System.Windows.Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
@@ -3825,7 +3829,28 @@ public partial class AhkWpfEngine
                             }
                             else
                             {
-                                val = new System.Windows.Media.ImageSourceConverter().ConvertFromString(parts[2]);
+                                if (System.IO.File.Exists(parts[2]))
+                                {
+                                    try
+                                    {
+                                        var bi = new System.Windows.Media.Imaging.BitmapImage();
+                                        bi.BeginInit();
+                                        bi.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                                        bi.CreateOptions = System.Windows.Media.Imaging.BitmapCreateOptions.IgnoreImageCache;
+                                        bi.UriSource = new Uri(parts[2], UriKind.Absolute);
+                                        bi.EndInit();
+                                        bi.Freeze();
+                                        val = bi;
+                                    }
+                                    catch
+                                    {
+                                        val = new System.Windows.Media.ImageSourceConverter().ConvertFromString(parts[2]);
+                                    }
+                                }
+                                else
+                                {
+                                    val = new System.Windows.Media.ImageSourceConverter().ConvertFromString(parts[2]);
+                                }
                             }
                         }
                         else if (pt == "GridLength") val = new System.Windows.GridLengthConverter().ConvertFromString(parts[2]);

@@ -27,6 +27,7 @@ class SearchComboGui {
         this.MacroGui := ""
         this.CurTarget := 1           ; 当前选中目标（工具行/预览/框选/取色作用于它）
         this.TargetList := []          ; 目标数组（= Data.SearchTargetArr 或旧配置构造）
+        this.ImageProcessGui := ""
 
         this.DLVariableArr := []
         this.ImageVariArr := []
@@ -387,8 +388,9 @@ class SearchComboGui {
     }
 
     _SetImage(n, path) {
-        if (IsObject(this.ui))
-            this.ui.Update(this._TN(n, "Image"), "Source", StrReplace(path, "\", "/"))
+        if (!IsObject(this.ui))
+            return
+        this.ui.Update(this._TN(n, "Image"), "Source", path != "" ? StrReplace(path, "\", "/") : "")
     }
 
     SetConArrState(ConArr, isEnabled, state) {
@@ -422,6 +424,13 @@ class SearchComboGui {
             OCRType: ObjHasOwnProp(Data, "OCRType") ? Data.OCRType : 1,
             SearchImageType: ObjHasOwnProp(Data, "SearchImageType") ? Data.SearchImageType : SearchImageDefaultType(),
             Adaptive: ObjHasOwnProp(Data, "Adaptive") ? Data.Adaptive : 0,
+            MultiPointData: ObjHasOwnProp(Data, "MultiPointData") && IsObject(Data.MultiPointData) ? Data.MultiPointData : [],
+            MultiPointSeedData: ObjHasOwnProp(Data, "MultiPointSeedData") && IsObject(Data.MultiPointSeedData) ? Data.MultiPointSeedData : [],
+            SuperMultiPointSeedData: ObjHasOwnProp(Data, "SuperMultiPointSeedData") && IsObject(Data.SuperMultiPointSeedData) ? Data.SuperMultiPointSeedData : [],
+            SuperMultiPointIgnoreData: ObjHasOwnProp(Data, "SuperMultiPointIgnoreData") ? String(Data.SuperMultiPointIgnoreData) : "",
+            MultiPointTolerance: ObjHasOwnProp(Data, "MultiPointTolerance") ? Data.MultiPointTolerance : 8,
+            SuperMultiPointTolerance: ObjHasOwnProp(Data, "SuperMultiPointTolerance") ? Data.SuperMultiPointTolerance : 8,
+            MultiPointMode: ObjHasOwnProp(Data, "MultiPointMode") ? Data.MultiPointMode : "",
             Remark: ObjHasOwnProp(Data, "Remark") ? Data.Remark : "",
             StartPosX: ObjHasOwnProp(Data, "StartPosX") ? Data.StartPosX : 0,
             StartPosY: ObjHasOwnProp(Data, "StartPosY") ? Data.StartPosY : 0,
@@ -517,8 +526,16 @@ class SearchComboGui {
             . ' Background="{DynamicResource ControlBg}" BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1">'
             . '<Image Name="' this._TN(n, "Image") '" Stretch="Uniform" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>'
             . '</Border>'
+            . '<Button Name="' this._TN(n, "ProcessBtn") '" Grid.Row="3" Grid.Column="4" Width="64" Height="28" MinHeight="28"'
+            . ' Padding="0" VerticalAlignment="Center" HorizontalAlignment="Stretch" Cursor="Hand" FontSize="11"'
+            . ' Content="' GetLang("图片处理") '"'
+            . ' ToolTip="' GetLang("图片处理：多点选点、裁剪或重命名模板") '"'
+            . ' Foreground="{DynamicResource TextMain}" Background="{DynamicResource ControlBg}"'
+            . ' BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1">'
+            . this._ThemeHoverBtnStyle()
+            . '</Button>'
             . '<TextBlock Name="' this._TN(n, "ImagePathTip") '" Grid.Row="3" Grid.Column="0" Text="' GetLang("图片路径：") '" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="{DynamicResource TextMain}" FontSize="' fs '"/>'
-            . '<Grid Name="' this._TN(n, "ImagePathRow") '" Grid.Row="3" Grid.Column="2" Width="228" HorizontalAlignment="Left">'
+            . '<Grid Name="' this._TN(n, "ImagePathRow") '" Grid.Row="3" Grid.Column="2" Width="264" HorizontalAlignment="Left">'
             . '<Grid.ColumnDefinitions>'
             . '<ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="28"/><ColumnDefinition Width="8"/><ColumnDefinition Width="28"/>'
             . '</Grid.ColumnDefinitions>'
@@ -622,6 +639,106 @@ class SearchComboGui {
         this._Bind(this._TN(n, "EndPosY"), "LostFocus", ObjBindMethod(this, "RefreshPreviewArea"))
         this._Bind(this._TN(n, "ScreenshotBtn"), "Click", ObjBindMethod(this, "OnScreenShotBtnClick", n))
         this._Bind(this._TN(n, "ImageSelectBtn"), "Click", ObjBindMethod(this, "OnClickSetPicBtn", n))
+        this._Bind(this._TN(n, "ProcessBtn"), "Click", ObjBindMethod(this, "OnClickProcessBtn", n))
+    }
+
+    _SyncProcessBtn(n) {
+        if (!IsObject(this.ui) || n > this.TargetList.Length)
+            return
+        t := this.TargetList[n]
+        points := ObjHasOwnProp(t, "MultiPointData") && IsObject(t.MultiPointData) ? t.MultiPointData : []
+        matchMode := SearchMatchMode(t)
+        on := matchMode == "super"
+            || (matchMode == "multi" && points.Length >= 1)
+        btn := this._TN(n, "ProcessBtn")
+        label := matchMode == "super" ? GetLang("超多点")
+            : (matchMode == "multi" ? GetLang("多点") : GetLang("图片处理"))
+        try this.ui.Update(btn, "Content", label)
+        try this.ui.Update(btn, "Tag", on ? "1" : "0")
+        try this.ui.Update(btn, "ToolTip", on
+            ? (matchMode == "super"
+                ? Format(GetLang("图片处理：超多点，基准色 {} 个（容差 {}）")
+                    , SearchSuperMultiPointSeedData(t).Length
+                    , ObjHasOwnProp(t, "SuperMultiPointTolerance") ? t.SuperMultiPointTolerance : 8)
+                : Format(GetLang("图片处理：多点 {} 个"), points.Length))
+            : GetLang("图片处理：多点选点、裁剪或重命名模板"))
+        if (on) {
+            try this.ui.Update(btn, "Background", "{DynamicResource ActionBg}")
+            try this.ui.Update(btn, "BorderBrush", "{DynamicResource ActionStroke}")
+            try this.ui.Update(btn, "Foreground", "{DynamicResource ActionText}")
+        } else {
+            try this.ui.Update(btn, "Background", "{DynamicResource ControlBg}")
+            try this.ui.Update(btn, "BorderBrush", "{DynamicResource ControlBorder}")
+            try this.ui.Update(btn, "Foreground", "{DynamicResource TextMain}")
+        }
+    }
+
+    OnClickProcessBtn(n, *) {
+        if (!IsObject(this.ui) || n < 1 || n > this.TargetList.Length)
+            return
+        path := String(this.ui.Query(this._TN(n, "ImagePath")))
+        if (path == "" || !FileExist(path)) {
+            RmtDialog.Info(GetLang("请先设置搜索图片"), GetLang("图片处理"))
+            return
+        }
+        this.CurTarget := n
+        if (!IsObject(this.ImageProcessGui))
+            this.ImageProcessGui := ImageProcessGui()
+        t := this.TargetList[n]
+        points := ObjHasOwnProp(t, "MultiPointData") && IsObject(t.MultiPointData) ? t.MultiPointData : []
+        seeds := ObjHasOwnProp(t, "MultiPointSeedData") && IsObject(t.MultiPointSeedData) ? t.MultiPointSeedData : []
+        superSeeds := SearchSuperMultiPointSeedData(t)
+        superIgnoreData := SearchSuperMultiPointIgnoreData(t)
+        tol := ObjHasOwnProp(t, "MultiPointTolerance") ? t.MultiPointTolerance : 8
+        superTol := ObjHasOwnProp(t, "SuperMultiPointTolerance") ? t.SuperMultiPointTolerance : 8
+        matchMode := SearchMatchMode(t)
+        this.ImageProcessGui.SureAction := (p, s, v, mode, superSeedPoints, superTolerance, ignoreData) =>
+            this.ApplyProcess(n, p, s, v, mode, superSeedPoints, superTolerance, ignoreData)
+        this.ImageProcessGui.CropAction := (newPath, p := "", s := "", superSeedPoints := "", ignoreData := "") =>
+            this.ApplyProcessPath(n, newPath, p, s, superSeedPoints, ignoreData)
+        this.ImageProcessGui.ReleaseAction := () => this._ReleaseImage(n)
+        this.ImageProcessGui.OwnerHwnd := this.Hwnd()
+        this.ImageProcessGui.ShowGui(path, points, seeds, tol, matchMode, superSeeds, superTol, superIgnoreData)
+    }
+
+    ApplyProcess(n, points, seeds, tol, matchMode := "", superSeeds := "", superTol := 8, ignoreData := "") {
+        if (n < 1 || n > this.TargetList.Length)
+            return
+        t := this.TargetList[n]
+        t.MultiPointData := IsObject(points) ? points.Clone() : []
+        t.MultiPointSeedData := IsObject(seeds) ? seeds.Clone() : []
+        t.SuperMultiPointSeedData := IsObject(superSeeds) ? superSeeds.Clone() : []
+        t.SuperMultiPointIgnoreData := String(ignoreData)
+        t.MultiPointTolerance := tol
+        t.SuperMultiPointTolerance := superTol
+        t.MultiPointMode := matchMode
+        this._SyncProcessBtn(n)
+        this._SetImage(n, String(this.ui.Query(this._TN(n, "ImagePath"))))
+    }
+
+    ApplyProcessPath(n, newPath, points := "", seeds := "", superSeeds := "", ignoreData := "") {
+        if (n < 1 || n > this.TargetList.Length)
+            return
+        this.TargetList[n].SearchImagePath := newPath
+        if (IsObject(points))
+            this.TargetList[n].MultiPointData := points.Clone()
+        if (IsObject(seeds))
+            this.TargetList[n].MultiPointSeedData := seeds.Clone()
+        if (IsObject(superSeeds))
+            this.TargetList[n].SuperMultiPointSeedData := superSeeds.Clone()
+        this.TargetList[n].SuperMultiPointIgnoreData := String(ignoreData)
+        mode := SearchMatchMode(this.TargetList[n])
+        this.TargetList[n].MultiPointMode := mode
+        this.ui.Update(this._TN(n, "ImagePath"), "Text", newPath)
+        this._SetImage(n, newPath)
+        this._SyncProcessBtn(n)
+    }
+
+    _ReleaseImage(n) {
+        if (!IsObject(this.ui))
+            return
+        try this.ui.Update(this._TN(n, "Image"), "Source", "")
+        Sleep 40
     }
 
     _FillTargetCard(n) {
@@ -635,6 +752,7 @@ class SearchComboGui {
         this._SetCombo(this._TN(n, "StartPosY"), this.DLVariableArr, t.StartPosY)
         this._SetCombo(this._TN(n, "EndPosX"), this.DLVariableArr, t.EndPosX)
         this._SetCombo(this._TN(n, "EndPosY"), this.DLVariableArr, t.EndPosY)
+        this._SyncProcessBtn(n)
         this._SetImage(n, t.SearchImagePath)
         this._SetCombo(this._TN(n, "ImagePath"), this.DLVariableArr, t.SearchImagePath)
         this._SetCombo(this._TN(n, "Color"), this.DLVariableArr, t.SearchColor)
@@ -686,6 +804,13 @@ class SearchComboGui {
             OCRType: last.OCRType,
             SearchImageType: last.SearchImageType,
             Adaptive: ObjHasOwnProp(last, "Adaptive") ? last.Adaptive : 0,
+            MultiPointData: ObjHasOwnProp(last, "MultiPointData") && IsObject(last.MultiPointData) ? last.MultiPointData.Clone() : [],
+            MultiPointSeedData: ObjHasOwnProp(last, "MultiPointSeedData") && IsObject(last.MultiPointSeedData) ? last.MultiPointSeedData.Clone() : [],
+            SuperMultiPointSeedData: SearchSuperMultiPointSeedData(last).Clone(),
+            SuperMultiPointIgnoreData: SearchSuperMultiPointIgnoreData(last),
+            MultiPointTolerance: ObjHasOwnProp(last, "MultiPointTolerance") ? last.MultiPointTolerance : 8,
+            SuperMultiPointTolerance: ObjHasOwnProp(last, "SuperMultiPointTolerance") ? last.SuperMultiPointTolerance : 8,
+            MultiPointMode: SearchMatchMode(last),
             Remark: ObjHasOwnProp(last, "Remark") ? last.Remark : "",
             StartPosX: last.StartPosX, StartPosY: last.StartPosY,
             EndPosX: last.EndPosX, EndPosY: last.EndPosY
@@ -739,6 +864,7 @@ class SearchComboGui {
         this.ui.Update(tn "ImagePathTip", "Visibility", isImage ? "Visible" : "Hidden")
         this.ui.Update(tn "ImagePathRow", "Visibility", isImage ? "Visible" : "Hidden")
         this.ui.Update(tn "ImagePreviewHost", "Visibility", isImage ? "Visible" : "Hidden")
+        this.ui.Update(tn "ProcessBtn", "Visibility", isImage ? "Visible" : "Hidden")
         this.ui.Update(tn "ColorTipLabel", "Visibility", isColor ? "Visible" : "Hidden")
         this.ui.Update(tn "ColorRow", "Visibility", isColor ? "Visible" : "Hidden")
         this.ui.Update(tn "TextTipLabel", "Visibility", isText ? "Visible" : "Hidden")
@@ -851,7 +977,6 @@ class SearchComboGui {
                 MsgBox(Format(GetLang("目标{}：请设置搜索图片"), n))
                 return false
             }
-
             if (isImage) {
                 imgPath := this.ui.Query(tn "ImagePath")
                 if (IsNumber(this.ui.Query(tn "StartPosX")) && IsNumber(this.ui.Query(tn "StartPosY"))
@@ -1004,6 +1129,7 @@ class SearchComboGui {
                 FileCopy(path, newPath)
                 path := newPath
             }
+            this._ResetTargetProcess(n)
             this._SetImage(n, path)
             this.TargetList[n].SearchImagePath := path
             this.ui.Update(tn "ImagePath", "Text", path)
@@ -1038,6 +1164,7 @@ class SearchComboGui {
             imageSerial := GetNextImageSerial()
             filePath := A_WorkingDir "\Setting\" MySoftData.CurSettingName "\Images\ScreenShot\" imageSerial ".png"
             SaveClipToBitmap(filePath)
+            this._ResetTargetProcess(n)
             this._SetImage(n, filePath)
             this.TargetList[n].SearchImagePath := filePath
             this.ui.Update(this._TN(n, "ImagePath"), "Text", filePath)
@@ -1063,10 +1190,25 @@ class SearchComboGui {
         imageSerial := GetNextImageSerial()
         filePath := A_WorkingDir "\Setting\" MySoftData.CurSettingName "\Images\ScreenShot\" imageSerial ".png"
         ScreenShot(x1, y1, x2, y2, filePath)
+        this._ResetTargetProcess(n)
         this._SetImage(n, filePath)
         this.TargetList[n].SearchImagePath := filePath
         this.ui.Update(this._TN(n, "ImagePath"), "Text", filePath)
         this.OnGetArea(x1, y1, x2, y2)
+    }
+
+    _ResetTargetProcess(n) {
+        if (n < 1 || n > this.TargetList.Length)
+            return
+        t := this.TargetList[n]
+        t.MultiPointData := []
+        t.MultiPointSeedData := []
+        t.SuperMultiPointSeedData := []
+        t.SuperMultiPointIgnoreData := ""
+        t.MultiPointTolerance := 8
+        t.SuperMultiPointTolerance := 8
+        t.MultiPointMode := ""
+        this._SyncProcessBtn(n)
     }
 
     OnSureFoundMacroBtnClick(CommandStr) {
@@ -1178,6 +1320,15 @@ class SearchComboGui {
                 OCRType: 1,   ; v6 统一多语言模型，不再区分
                 SearchImageType: SearchImageDefaultType(),
                 Adaptive: ObjHasOwnProp(this.TargetList[n], "Adaptive") ? this.TargetList[n].Adaptive : 0,
+                MultiPointData: ObjHasOwnProp(this.TargetList[n], "MultiPointData") && IsObject(this.TargetList[n].MultiPointData)
+                    ? this.TargetList[n].MultiPointData : [],
+                MultiPointSeedData: ObjHasOwnProp(this.TargetList[n], "MultiPointSeedData") && IsObject(this.TargetList[n].MultiPointSeedData)
+                    ? this.TargetList[n].MultiPointSeedData : [],
+                SuperMultiPointSeedData: SearchSuperMultiPointSeedData(this.TargetList[n]),
+                SuperMultiPointIgnoreData: SearchSuperMultiPointIgnoreData(this.TargetList[n]),
+                MultiPointTolerance: ObjHasOwnProp(this.TargetList[n], "MultiPointTolerance") ? this.TargetList[n].MultiPointTolerance : 8,
+                SuperMultiPointTolerance: ObjHasOwnProp(this.TargetList[n], "SuperMultiPointTolerance") ? this.TargetList[n].SuperMultiPointTolerance : 8,
+                MultiPointMode: SearchMatchMode(this.TargetList[n]),
                 Remark: this.ui.Query(tn "Remark"),
                 StartPosX: this.ui.Query(tn "StartPosX"),
                 StartPosY: this.ui.Query(tn "StartPosY"),
@@ -1196,6 +1347,13 @@ class SearchComboGui {
                 data.OCRType := t.OCRType
                 data.SearchImageType := t.SearchImageType
                 data.Adaptive := t.Adaptive
+                data.MultiPointData := t.MultiPointData
+                data.MultiPointSeedData := t.MultiPointSeedData
+                data.SuperMultiPointSeedData := t.SuperMultiPointSeedData
+                data.SuperMultiPointIgnoreData := t.SuperMultiPointIgnoreData
+                data.MultiPointTolerance := t.MultiPointTolerance
+                data.SuperMultiPointTolerance := t.SuperMultiPointTolerance
+                data.MultiPointMode := t.MultiPointMode
                 data.StartPosX := t.StartPosX
                 data.StartPosY := t.StartPosY
                 data.EndPosX := t.EndPosX

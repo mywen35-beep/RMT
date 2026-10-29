@@ -1,5 +1,6 @@
 #Requires AutoHotkey v2.0
 #Include MacroEditGui.ahk
+#Include ImageProcessGui.ahk
 
 ; =====================================================================
 ; 搜索Pro编辑器 —— 1.2.2 单目标界面的 XAML 版
@@ -27,6 +28,15 @@ class SearchProGui {
         this.PreviewFollowing := false
         this.PreviewShowing := false
         this._comboGuard := 0
+        this.MultiPointData := []
+        this.MultiPointSeedData := []
+        this.SuperMultiPointSeedData := []
+        this.SuperMultiPointIgnoreData := ""
+        this.MultiPointTolerance := 8
+        this.SuperMultiPointTolerance := 8
+        this.MultiPointMode := ""
+        this._windowToken := 0
+        this.ImageProcessGui := ""
         this.CountTogArr := ["SearchIntervalHost"]
         this.MouseSpeedArr := ["SpeedTipCon", "SpeedCon"]
         this.MouseClickArr := ["ClickCountCon"]
@@ -68,6 +78,8 @@ class SearchProGui {
 
     _BuildAndShow() {
         global MySoftData
+        this._windowToken += 1
+        windowToken := this._windowToken
         this._closed := false
         title := this.ParentTile GetLang("搜索Pro编辑器")
         this._title := title
@@ -226,6 +238,13 @@ class SearchProGui {
             .Background("{DynamicResource ControlBg}").BorderBrush("{DynamicResource ControlBorder}").BorderThickness("1")
         imgPrev.Add("Image").Name("ImageCon").Stretch("Uniform")
             .HorizontalAlignment("Stretch").VerticalAlignment("Stretch")
+        imgPanel.Add("Button").Grid_Row(2).Name("ImageProcessBtn").Uid("gm:Search.ImageProcess")
+            .Width(76).Height(28).MinHeight(28).Padding("0").Cursor("Hand")
+            .HorizontalAlignment("Left").VerticalAlignment("Top").Margin("72,6,0,0")
+            .Content(GetLang("图片处理")).FontSize("11").Tag("0")
+            .ToolTip(GetLang("图片处理：多点选点、裁剪或重命名模板"))
+            .Foreground("{DynamicResource TextMain}").Background("{DynamicResource ControlBg}")
+            .BorderBrush("{DynamicResource ControlBorder}").BorderThickness("1")
         clrPanel := typeHost.Add("Grid").Name("ColorPanel").VerticalAlignment("Top").Visibility("Collapsed")
         clrPanel.Rows("32", "32")
         clrPanel.Cols("Auto", "8", "90", "8", "20")
@@ -321,7 +340,7 @@ class SearchProGui {
         this.ui.xaml := StrReplace(this.ui.xaml, 'FontFamily="Segoe UI Variable Display, Segoe UI, sans-serif"', 'FontFamily="' MainSoftData.FontType '"')
         this.ui.xaml := StrReplace(this.ui.xaml, '%resources%', '')
 
-        this.ui.OnEvent("Window", "Closing", ObjBindMethod(this, "OnWindowClosing"))
+        this.ui.OnEvent("Window", "Closing", ObjBindMethod(this, "OnWindowClosing").Bind(windowToken))
         this.ui.OnEvent("Window", "LoadedHwnd", ObjBindMethod(this, "OnWindowLoad"))
         this.ui.OnEvent("BtnClosePanel", "Click", ObjBindMethod(this, "OnCancelClick"))
         BindCmdEditorChrome(this.ui, "#指令手册/4-搜索Pro", (*) => this.TriggerMacro(), "!l"
@@ -341,6 +360,7 @@ class SearchProGui {
         this.ui.OnEvent("HexColorCon", "TextChanged", ObjBindMethod(this, "OnHexColorChange"))
         this.ui.OnEvent("ImageShotBtn", "Click", ObjBindMethod(this, "OnImageShotBtnClick"))
         this.ui.OnEvent("ImageSelectBtn", "Click", ObjBindMethod(this, "OnClickSetPicBtn"))
+        this.ui.OnEvent("ImageProcessBtn", "Click", ObjBindMethod(this, "OnClickImageProcessBtn"))
         this.ui.OnEvent("BtnWinEdit", "Click", ObjBindMethod(this, "OnClickWinEditBtn"))
         this.ui.OnEvent("BtnEditFoundMacro", "Click", ObjBindMethod(this, "OnEditFoundMacroBtnClick"))
         this.ui.OnEvent("BtnEditUnFoundMacro", "Click", ObjBindMethod(this, "OnEditUnFoundMacroBtnClick"))
@@ -439,8 +459,105 @@ class SearchProGui {
     }
 
     _SetImage(path) {
-        if (IsObject(this.ui))
-            this.ui.Update("ImageCon", "Source", path != "" ? StrReplace(path, "\", "/") : "")
+        if (!IsObject(this.ui))
+            return
+        this.ui.Update("ImageCon", "Source", path != "" ? StrReplace(path, "\", "/") : "")
+    }
+
+    ; ---- 多点找图 / 图片处理 ----
+    OnClickImageProcessBtn(*) {
+        path := ""
+        try path := String(XamlValueBridge(this.ui, "ImagePathCon").Value)
+        if (path == "" || !FileExist(path)) {
+            RmtDialog.Info(GetLang("请先设置搜索图片"), GetLang("多点找图"))
+            return
+        }
+        if (!IsObject(this.ImageProcessGui))
+            this.ImageProcessGui := ImageProcessGui()
+        this.ImageProcessGui.SureAction := (points, seeds, tol, matchMode, superSeeds, superTol, ignoreData) =>
+            this.ApplyMultiPoint(points, seeds, tol, matchMode, superSeeds, superTol, ignoreData)
+        this.ImageProcessGui.CropAction := (newPath, points := "", seeds := "", superSeeds := "", ignoreData := "") =>
+            this.ApplyCroppedImage(newPath, points, seeds, superSeeds, ignoreData)
+        this.ImageProcessGui.ReleaseAction := () => this._ReleaseImageSource()
+        this.ImageProcessGui.OwnerHwnd := this.Hwnd()
+        this.ImageProcessGui.ShowGui(path, this.MultiPointData, this.MultiPointSeedData
+            , this.MultiPointTolerance, this.MultiPointMode
+            , this.SuperMultiPointSeedData, this.SuperMultiPointTolerance, this.SuperMultiPointIgnoreData)
+    }
+
+    ApplyMultiPoint(points, seeds, tol, matchMode := "", superSeeds := "", superTol := 8, ignoreData := "") {
+        this.MultiPointData := IsObject(points) ? points.Clone() : []
+        this.MultiPointSeedData := IsObject(seeds) ? seeds.Clone() : []
+        this.SuperMultiPointSeedData := IsObject(superSeeds) ? superSeeds.Clone() : []
+        this.SuperMultiPointIgnoreData := String(ignoreData)
+        this.MultiPointTolerance := tol
+        this.SuperMultiPointTolerance := superTol
+        this.MultiPointMode := matchMode
+        this.Data.MultiPointData := this.MultiPointData
+        this.Data.MultiPointSeedData := this.MultiPointSeedData
+        this.Data.SuperMultiPointSeedData := this.SuperMultiPointSeedData
+        this.Data.SuperMultiPointIgnoreData := this.SuperMultiPointIgnoreData
+        this.Data.MultiPointTolerance := this.MultiPointTolerance
+        this.Data.SuperMultiPointTolerance := this.SuperMultiPointTolerance
+        this.Data.MultiPointMode := matchMode
+        this._SyncImageProcessBtn()
+        this._SetImage(String(XamlValueBridge(this.ui, "ImagePathCon").Value))
+    }
+
+    ApplyCroppedImage(newPath, points := "", seeds := "", superSeeds := "", ignoreData := "") {
+        this.Data.SearchImagePath := newPath
+        if (IsObject(points))
+            this.MultiPointData := points.Clone()
+        if (IsObject(seeds))
+            this.MultiPointSeedData := seeds.Clone()
+        if (IsObject(superSeeds))
+            this.SuperMultiPointSeedData := superSeeds.Clone()
+        this.SuperMultiPointIgnoreData := String(ignoreData)
+        if ((this.MultiPointMode == "multi" && this.MultiPointData.Length < 1)
+            || (this.MultiPointMode == "super" && this.SuperMultiPointSeedData.Length < 1))
+            this.MultiPointMode := ""
+        if (this.Data) {
+            this.Data.MultiPointData := this.MultiPointData
+            this.Data.MultiPointSeedData := this.MultiPointSeedData
+            this.Data.SuperMultiPointSeedData := this.SuperMultiPointSeedData
+            this.Data.SuperMultiPointIgnoreData := this.SuperMultiPointIgnoreData
+            this.Data.MultiPointTolerance := this.MultiPointTolerance
+            this.Data.SuperMultiPointTolerance := this.SuperMultiPointTolerance
+            this.Data.MultiPointMode := this.MultiPointMode
+        }
+        this._SyncImageProcessBtn()
+        try this.ui.Update("ImagePathCon", "Text", newPath)
+        this._SetImage(newPath)
+    }
+
+    _SyncImageProcessBtn() {
+        if (!IsObject(this.ui))
+            return
+        matchMode := this.MultiPointMode
+        if ((matchMode == "multi" && this.MultiPointData.Length < 1)
+            || (matchMode == "super" && this.SuperMultiPointSeedData.Length < 1))
+            matchMode := ""
+        on := matchMode == "multi" || matchMode == "super"
+        label := matchMode == "super" ? GetLang("超多点")
+            : (matchMode == "multi" ? GetLang("多点") : GetLang("图片处理"))
+        try this.ui.Update("ImageProcessBtn", "Content", label)
+        try this.ui.Update("ImageProcessBtn", "Tag", on ? "1" : "0")
+        try this.ui.Update("ImageProcessBtn", "ToolTip", on
+            ? (matchMode == "super"
+                ? Format(GetLang("图片处理：超多点，基准色 {} 个（容差 {}）")
+                    , this.SuperMultiPointSeedData.Length, this.SuperMultiPointTolerance)
+                : Format(GetLang("图片处理：多点 {} 个（容差 {}）")
+                    , this.MultiPointData.Length, this.MultiPointTolerance))
+            : GetLang("图片处理：多点选点、裁剪或重命名模板"))
+        if (on) {
+            try this.ui.Update("ImageProcessBtn", "Background", "{DynamicResource ActionBg}")
+            try this.ui.Update("ImageProcessBtn", "BorderBrush", "{DynamicResource ActionStroke}")
+            try this.ui.Update("ImageProcessBtn", "Foreground", "{DynamicResource ActionText}")
+        } else {
+            try this.ui.Update("ImageProcessBtn", "Background", "{DynamicResource ControlBg}")
+            try this.ui.Update("ImageProcessBtn", "BorderBrush", "{DynamicResource ControlBorder}")
+            try this.ui.Update("ImageProcessBtn", "Foreground", "{DynamicResource TextMain}")
+        }
     }
 
     SetConArrState(ConArr, isEnabled, state) {
@@ -465,6 +582,17 @@ class SearchProGui {
         this.ui.Update("SimilarCon", "Text", this.Data.Similar)
         this.ui.Update("ColorSimilarCon", "Text", this.Data.Similar)
         this.ui.Update("WinInfoCon", "Text", this.Data.WinInfo)
+        this.MultiPointData := ObjHasOwnProp(this.Data, "MultiPointData") && IsObject(this.Data.MultiPointData)
+            ? this.Data.MultiPointData.Clone() : []
+        this.MultiPointSeedData := ObjHasOwnProp(this.Data, "MultiPointSeedData") && IsObject(this.Data.MultiPointSeedData)
+            ? this.Data.MultiPointSeedData.Clone() : []
+        this.SuperMultiPointSeedData := SearchSuperMultiPointSeedData(this.Data).Clone()
+        this.SuperMultiPointIgnoreData := SearchSuperMultiPointIgnoreData(this.Data)
+        this.MultiPointTolerance := ObjHasOwnProp(this.Data, "MultiPointTolerance") ? this.Data.MultiPointTolerance : 8
+        this.SuperMultiPointTolerance := ObjHasOwnProp(this.Data, "SuperMultiPointTolerance")
+            ? this.Data.SuperMultiPointTolerance : 8
+        this.MultiPointMode := SearchMatchMode(this.Data)
+        this._SyncImageProcessBtn()
         this._SetCombo("ImagePathCon", this.DLVariableArr, this.Data.SearchImagePath)
         this._SetImage(this.Data.SearchImagePath)
         this._SetCombo("HexColorCon", this.DLVariableArr, this.Data.SearchColor)
@@ -501,6 +629,11 @@ class SearchProGui {
             return
         t := data.SearchTargetArr[1]
         for key in ["SearchType", "WinInfo", "SearchColor", "SearchText", "SearchImagePath", "Similar", "OCRType", "SearchImageType", "Adaptive", "StartPosX", "StartPosY", "EndPosX", "EndPosY"] {
+            if (ObjHasOwnProp(t, key))
+                data.%key% := t.%key%
+        }
+        for key in ["MultiPointData", "MultiPointSeedData", "SuperMultiPointSeedData"
+            , "SuperMultiPointIgnoreData", "MultiPointTolerance", "SuperMultiPointTolerance", "MultiPointMode"] {
             if (ObjHasOwnProp(t, key))
                 data.%key% := t.%key%
         }
@@ -597,6 +730,13 @@ class SearchProGui {
         data.Similar := (this._TypeIndex() == 2 || this._TypeIndex() == 5) ? this.ui.Query("ColorSimilarCon") : this.ui.Query("SimilarCon")
         data.OCRType := 1
         data.SearchImageType := SearchImageDefaultType()
+        data.MultiPointData := this.MultiPointData
+        data.MultiPointSeedData := this.MultiPointSeedData
+        data.SuperMultiPointSeedData := this.SuperMultiPointSeedData
+        data.SuperMultiPointIgnoreData := this.SuperMultiPointIgnoreData
+        data.MultiPointTolerance := this.MultiPointTolerance
+        data.SuperMultiPointTolerance := this.SuperMultiPointTolerance
+        data.MultiPointMode := this.MultiPointMode
         data.SearchType := this._TypeIndex()
         data.WinInfo := this.ui.Query("WinInfoCon")
         data.SearchColor := this.ui.Query("HexColorCon")
@@ -790,6 +930,7 @@ class SearchProGui {
             FileCopy(path, newPath)
             path := newPath
         }
+        this._ResetImageProcessForNewImage()
         this._SetImage(path)
         this.Data.SearchImagePath := path
         this.ui.Update("ImagePathCon", "Text", path)
@@ -822,6 +963,7 @@ class SearchProGui {
             imageSerial := GetNextImageSerial()
             filePath := A_WorkingDir "\Setting\" MySoftData.CurSettingName "\Images\ScreenShot\" imageSerial ".png"
             SaveClipToBitmap(filePath)
+            this._ResetImageProcessForNewImage()
             this._SetImage(filePath)
             this.Data.SearchImagePath := filePath
             this.ui.Update("ImagePathCon", "Text", filePath)
@@ -853,10 +995,22 @@ class SearchProGui {
         imageSerial := GetNextImageSerial()
         filePath := A_WorkingDir "\Setting\" MySoftData.CurSettingName "\Images\ScreenShot\" imageSerial ".png"
         ScreenShot(x1, y1, x2, y2, filePath)
+        this._ResetImageProcessForNewImage()
         this._SetImage(filePath)
         this.Data.SearchImagePath := filePath
         this.ui.Update("ImagePathCon", "Text", filePath)
         this.OnGetArea(x1, y1, x2, y2)
+    }
+
+    _ResetImageProcessForNewImage() {
+        this.MultiPointData := []
+        this.MultiPointSeedData := []
+        this.SuperMultiPointSeedData := []
+        this.SuperMultiPointIgnoreData := ""
+        this.MultiPointTolerance := 8
+        this.SuperMultiPointTolerance := 8
+        this.MultiPointMode := ""
+        this._SyncImageProcessBtn()
     }
 
     OnSureFoundMacroBtnClick(CommandStr) {
@@ -1046,9 +1200,12 @@ class SearchProGui {
         XamlWin.OnLoadTheme(this.ui)
     }
 
-    OnWindowClosing(state, ctrl, event) {
+    OnWindowClosing(windowToken, state, ctrl, event) {
+        if (windowToken != this._windowToken)
+            return
         this.StopPreviewFollow()
         this.HidePreviewRect()
+        this._ReleaseImageSource()
         try this.ToggleFunc(false)
         if (this.OwnerHwnd != "" && MainSoftData.IsModalSubGui) {
             try SafeGuiFromHwnd(this.OwnerHwnd).Opt("-Disabled")
@@ -1064,6 +1221,7 @@ class SearchProGui {
     _CloseWindow() {
         this.StopPreviewFollow()
         this.HidePreviewRect()
+        this._ReleaseImageSource()
         try this.ToggleFunc(false)
         if (this.OwnerHwnd != "" && MainSoftData.IsModalSubGui) {
             try SafeGuiFromHwnd(this.OwnerHwnd).Opt("-Disabled")
@@ -1073,6 +1231,14 @@ class SearchProGui {
         }
         this.ui := ""
         this._closed := true
+    }
+
+    ; 清空图片源，解除模板图与当前窗口的关联。
+    _ReleaseImageSource() {
+        if (!IsObject(this.ui))
+            return
+        try this.ui.Update("ImageCon", "Source", "")
+        Sleep 40
     }
 
     OnGuiClose() {

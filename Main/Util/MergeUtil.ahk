@@ -810,39 +810,52 @@ class MergeUtil {
         if (oldSerial == "" || newSerial == "")
             return renamedCount
 
-        if (!ObjHasOwnProp(Data, "SearchImagePath") || Data.SearchImagePath == "")
-            return renamedCount
-
-        sourceImagePath := Data.SearchImagePath
-        if (!FileExist(sourceImagePath))
-            return renamedCount
-
-        SplitPath sourceImagePath, &imageFileName, &sourceImageDir, &imageExt, &imageNameNoExt
-
-        targetImagesDir := A_WorkingDir "\Setting\" MySoftData.CurSettingName "\Images"
-        if (!DirExist(targetImagesDir))
-            DirCreate(targetImagesDir)
-
         oldTextPart := RegExReplace(oldSerial, "\d+")
         newTextPart := RegExReplace(newSerial, "\d+")
         oldNumPart := RegExReplace(oldSerial, "\D+")
         newNumPart := RegExReplace(newSerial, "\D+")
 
-        newImageName := RegExReplace(imageNameNoExt, oldTextPart . oldNumPart "$", newTextPart . newNumPart)
-        if (newImageName == imageNameNoExt) {
-            newImageName := newSerial "_" imageNameNoExt
+        imageDataArr := [Data]
+        if (ObjHasOwnProp(Data, "SearchTargetArr") && IsObject(Data.SearchTargetArr)) {
+            for target in Data.SearchTargetArr {
+                if (IsObject(target))
+                    imageDataArr.Push(target)
+            }
         }
 
-        targetImagePath := targetImagesDir "\" newImageName "." imageExt
+        targetImagesDir := A_WorkingDir "\Setting\" MySoftData.CurSettingName "\Images"
+        pathMap := Map()
+        for imageData in imageDataArr {
+            if (!ObjHasOwnProp(imageData, "SearchImagePath") || imageData.SearchImagePath == "")
+                continue
 
-        try {
-            FileCopy(sourceImagePath, targetImagePath, true)
-            if (FileExist(targetImagePath)) {
-                Data.SearchImagePath := targetImagePath
-                renamedCount++
-                result.CopiedImages.Push({ SourcePath: sourceImagePath, TargetPath: targetImagePath })
+            sourceImagePath := String(imageData.SearchImagePath)
+            if (pathMap.Has(sourceImagePath)) {
+                imageData.SearchImagePath := pathMap[sourceImagePath]
+                continue
             }
-        } catch as e {
+
+            if (!FileExist(sourceImagePath))
+                continue
+
+            SplitPath sourceImagePath, &imageFileName, &sourceImageDir, &imageExt, &imageNameNoExt
+            newImageName := RegExReplace(imageNameNoExt, oldTextPart . oldNumPart "$", newTextPart . newNumPart)
+            if (newImageName == imageNameNoExt)
+                newImageName := newSerial "_" imageNameNoExt
+
+            targetImagePath := targetImagesDir "\" newImageName "." imageExt
+            try {
+                if (!DirExist(targetImagesDir))
+                    DirCreate(targetImagesDir)
+                FileCopy(sourceImagePath, targetImagePath, true)
+                if (FileExist(targetImagePath)) {
+                    imageData.SearchImagePath := targetImagePath
+                    pathMap.Set(sourceImagePath, targetImagePath)
+                    renamedCount++
+                    result.CopiedImages.Push({ SourcePath: sourceImagePath, TargetPath: targetImagePath })
+                }
+            } catch as e {
+            }
         }
 
         return renamedCount

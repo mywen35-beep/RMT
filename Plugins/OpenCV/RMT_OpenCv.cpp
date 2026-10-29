@@ -10,6 +10,14 @@
 #include <unordered_map>
 #include <algorithm>
 #include <cmath>
+#include <climits>
+#include <vector>
+#include <string>
+#include <memory>
+#include <mutex>
+#include <cstdarg>
+#include <cstdio>
+#include <cwchar>
 #include <cstdlib>
 #pragma comment(lib, "Dwmapi.lib")
 
@@ -944,7 +952,7 @@ static int findImageAdaptiveCore(const cv::Mat& captured, const cv::Mat& tpl, in
 
 extern "C" IMAGEFINDER_API int __cdecl GetApiVersion()
 {
-	return 3;   // 2 = 自适应匹配；3 = 加了边缘图比例判断 + 原分辨率细调
+	return 11;  // 11 = 超多点支持可编辑忽略蒙版
 }
 
 extern "C" IMAGEFINDER_API int __cdecl FindScreenImageAdaptive(
@@ -1002,4 +1010,1767 @@ extern "C" IMAGEFINDER_API int __cdecl FindWinImageAdaptive(
 	*x = pt.x + searchX;
 	*y = pt.y + searchY;
 	return 1;
+}
+
+namespace
+{
+thread_local wchar_t g_imageLastError[512] = L"";
+
+void ClearImageError()
+{
+	g_imageLastError[0] = L'\0';
+}
+
+void SetImageError(const wchar_t* fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	_vsnwprintf_s(g_imageLastError, _countof(g_imageLastError), _TRUNCATE, fmt, args);
+	va_end(args);
+}
+
+bool ReadAllBytesW(const wchar_t* path, std::vector<uchar>& out)
+{
+	out.clear();
+	if (path == nullptr || path[0] == L'\0')
+		return false;
+
+	FILE* fp = nullptr;
+	if (_wfopen_s(&fp, path, L"rb") != 0 || fp == nullptr)
+		return false;
+	if (fseek(fp, 0, SEEK_END) != 0)
+	{
+		fclose(fp);
+		return false;
+	}
+
+	const long size = ftell(fp);
+	if (size <= 0)
+	{
+		fclose(fp);
+		return false;
+	}
+	rewind(fp);
+	out.resize(static_cast<size_t>(size));
+	const size_t read = fread(out.data(), 1, out.size(), fp);
+	fclose(fp);
+	if (read != out.size())
+	{
+		out.clear();
+		return false;
+	}
+	return true;
+}
+
+bool LoadTemplateBgra(const wchar_t* path, cv::Mat& bgra, bool& hasAlpha)
+{
+	bgra.release();
+	hasAlpha = false;
+	std::vector<uchar> bytes;
+	if (!ReadAllBytesW(path, bytes))
+		return false;
+
+	try
+	{
+		cv::Mat raw = cv::imdecode(bytes, cv::IMREAD_UNCHANGED);
+		if (raw.empty() || raw.depth() != CV_8U)
+		return false;
+		switch (raw.channels())
+		{
+		case 4:
+			bgra = raw;
+			hasAlpha = true;
+			break;
+		case 3:
+			cv::cvtColor(raw, bgra, cv::COLOR_BGR2BGRA);
+			break;
+		case 1:
+			cv::cvtColor(raw, bgra, cv::COLOR_GRAY2BGRA);
+			break;
+		default:
+			return false;
+		}
+	}
+	catch (const cv::Exception&)
+	{
+		bgra.release();
+		hasAlpha = false;
+		return false;
+	}
+	return true;
+}
+
+bool WriteAllBytesW(const wchar_t* path, const std::vector<uchar>& data)
+{
+	if (path == nullptr || path[0] == L'\0')
+		return false;
+	FILE* fp = nullptr;
+	if (_wfopen_s(&fp, path, L"wb") != 0 || fp == nullptr)
+		return false;
+	const size_t written = fwrite(data.data(), 1, data.size(), fp);
+	fclose(fp);
+	return written == data.size();
+}
+
+bool WritePreview(const wchar_t* path, const cv::Mat& image)
+{
+	if (path == nullptr || path[0] == L'\0')
+		return true;
+	std::vector<uchar> png;
+	if (!cv::imencode(".png", image, png) || png.empty())
+	{
+		SetImageError(L"预览图编码失败");
+		return false;
+	}
+	if (!WriteAllBytesW(path, png))
+	{
+		SetImageError(L"预览图写入失败：%s", path);
+		return false;
+	}
+	return true;
+}
+}
+
+static bool ApplySeedColorPreview(cv::Mat& scaled, const cv::Mat& sourceView,
+	const wchar_t* seedPointText, int tolerance, int zoomPercent);
+
+extern "C" IMAGEFINDER_API const wchar_t* __cdecl GetImageLastError()
+{
+	return g_imageLastError;
+}
+
+extern "C" IMAGEFINDER_API int __cdecl RenderImagePreview(
+	const wchar_t* targetPath,
+	int maxW, int maxH,
+	int viewX, int viewY, int viewW, int viewH,
+	int rectX, int rectY, int rectW, int rectH,
+	int showGrid, int zoomPercent,
+	const wchar_t* seedPoints, int tolerance,
+	const wchar_t* outOrigPath, const wchar_t* outPreviewPath,
+	int* validPixels, int* totalPixels,
+	int* previewW, int* previewH, int* origW, int* origH,
+	int* bboxX, int* bboxY, int* bboxW, int* bboxH)
+{
+	ClearImageError();
+	if (targetPath == nullptr || validPixels == nullptr || totalPixels == nullptr
+		|| previewW == nullptr || previewH == nullptr || origW == nullptr || origH == nullptr
+		|| bboxX == nullptr || bboxY == nullptr || bboxW == nullptr || bboxH == nullptr
+		|| (outOrigPath == nullptr && outPreviewPath == nullptr))
+	{
+		SetImageError(L"参数非法：指针为空");
+		return -6;
+	}
+
+	*validPixels = *totalPixels = *previewW = *previewH = 0;
+	*origW = *origH = *bboxX = *bboxY = *bboxW = *bboxH = 0;
+	maxW = std::max(16, maxW);
+	maxH = std::max(16, maxH);
+
+	cv::Mat bgra;
+	bool hasAlpha = false;
+	if (!LoadTemplateBgra(targetPath, bgra, hasAlpha))
+	{
+		SetImageError(L"模板读取失败：无法打开、解码失败或不是 8 位图像 %s", targetPath);
+		return -1;
+	}
+
+	*origW = bgra.cols;
+	*origH = bgra.rows;
+	*totalPixels = bgra.cols * bgra.rows;
+	if (hasAlpha)
+	{
+		*validPixels = 0;
+		for (int y = 0; y < bgra.rows; ++y)
+		{
+			const uchar* row = bgra.ptr<uchar>(y);
+			for (int x = 0; x < bgra.cols; ++x)
+				if (row[x * 4 + 3] > 0)
+					++*validPixels;
+		}
+	}
+	else
+	{
+		*validPixels = *totalPixels;
+	}
+	*bboxX = 0;
+	*bboxY = 0;
+	*bboxW = bgra.cols;
+	*bboxH = bgra.rows;
+
+	cv::Rect view(0, 0, bgra.cols, bgra.rows);
+	if (viewW > 0 && viewH > 0)
+	{
+		view.width = std::min(viewW, bgra.cols);
+		view.height = std::min(viewH, bgra.rows);
+		view.x = std::max(0, std::min(viewX, bgra.cols - view.width));
+		view.y = std::max(0, std::min(viewY, bgra.rows - view.height));
+	}
+
+	const double zoom = std::max(0.01, zoomPercent / 100.0);
+	const int scaledW = std::max(1, static_cast<int>(std::lround(view.width * zoom)));
+	const int scaledH = std::max(1, static_cast<int>(std::lround(view.height * zoom)));
+	const cv::Mat sourceView = bgra(view);
+	cv::Mat scaled;
+	const int interpolation = zoom < 1.0 ? cv::INTER_AREA : cv::INTER_NEAREST;
+	cv::resize(sourceView, scaled, cv::Size(scaledW, scaledH), 0, 0, interpolation);
+	const cv::Mat originalScaled = scaled.clone();
+	if (!ApplySeedColorPreview(scaled, sourceView, seedPoints, tolerance, zoomPercent))
+		return -4;
+
+	cv::Mat canvas(maxH, maxW, CV_8UC4, cv::Scalar(30, 30, 30, 255));
+	cv::Mat previewCanvas(maxH, maxW, CV_8UC4, cv::Scalar(30, 30, 30, 255));
+	int pasteX = (maxW - scaledW) / 2;
+	int pasteY = (maxH - scaledH) / 2;
+	int srcX = std::max(0, -pasteX);
+	int srcY = std::max(0, -pasteY);
+	pasteX = std::max(0, pasteX);
+	pasteY = std::max(0, pasteY);
+	const int copyW = std::min(scaledW - srcX, maxW - pasteX);
+	const int copyH = std::min(scaledH - srcY, maxH - pasteY);
+	if (copyW > 0 && copyH > 0)
+	{
+		const cv::Rect sourceRect(srcX, srcY, copyW, copyH);
+		const cv::Rect targetRect(pasteX, pasteY, copyW, copyH);
+		originalScaled(sourceRect).copyTo(canvas(targetRect));
+		scaled(sourceRect).copyTo(previewCanvas(targetRect));
+	}
+	*previewW = copyW;
+	*previewH = copyH;
+
+	auto drawDecorations = [&](cv::Mat& target)
+	{
+		if (showGrid && zoom >= 6.0)
+		{
+			for (int i = 1; i < view.width; ++i)
+			{
+				const int gx = pasteX + static_cast<int>(std::lround(i * zoom)) - srcX;
+				if (gx > 0 && gx < maxW)
+					cv::line(target, cv::Point(gx, pasteY), cv::Point(gx, pasteY + copyH - 1), cv::Scalar(70, 70, 70, 255), 1);
+			}
+			for (int i = 1; i < view.height; ++i)
+			{
+				const int gy = pasteY + static_cast<int>(std::lround(i * zoom)) - srcY;
+				if (gy > 0 && gy < maxH)
+					cv::line(target, cv::Point(pasteX, gy), cv::Point(pasteX + copyW - 1, gy), cv::Scalar(70, 70, 70, 255), 1);
+			}
+		}
+
+		if (rectW > 0 && rectH > 0)
+		{
+			const int rx = pasteX + static_cast<int>(std::lround((rectX - view.x) * zoom)) - srcX;
+			const int ry = pasteY + static_cast<int>(std::lround((rectY - view.y) * zoom)) - srcY;
+			const int rw = std::max(1, static_cast<int>(std::lround(rectW * zoom)));
+			const int rh = std::max(1, static_cast<int>(std::lround(rectH * zoom)));
+			cv::rectangle(target, cv::Rect(rx, ry, rw, rh), cv::Scalar(0, 220, 255, 255), 1);
+			const int handleSize = 4;
+			for (int dx : { 0, rw })
+				for (int dy : { 0, rh })
+					cv::rectangle(target, cv::Point(rx + dx - handleSize, ry + dy - handleSize),
+						cv::Point(rx + dx + handleSize, ry + dy + handleSize), cv::Scalar(0, 220, 255, 255), -1);
+		}
+	};
+
+	drawDecorations(canvas);
+	drawDecorations(previewCanvas);
+
+	if (!WritePreview(outOrigPath, canvas) || !WritePreview(outPreviewPath, previewCanvas))
+		return -3;
+	ClearImageError();
+	return 1;
+}
+
+extern "C" IMAGEFINDER_API int __cdecl CropImageFile(
+	const wchar_t* srcPath, int x, int y, int w, int h, const wchar_t* dstPath)
+{
+	ClearImageError();
+	if (srcPath == nullptr || dstPath == nullptr)
+	{
+		SetImageError(L"参数非法：路径为空");
+		return -6;
+	}
+	cv::Mat bgra;
+	bool hasAlpha = false;
+	if (!LoadTemplateBgra(srcPath, bgra, hasAlpha))
+	{
+		SetImageError(L"读取失败：%s", srcPath);
+		return -1;
+	}
+	if (w <= 0 || h <= 0 || x < 0 || y < 0 || x >= bgra.cols || y >= bgra.rows)
+	{
+		SetImageError(L"裁剪区域无效：(%d,%d) %dx%d", x, y, w, h);
+		return -6;
+	}
+	const int cropW = std::min(w, bgra.cols - x);
+	const int cropH = std::min(h, bgra.rows - y);
+	cv::Mat cropped = bgra(cv::Rect(x, y, cropW, cropH)).clone();
+	std::vector<uchar> png;
+	if (!cv::imencode(".png", cropped, png) || png.empty())
+	{
+		SetImageError(L"裁剪结果编码失败");
+		return -3;
+	}
+	if (!WriteAllBytesW(dstPath, png))
+	{
+		SetImageError(L"裁剪结果写入失败：%s", dstPath);
+		return -3;
+	}
+	ClearImageError();
+	return 1;
+}
+
+static int GetImagePixel(const wchar_t* path, int x, int y,
+	int* r, int* g, int* b, int* a)
+{
+	ClearImageError();
+	if (path == nullptr || r == nullptr || g == nullptr || b == nullptr)
+	{
+		SetImageError(L"参数非法：指针为空");
+		return -6;
+	}
+	*r = *g = *b = 0;
+	if (a != nullptr)
+		*a = 255;
+	cv::Mat bgra;
+	bool hasAlpha = false;
+	if (!LoadTemplateBgra(path, bgra, hasAlpha))
+	{
+		SetImageError(L"模板读取失败：%s", path);
+		return -1;
+	}
+	if (x < 0 || y < 0 || x >= bgra.cols || y >= bgra.rows)
+	{
+		SetImageError(L"坐标越界：(%d,%d) 超出 %dx%d", x, y, bgra.cols, bgra.rows);
+		return -6;
+	}
+	const uchar* pixel = bgra.ptr<uchar>(y) + x * 4;
+	*b = pixel[0];
+	*g = pixel[1];
+	*r = pixel[2];
+	if (a != nullptr)
+		*a = pixel[3];
+	return 1;
+}
+
+extern "C" IMAGEFINDER_API int __cdecl GetImagePixelAt(
+	const wchar_t* path, int x, int y, int* r, int* g, int* b)
+{
+	return GetImagePixel(path, x, y, r, g, b, nullptr);
+}
+
+extern "C" IMAGEFINDER_API int __cdecl GetImagePixelAtEx(
+	const wchar_t* path, int x, int y, int* r, int* g, int* b, int* a)
+{
+	if (a == nullptr)
+	{
+		ClearImageError();
+		SetImageError(L"参数非法：Alpha 指针为空");
+		return -6;
+	}
+	return GetImagePixel(path, x, y, r, g, b, a);
+}
+
+// 多点找图：只采样用户选中的模板点，避免对整张模板做逐像素比较。
+// points 格式为 "x,y,RRGGBB;x,y,RRGGBB"，坐标相对模板左上角。
+// ===========================================================================
+struct MultiPointSample
+{
+	int x;
+	int y;
+	cv::Vec3b bgr;
+};
+
+static bool ParseMultiPointData(const wchar_t* text, std::vector<MultiPointSample>& points)
+{
+	points.clear();
+	if (text == nullptr || text[0] == L'\0')
+		return false;
+
+	const std::wstring all(text);
+	size_t pos = 0;
+	while (pos < all.size())
+	{
+		const size_t end = all.find(L';', pos);
+		const std::wstring token = all.substr(pos, end == std::wstring::npos ? end : end - pos);
+		const size_t comma1 = token.find(L',');
+		const size_t comma2 = comma1 == std::wstring::npos ? comma1 : token.find(L',', comma1 + 1);
+		if (comma1 == std::wstring::npos || comma2 == std::wstring::npos
+			|| token.find(L',', comma2 + 1) != std::wstring::npos)
+			return false;
+
+		const std::wstring xs = token.substr(0, comma1);
+		const std::wstring ys = token.substr(comma1 + 1, comma2 - comma1 - 1);
+		const std::wstring color = token.substr(comma2 + 1);
+		wchar_t* parseEnd = nullptr;
+		const long px = wcstol(xs.c_str(), &parseEnd, 10);
+		if (parseEnd == xs.c_str() || *parseEnd != L'\0' || px < 0)
+			return false;
+		const long py = wcstol(ys.c_str(), &parseEnd, 10);
+		if (parseEnd == ys.c_str() || *parseEnd != L'\0' || py < 0)
+			return false;
+		if (color.size() != 6 || points.size() >= 256)
+			return false;
+		for (wchar_t ch : color)
+			if (!((ch >= L'0' && ch <= L'9') || (ch >= L'a' && ch <= L'f') || (ch >= L'A' && ch <= L'F')))
+				return false;
+
+		wchar_t* colorEnd = nullptr;
+		const unsigned long rgb = wcstoul(color.c_str(), &colorEnd, 16);
+		if (colorEnd == color.c_str() || *colorEnd != L'\0' || rgb > 0xFFFFFFUL)
+			return false;
+
+		points.push_back({
+			static_cast<int>(px),
+			static_cast<int>(py),
+			cv::Vec3b(
+				static_cast<uchar>(rgb & 0xFF),
+				static_cast<uchar>((rgb >> 8) & 0xFF),
+				static_cast<uchar>((rgb >> 16) & 0xFF))
+		});
+		if (end == std::wstring::npos)
+			break;
+		pos = end + 1;
+	}
+
+    return !points.empty();
+}
+
+static bool IsMultiPointColorHit(const uchar* pixel, const cv::Vec3b& target, int tolerance)
+{
+	return std::abs(static_cast<int>(pixel[0]) - static_cast<int>(target[0])) <= tolerance
+		&& std::abs(static_cast<int>(pixel[1]) - static_cast<int>(target[1])) <= tolerance
+		&& std::abs(static_cast<int>(pixel[2]) - static_cast<int>(target[2])) <= tolerance;
+}
+
+static int FindImageMultiPointCore(const wchar_t* targetPath, const cv::Mat& shot,
+	int matchThreshold, const wchar_t* pointText, int tolerance, int* x, int* y)
+{
+	cv::Mat tpl;
+	bool hasAlpha = false;
+	if (!LoadTemplateBgra(targetPath, tpl, hasAlpha))
+	{
+		SetImageError(L"模板读取失败：%s", targetPath);
+		return -1;
+	}
+
+	std::vector<MultiPointSample> points;
+	if (!ParseMultiPointData(pointText, points))
+	{
+		SetImageError(L"多点数据无效：至少选择 1 个点，最多 256 个点");
+		return -4;
+	}
+	for (const MultiPointSample& point : points)
+	{
+		if (point.x < 0 || point.y < 0 || point.x >= tpl.cols || point.y >= tpl.rows)
+		{
+			SetImageError(L"多点坐标越界：(%d,%d) 超出模板 %dx%d", point.x, point.y, tpl.cols, tpl.rows);
+			return -4;
+		}
+		if (hasAlpha && tpl.ptr<uchar>(point.y)[point.x * 4 + 3] < 128)
+		{
+			SetImageError(L"多点不能落在透明区域：(%d,%d)", point.x, point.y);
+			return -4;
+		}
+	}
+
+	if (shot.empty())
+	{
+		SetImageError(L"截图失败：搜索区域为空");
+		return -5;
+	}
+	if (tpl.cols > shot.cols || tpl.rows > shot.rows)
+	{
+		SetImageError(L"模板尺寸(%dx%d)大于搜索区域(%dx%d)", tpl.cols, tpl.rows, shot.cols, shot.rows);
+		return -2;
+	}
+
+	matchThreshold = std::max(0, std::min(100, matchThreshold));
+	tolerance = std::max(0, std::min(255, tolerance));
+	const int required = std::max(1, static_cast<int>(std::ceil(points.size() * matchThreshold / 100.0)));
+	const int maxX = shot.cols - tpl.cols;
+	const int maxY = shot.rows - tpl.rows;
+	int bestHits = 0;
+	int bestX = 0;
+	int bestY = 0;
+	const size_t anchorCount = points.size() - static_cast<size_t>(required) + 1;
+	const size_t firstAnchor = (anchorCount == 1) ? 0 : points.size() - anchorCount;
+
+	for (int row = 0; row <= maxY; ++row)
+	{
+		for (int col = 0; col <= maxX; ++col)
+		{
+			// A valid candidate can miss N-required points, so at least one of
+			// N-required+1 anchors must hit. A single fixed anchor loses valid matches.
+			bool anchorHit = false;
+			for (size_t i = 0; i < anchorCount; ++i)
+			{
+				const MultiPointSample& anchor = points[firstAnchor + i];
+				const uchar* anchorPixel = shot.ptr<uchar>(row + anchor.y) + (col + anchor.x) * 4;
+				if (IsMultiPointColorHit(anchorPixel, anchor.bgr, tolerance))
+				{
+					anchorHit = true;
+					break;
+				}
+			}
+			if (!anchorHit)
+				continue;
+
+			int hits = 0;
+			for (size_t i = 0; i < points.size(); ++i)
+			{
+				const MultiPointSample& point = points[i];
+				const uchar* pixel = shot.ptr<uchar>(row + point.y) + (col + point.x) * 4;
+				if (IsMultiPointColorHit(pixel, point.bgr, tolerance))
+					++hits;
+			}
+			if (hits > bestHits)
+			{
+				bestHits = hits;
+				bestX = col;
+				bestY = row;
+				if (bestHits == static_cast<int>(points.size()))
+					break;
+			}
+		}
+		if (bestHits == static_cast<int>(points.size()))
+			break;
+	}
+
+	if (bestHits < required)
+	{
+		SetImageError(L"多点未命中：命中 %d/%d 点，要求至少 %d 点", bestHits,
+			static_cast<int>(points.size()), required);
+		return 0;
+	}
+	*x = bestX;
+	*y = bestY;
+	return 1;
+}
+
+extern "C" IMAGEFINDER_API int __cdecl FindScreenImageMultiPoint(
+	const wchar_t* targetPath, int searchX, int searchY, int searchW, int searchH,
+	int matchThreshold, const wchar_t* points, int tolerance, int* x, int* y)
+{
+	ClearImageError();
+	if (targetPath == nullptr || x == nullptr || y == nullptr || searchW <= 0 || searchH <= 0)
+	{
+		SetImageError(L"参数非法：模板路径、坐标指针和搜索区域必须有效");
+		return -6;
+	}
+	*x = 0;
+	*y = 0;
+	try
+	{
+		cv::Mat shot = captureScreen(searchX, searchY, searchW, searchH);
+		const int ret = FindImageMultiPointCore(targetPath, shot, matchThreshold, points, tolerance, x, y);
+		if (ret == 1)
+		{
+			*x += searchX;
+			*y += searchY;
+			ClearImageError();
+		}
+		return ret;
+	}
+	catch (const cv::Exception& ex)
+	{
+		SetImageError(L"OpenCV 多点匹配异常：%hs", ex.what());
+		return -3;
+	}
+	catch (...)
+	{
+		SetImageError(L"多点匹配异常");
+		return -3;
+	}
+}
+
+extern "C" IMAGEFINDER_API int __cdecl FindWinImageMultiPoint(
+	const wchar_t* targetPath, int hwnd, int searchX, int searchY, int searchW, int searchH,
+	int matchThreshold, const wchar_t* points, int tolerance, int* x, int* y)
+{
+	ClearImageError();
+	if (targetPath == nullptr || x == nullptr || y == nullptr || hwnd == 0 || searchW <= 0 || searchH <= 0)
+	{
+		SetImageError(L"参数非法：模板路径、窗口句柄、坐标指针和搜索区域必须有效");
+		return -6;
+	}
+	*x = 0;
+	*y = 0;
+	try
+	{
+		cv::Mat shot = captureScreen(hwnd, searchX, searchY, searchW, searchH);
+		const int ret = FindImageMultiPointCore(targetPath, shot, matchThreshold, points, tolerance, x, y);
+		if (ret == 1)
+		{
+			*x += searchX;
+			*y += searchY;
+			ClearImageError();
+		}
+		return ret;
+	}
+	catch (const cv::Exception& ex)
+	{
+		SetImageError(L"OpenCV 窗口多点匹配异常：%hs", ex.what());
+		return -3;
+	}
+	catch (...)
+	{
+		SetImageError(L"窗口多点匹配异常");
+		return -3;
+	}
+}
+
+namespace
+{
+struct EffectivePixel
+{
+	int x;
+	int y;
+	cv::Vec3b bgr;
+};
+
+struct SuperMultiPointTemplate
+{
+	int width = 0;
+	int height = 0;
+	std::vector<EffectivePixel> pixels;
+	std::vector<MultiPointSample> coarsePoints;
+};
+
+struct SuperIgnoreOperation
+{
+	wchar_t type = L'\0';
+	int size = 1;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int height = 0;
+	std::vector<cv::Point> points;
+};
+
+static bool ParseIgnoreCoordinate(const std::wstring& text, int& value)
+{
+	if (text.empty())
+		return false;
+	wchar_t* end = nullptr;
+	const long parsed = wcstol(text.c_str(), &end, 10);
+	if (end == text.c_str() || *end != L'\0' || parsed < -1000000 || parsed > 1000000)
+		return false;
+	value = static_cast<int>(parsed);
+	return true;
+}
+
+static bool ParseSuperIgnoreData(const wchar_t* text, std::vector<SuperIgnoreOperation>& operations)
+{
+	operations.clear();
+	if (text == nullptr || text[0] == L'\0')
+		return true;
+
+	const std::wstring all(text);
+	if (all.size() > 4u * 1024u * 1024u)
+		return false;
+
+	size_t totalPathPoints = 0;
+	size_t pos = 0;
+	while (pos < all.size())
+	{
+		const size_t end = all.find(L';', pos);
+		const std::wstring token = all.substr(pos,
+			end == std::wstring::npos ? end : end - pos);
+		std::vector<std::wstring> fields;
+		size_t fieldPos = 0;
+		while (fieldPos <= token.size())
+		{
+			const size_t separator = token.find(L':', fieldPos);
+			fields.push_back(token.substr(fieldPos,
+				separator == std::wstring::npos ? separator : separator - fieldPos));
+			if (separator == std::wstring::npos)
+				break;
+			fieldPos = separator + 1;
+		}
+
+		SuperIgnoreOperation operation;
+		if (fields.size() == 5 && fields[0] == L"R")
+		{
+			operation.type = L'R';
+			if (!ParseIgnoreCoordinate(fields[1], operation.x)
+				|| !ParseIgnoreCoordinate(fields[2], operation.y)
+				|| !ParseIgnoreCoordinate(fields[3], operation.width)
+				|| !ParseIgnoreCoordinate(fields[4], operation.height)
+				|| operation.width <= 0 || operation.height <= 0)
+				return false;
+		}
+		else if (fields.size() == 3 && (fields[0] == L"B" || fields[0] == L"E"))
+		{
+			operation.type = fields[0][0];
+			if (!ParseIgnoreCoordinate(fields[1], operation.size)
+				|| operation.size < 1 || operation.size > 3 || fields[2].empty())
+				return false;
+
+			size_t pointPos = 0;
+			while (pointPos <= fields[2].size())
+			{
+				const size_t pointEnd = fields[2].find(L'|', pointPos);
+				const std::wstring pointText = fields[2].substr(pointPos,
+					pointEnd == std::wstring::npos ? pointEnd : pointEnd - pointPos);
+				const size_t comma = pointText.find(L',');
+				if (comma == std::wstring::npos
+					|| pointText.find(L',', comma + 1) != std::wstring::npos)
+					return false;
+
+				int x = 0, y = 0;
+				if (!ParseIgnoreCoordinate(pointText.substr(0, comma), x)
+					|| !ParseIgnoreCoordinate(pointText.substr(comma + 1), y))
+					return false;
+				operation.points.emplace_back(x, y);
+				if (++totalPathPoints > 1000000)
+					return false;
+				if (pointEnd == std::wstring::npos)
+					break;
+				pointPos = pointEnd + 1;
+			}
+		}
+		else
+		{
+			return false;
+		}
+
+		operations.push_back(std::move(operation));
+		if (operations.size() > 100000)
+			return false;
+		if (end == std::wstring::npos)
+			break;
+		pos = end + 1;
+	}
+	return true;
+}
+
+static cv::Mat BuildSuperIgnoreMask(int width, int height,
+	const std::vector<SuperIgnoreOperation>& operations)
+{
+	if (operations.empty())
+		return {};
+
+	cv::Mat mask(height, width, CV_8UC1, cv::Scalar(0));
+	const cv::Rect bounds(0, 0, width, height);
+	for (const SuperIgnoreOperation& operation : operations)
+	{
+		if (operation.type == L'R')
+		{
+			const long long right = static_cast<long long>(operation.x) + operation.width;
+			const long long bottom = static_cast<long long>(operation.y) + operation.height;
+			const int left = std::max(0, operation.x);
+			const int top = std::max(0, operation.y);
+			const int clippedRight = static_cast<int>(std::min<long long>(width, right));
+			const int clippedBottom = static_cast<int>(std::min<long long>(height, bottom));
+			if (clippedRight > left && clippedBottom > top)
+			{
+				const cv::Rect region(left, top, clippedRight - left, clippedBottom - top);
+				mask(region) = cv::Scalar(255);
+			}
+			continue;
+		}
+
+		const uchar value = operation.type == L'E' ? 0 : 255;
+		for (size_t i = 0; i < operation.points.size(); ++i)
+		{
+			const cv::Point& point = operation.points[i];
+			if (i == 0)
+			{
+				const int left = point.x - operation.size / 2;
+				const int top = point.y - operation.size / 2;
+				const cv::Rect stamp(left, top, operation.size, operation.size);
+				const cv::Rect clipped = stamp & bounds;
+				if (clipped.area() > 0)
+					mask(clipped) = cv::Scalar(value);
+			}
+			else
+			{
+				cv::line(mask, operation.points[i - 1], point, cv::Scalar(value),
+					operation.size, cv::LINE_8);
+			}
+		}
+	}
+	return mask;
+}
+
+struct SuperMultiPointCacheEntry
+{
+	std::wstring path;
+	std::wstring seeds;
+	std::wstring ignoreData;
+	int tolerance = 0;
+	ULONGLONG fileSize = 0;
+	FILETIME lastWrite = {};
+	ULONGLONG lastUse = 0;
+	size_t bytes = 0;
+	std::shared_ptr<const SuperMultiPointTemplate> data;
+};
+
+std::mutex g_superMultiPointCacheMutex;
+std::vector<SuperMultiPointCacheEntry> g_superMultiPointCache;
+ULONGLONG g_superMultiPointCacheTick = 0;
+size_t g_superMultiPointCacheBytes = 0;
+constexpr size_t kSuperMultiPointCacheCapacity = 8;
+constexpr size_t kSuperMultiPointCacheByteLimit = 512u * 1024u * 1024u;
+
+static bool GetSuperMultiPointFileStamp(const wchar_t* path, ULONGLONG& fileSize, FILETIME& lastWrite)
+{
+	WIN32_FILE_ATTRIBUTE_DATA data = {};
+	if (path == nullptr || !GetFileAttributesExW(path, GetFileExInfoStandard, &data))
+		return false;
+	fileSize = (static_cast<ULONGLONG>(data.nFileSizeHigh) << 32) | data.nFileSizeLow;
+	lastWrite = data.ftLastWriteTime;
+	return true;
+}
+
+static bool SameSuperMultiPointFileStamp(const SuperMultiPointCacheEntry& entry,
+	ULONGLONG fileSize, const FILETIME& lastWrite)
+{
+	return entry.fileSize == fileSize && CompareFileTime(&entry.lastWrite, &lastWrite) == 0;
+}
+
+static size_t GetSuperMultiPointTemplateBytes(const SuperMultiPointTemplate& data)
+{
+	return sizeof(data)
+		+ data.pixels.capacity() * sizeof(EffectivePixel)
+		+ data.coarsePoints.capacity() * sizeof(MultiPointSample);
+}
+
+static std::shared_ptr<const SuperMultiPointTemplate> BuildSuperMultiPointTemplate(
+	const wchar_t* targetPath, const wchar_t* seedPointText, int tolerance,
+	const wchar_t* ignoreData)
+{
+	cv::Mat bgra;
+	bool hasAlpha = false;
+	if (!LoadTemplateBgra(targetPath, bgra, hasAlpha))
+	{
+		SetImageError(L"模板读取失败：%s", targetPath);
+		return nullptr;
+	}
+
+	std::vector<MultiPointSample> seeds;
+	if (!ParseMultiPointData(seedPointText, seeds))
+	{
+		SetImageError(L"超多点基准点数据无效");
+		return nullptr;
+	}
+	for (const MultiPointSample& seed : seeds)
+	{
+		if (seed.x < 0 || seed.y < 0 || seed.x >= bgra.cols || seed.y >= bgra.rows)
+		{
+			SetImageError(L"基准点坐标越界：(%d,%d) 超出模板 %dx%d",
+				seed.x, seed.y, bgra.cols, bgra.rows);
+			return nullptr;
+		}
+		if (hasAlpha && bgra.ptr<uchar>(seed.y)[seed.x * 4 + 3] < 128)
+		{
+			SetImageError(L"基准点不能落在透明区域：(%d,%d)", seed.x, seed.y);
+			return nullptr;
+		}
+	}
+
+	std::vector<SuperIgnoreOperation> ignoreOperations;
+	if (!ParseSuperIgnoreData(ignoreData, ignoreOperations))
+	{
+		SetImageError(L"超多点忽略蒙版数据无效");
+		return nullptr;
+	}
+	const cv::Mat ignoreMask = BuildSuperIgnoreMask(bgra.cols, bgra.rows, ignoreOperations);
+
+	auto result = std::make_shared<SuperMultiPointTemplate>();
+	result->width = bgra.cols;
+	result->height = bgra.rows;
+	std::vector<EffectivePixel> effective;
+	for (int y = 0; y < bgra.rows; ++y)
+	{
+		const uchar* row = bgra.ptr<uchar>(y);
+		for (int x = 0; x < bgra.cols; ++x)
+		{
+			const uchar* pixel = row + x * 4;
+			if (hasAlpha && pixel[3] < 128)
+				continue;
+			if (!ignoreMask.empty() && ignoreMask.ptr<uchar>(y)[x] != 0)
+				continue;
+
+			bool included = false;
+			for (const MultiPointSample& seed : seeds)
+			{
+				if (IsMultiPointColorHit(pixel, seed.bgr, tolerance))
+				{
+					included = true;
+					break;
+				}
+			}
+			if (!included)
+				continue;
+
+			effective.push_back({ x, y, cv::Vec3b(pixel[0], pixel[1], pixel[2]) });
+		}
+	}
+
+	if (effective.empty())
+	{
+		SetImageError(L"模板中没有符合基准颜色容差的有效像素");
+		return nullptr;
+	}
+
+	result->pixels = std::move(effective);
+	constexpr size_t kColorBucketCount = 1u << 15;
+	std::vector<size_t> colorCounts(kColorBucketCount, 0);
+	for (const EffectivePixel& pixel : result->pixels)
+	{
+		const cv::Vec3b& color = pixel.bgr;
+		const size_t bucket = (static_cast<size_t>(color[0] >> 3) << 10)
+			| (static_cast<size_t>(color[1] >> 3) << 5)
+			| static_cast<size_t>(color[2] >> 3);
+		++colorCounts[bucket];
+	}
+
+	auto colorBucket = [](const cv::Vec3b& color) -> size_t
+	{
+		return (static_cast<size_t>(color[0] >> 3) << 10)
+			| (static_cast<size_t>(color[1] >> 3) << 5)
+			| static_cast<size_t>(color[2] >> 3);
+	};
+	std::stable_sort(result->pixels.begin(), result->pixels.end(),
+		[&colorCounts, &colorBucket](const EffectivePixel& a, const EffectivePixel& b)
+		{
+			return colorCounts[colorBucket(a.bgr)] < colorCounts[colorBucket(b.bgr)];
+		});
+
+	std::vector<wchar_t> output(16384, L'\0');
+	const int count = AutoSelectImageMultiPoints(
+		targetPath, seedPointText, 100, tolerance, ignoreData, output.data(),
+		static_cast<int>(output.size()));
+	if (count <= 0 || count > 256
+		|| !ParseMultiPointData(output.data(), result->coarsePoints))
+	{
+		if (count >= 0)
+			SetImageError(L"超多点自动选点失败");
+		return nullptr;
+	}
+
+	return result;
+}
+
+static std::shared_ptr<const SuperMultiPointTemplate> GetSuperMultiPointTemplate(
+	const wchar_t* targetPath, const wchar_t* seedPointText, int tolerance,
+	const wchar_t* ignoreData)
+{
+	const std::wstring path = targetPath ? targetPath : L"";
+	const std::wstring seeds = seedPointText ? seedPointText : L"";
+	const std::wstring ignored = ignoreData ? ignoreData : L"";
+	ULONGLONG fileSize = 0;
+	FILETIME lastWrite = {};
+	const bool hasStamp = GetSuperMultiPointFileStamp(targetPath, fileSize, lastWrite);
+
+	if (hasStamp)
+	{
+		std::lock_guard<std::mutex> lock(g_superMultiPointCacheMutex);
+		for (SuperMultiPointCacheEntry& entry : g_superMultiPointCache)
+		{
+			if (entry.path == path && entry.seeds == seeds && entry.ignoreData == ignored
+				&& entry.tolerance == tolerance
+				&& SameSuperMultiPointFileStamp(entry, fileSize, lastWrite))
+			{
+				entry.lastUse = ++g_superMultiPointCacheTick;
+				return entry.data;
+			}
+		}
+	}
+
+	std::shared_ptr<const SuperMultiPointTemplate> built =
+		BuildSuperMultiPointTemplate(targetPath, seedPointText, tolerance, ignoreData);
+	if (!built || !hasStamp)
+		return built;
+	const size_t builtBytes = GetSuperMultiPointTemplateBytes(*built);
+	if (builtBytes > kSuperMultiPointCacheByteLimit)
+		return built;
+
+	std::lock_guard<std::mutex> lock(g_superMultiPointCacheMutex);
+	for (SuperMultiPointCacheEntry& entry : g_superMultiPointCache)
+	{
+		if (entry.path == path && entry.seeds == seeds && entry.ignoreData == ignored
+			&& entry.tolerance == tolerance
+			&& SameSuperMultiPointFileStamp(entry, fileSize, lastWrite))
+		{
+			entry.lastUse = ++g_superMultiPointCacheTick;
+			return entry.data;
+		}
+	}
+	while (!g_superMultiPointCache.empty()
+		&& (g_superMultiPointCache.size() >= kSuperMultiPointCacheCapacity
+			|| g_superMultiPointCacheBytes > kSuperMultiPointCacheByteLimit - builtBytes))
+	{
+		const auto oldest = std::min_element(g_superMultiPointCache.begin(), g_superMultiPointCache.end(),
+			[](const SuperMultiPointCacheEntry& a, const SuperMultiPointCacheEntry& b)
+			{
+				return a.lastUse < b.lastUse;
+			});
+		if (oldest != g_superMultiPointCache.end())
+		{
+			g_superMultiPointCacheBytes -= oldest->bytes;
+			g_superMultiPointCache.erase(oldest);
+		}
+	}
+	g_superMultiPointCache.push_back({
+		path, seeds, ignored, tolerance,
+		fileSize, lastWrite, ++g_superMultiPointCacheTick, builtBytes, built
+	});
+	g_superMultiPointCacheBytes += builtBytes;
+	return built;
+}
+
+static bool HasRequiredEffectivePixelHits(const cv::Mat& shotBgr,
+	const std::vector<EffectivePixel>& pixels, int x, int y,
+	int tolerance, int required)
+{
+	int hits = 0;
+	for (size_t i = 0; i < pixels.size(); ++i)
+	{
+		const EffectivePixel& point = pixels[i];
+		const uchar* pixel = shotBgr.ptr<uchar>(y + point.y) + (x + point.x) * 3;
+		if (IsMultiPointColorHit(pixel, point.bgr, tolerance))
+			++hits;
+		if (hits >= required)
+			return true;
+		if (hits + static_cast<int>(pixels.size() - i - 1) < required)
+			return false;
+	}
+	return false;
+}
+
+static int FindImageMultiPointSuperCore(const wchar_t* targetPath, const cv::Mat& shot,
+	int matchThreshold, const wchar_t* seedPointText, int tolerance,
+	const wchar_t* ignoreData, int* x, int* y)
+{
+	matchThreshold = std::max(0, std::min(100, matchThreshold));
+	tolerance = std::max(0, std::min(255, tolerance));
+	const auto target = GetSuperMultiPointTemplate(targetPath, seedPointText, tolerance, ignoreData);
+	if (!target)
+		return -4;
+	if (shot.empty())
+	{
+		SetImageError(L"截图失败：搜索区域为空");
+		return -5;
+	}
+	if (target->width > shot.cols || target->height > shot.rows)
+	{
+		SetImageError(L"模板尺寸(%dx%d)大于搜索区域(%dx%d)",
+			target->width, target->height, shot.cols, shot.rows);
+		return -2;
+	}
+
+	cv::Mat shotBgr;
+	if (shot.channels() == 4)
+		cv::cvtColor(shot, shotBgr, cv::COLOR_BGRA2BGR);
+	else if (shot.channels() == 3)
+		shotBgr = shot;
+	else
+	{
+		SetImageError(L"截图格式无效：需要 BGR 或 BGRA");
+		return -5;
+	}
+
+	const std::vector<MultiPointSample>& points = target->coarsePoints;
+	const size_t pointCount = points.size();
+	if (pointCount == 0 || pointCount > 256)
+	{
+		SetImageError(L"超多点自动点位无效");
+		return -4;
+	}
+
+	const size_t pixelCount = target->pixels.size();
+	const int required = std::max(1, static_cast<int>(
+		std::ceil(static_cast<double>(pixelCount) * matchThreshold / 100.0)));
+	const int coarseThreshold = std::max(1, matchThreshold - 10);
+	const int coarseRequired = std::max(1, static_cast<int>(
+		std::ceil(static_cast<double>(pointCount) * coarseThreshold / 100.0)));
+	const size_t anchorCount = pointCount - static_cast<size_t>(coarseRequired) + 1;
+	const size_t firstAnchor = pointCount - anchorCount;
+	const int candidateCols = shot.cols - target->width + 1;
+	const int candidateRows = shot.rows - target->height + 1;
+	cv::Mat tested(candidateRows, candidateCols, CV_8UC1, cv::Scalar(0));
+	constexpr int kRefineRadius = 2;
+
+	for (int row = 0; row < candidateRows; ++row)
+	{
+		for (int col = 0; col < candidateCols; ++col)
+		{
+			bool anchorHit = false;
+			for (size_t i = firstAnchor; i < pointCount; ++i)
+			{
+				const MultiPointSample& point = points[i];
+				const uchar* pixel = shotBgr.ptr<uchar>(row + point.y) + (col + point.x) * 3;
+				if (IsMultiPointColorHit(pixel, point.bgr, tolerance))
+				{
+					anchorHit = true;
+					break;
+				}
+			}
+			if (!anchorHit)
+				continue;
+
+			int hits = 0;
+			for (size_t i = 0; i < pointCount; ++i)
+			{
+				const MultiPointSample& point = points[i];
+				const uchar* pixel = shotBgr.ptr<uchar>(row + point.y) + (col + point.x) * 3;
+				if (IsMultiPointColorHit(pixel, point.bgr, tolerance))
+					++hits;
+				if (hits + static_cast<int>(pointCount - i - 1) < coarseRequired)
+					break;
+			}
+			if (hits < coarseRequired)
+				continue;
+
+			const int left = std::max(0, col - kRefineRadius);
+			const int top = std::max(0, row - kRefineRadius);
+			const int right = std::min(candidateCols, col + kRefineRadius + 1);
+			const int bottom = std::min(candidateRows, row + kRefineRadius + 1);
+			for (int verifyY = top; verifyY < bottom; ++verifyY)
+			{
+				uchar* testedRow = tested.ptr<uchar>(verifyY);
+				for (int verifyX = left; verifyX < right; ++verifyX)
+				{
+					if (testedRow[verifyX] != 0)
+						continue;
+					testedRow[verifyX] = 255;
+					if (HasRequiredEffectivePixelHits(shotBgr, target->pixels,
+						verifyX, verifyY, tolerance, required))
+					{
+						*x = verifyX;
+						*y = verifyY;
+						return 1;
+					}
+				}
+			}
+		}
+	}
+
+	SetImageError(L"超多点未命中：有效像素 %d，要求至少命中 %d",
+		static_cast<int>(pixelCount), required);
+	return 0;
+}
+}
+
+extern "C" IMAGEFINDER_API int __cdecl FindScreenImageMultiPointSuper(
+	const wchar_t* targetPath, int searchX, int searchY, int searchW, int searchH,
+	int matchThreshold, const wchar_t* seedPoints, int tolerance,
+	const wchar_t* ignoreData, int* x, int* y)
+{
+	ClearImageError();
+	if (targetPath == nullptr || x == nullptr || y == nullptr || searchW <= 0 || searchH <= 0)
+	{
+		SetImageError(L"参数非法：模板路径、坐标指针和搜索区域必须有效");
+		return -6;
+	}
+	*x = 0;
+	*y = 0;
+	try
+	{
+		const cv::Mat shot = captureScreen(searchX, searchY, searchW, searchH);
+		const int ret = FindImageMultiPointSuperCore(
+			targetPath, shot, matchThreshold, seedPoints, tolerance, ignoreData, x, y);
+		if (ret == 1)
+		{
+			*x += searchX;
+			*y += searchY;
+			ClearImageError();
+		}
+		return ret;
+	}
+	catch (const cv::Exception& ex)
+	{
+		SetImageError(L"OpenCV 超多点匹配异常：%hs", ex.what());
+		return -3;
+	}
+	catch (...)
+	{
+		SetImageError(L"超多点匹配异常");
+		return -3;
+	}
+}
+
+extern "C" IMAGEFINDER_API int __cdecl FindWinImageMultiPointSuper(
+	const wchar_t* targetPath, int hwnd, int searchX, int searchY, int searchW, int searchH,
+	int matchThreshold, const wchar_t* seedPoints, int tolerance,
+	const wchar_t* ignoreData, int* x, int* y)
+{
+	ClearImageError();
+	if (targetPath == nullptr || x == nullptr || y == nullptr || hwnd == 0
+		|| searchW <= 0 || searchH <= 0)
+	{
+		SetImageError(L"参数非法：模板路径、窗口句柄、坐标指针和搜索区域必须有效");
+		return -6;
+	}
+	*x = 0;
+	*y = 0;
+	try
+	{
+		const cv::Mat shot = captureScreen(hwnd, searchX, searchY, searchW, searchH);
+		const int ret = FindImageMultiPointSuperCore(
+			targetPath, shot, matchThreshold, seedPoints, tolerance, ignoreData, x, y);
+		if (ret == 1)
+		{
+			*x += searchX;
+			*y += searchY;
+			ClearImageError();
+		}
+		return ret;
+	}
+	catch (const cv::Exception& ex)
+	{
+		SetImageError(L"OpenCV 窗口超多点匹配异常：%hs", ex.what());
+		return -3;
+	}
+	catch (...)
+	{
+		SetImageError(L"窗口超多点匹配异常");
+		return -3;
+	}
+}
+
+namespace
+{
+struct AutoPointCandidate
+{
+	MultiPointSample point;
+	int group = -1;
+	int colorFrequency = 0;
+	int localGradient = 0;
+};
+
+static bool BetterAutoPoint(const AutoPointCandidate& a, const AutoPointCandidate& b)
+{
+	if (a.colorFrequency != b.colorFrequency)
+		return a.colorFrequency < b.colorFrequency;
+	if (a.localGradient != b.localGradient)
+		return a.localGradient < b.localGradient;
+	if (a.point.y != b.point.y)
+		return a.point.y < b.point.y;
+	return a.point.x < b.point.x;
+}
+
+static int CountColorsWithinTolerance(const cv::Vec3b& color, int tolerance,
+	const std::vector<int>& prefix, int prefixSide)
+{
+	const int binCount = prefixSide - 1;
+	int low[3], high[3];
+	for (int channel = 0; channel < 3; ++channel)
+	{
+		low[channel] = std::max(0, static_cast<int>(color[channel]) - tolerance) / 4;
+		high[channel] = std::min(binCount - 1,
+			std::min(255, static_cast<int>(color[channel]) + tolerance) / 4);
+	}
+	auto at = [prefixSide, &prefix](int r, int g, int b) -> int
+	{
+		return prefix[(static_cast<size_t>(r) * prefixSide + g) * prefixSide + b];
+	};
+	const int x0 = low[2], x1 = high[2] + 1;
+	const int y0 = low[1], y1 = high[1] + 1;
+	const int z0 = low[0], z1 = high[0] + 1;
+	return at(x1, y1, z1) - at(x0, y1, z1) - at(x1, y0, z1) - at(x1, y1, z0)
+		+ at(x0, y0, z1) + at(x0, y1, z0) + at(x1, y0, z0) - at(x0, y0, z0);
+}
+
+static bool IsOpaquePixel(const cv::Mat& tpl, bool hasAlpha, int x, int y)
+{
+	return !hasAlpha || tpl.ptr<uchar>(y)[x * 4 + 3] >= 128;
+}
+
+static int LocalColorGradient(const cv::Mat& tpl, bool hasAlpha, int x, int y,
+	int left, int top, int right, int bottom)
+{
+	const uchar* center = tpl.ptr<uchar>(y) + x * 4;
+	int total = 0;
+	int samples = 0;
+	for (int dy = -1; dy <= 1; ++dy)
+	{
+		for (int dx = -1; dx <= 1; ++dx)
+		{
+			if (dx == 0 && dy == 0)
+				continue;
+			const int nx = x + dx, ny = y + dy;
+			if (nx < left || nx >= right || ny < top || ny >= bottom
+				|| !IsOpaquePixel(tpl, hasAlpha, nx, ny))
+				continue;
+			const uchar* neighbor = tpl.ptr<uchar>(ny) + nx * 4;
+			total += std::abs(static_cast<int>(center[0]) - neighbor[0])
+				+ std::abs(static_cast<int>(center[1]) - neighbor[1])
+				+ std::abs(static_cast<int>(center[2]) - neighbor[2]);
+			++samples;
+		}
+	}
+	return samples > 0 ? total / (samples * 3) : 255;
+}
+
+static bool IsFarEnoughFromPoints(const MultiPointSample& candidate,
+	const std::vector<MultiPointSample>& points, int minSpacingSquared)
+{
+	for (const MultiPointSample& point : points)
+	{
+		const long long dx = static_cast<long long>(candidate.x) - point.x;
+		const long long dy = static_cast<long long>(candidate.y) - point.y;
+		if (dx * dx + dy * dy < minSpacingSquared)
+			return false;
+	}
+	return true;
+}
+
+// 返回像素最接近的基准颜色组。这里直接逐像素比较，不生成整张 mask。
+static int MatchSeedColor(const cv::Vec3b& color,
+	const std::vector<MultiPointSample>& seeds, int tolerance, int* distance)
+{
+	int bestGroup = -1;
+	int bestDistance = INT_MAX;
+	for (size_t i = 0; i < seeds.size(); ++i)
+	{
+		const int db = std::abs(static_cast<int>(color[0]) - static_cast<int>(seeds[i].bgr[0]));
+		const int dg = std::abs(static_cast<int>(color[1]) - static_cast<int>(seeds[i].bgr[1]));
+		const int dr = std::abs(static_cast<int>(color[2]) - static_cast<int>(seeds[i].bgr[2]));
+		if (db > tolerance || dg > tolerance || dr > tolerance)
+			continue;
+		const int currentDistance = db * db + dg * dg + dr * dr;
+		if (currentDistance < bestDistance)
+		{
+			bestDistance = currentDistance;
+			bestGroup = static_cast<int>(i);
+		}
+	}
+	if (distance != nullptr)
+		*distance = (bestGroup >= 0) ? bestDistance : INT_MAX;
+	return bestGroup;
+}
+
+static std::wstring SerializeMultiPoints(const std::vector<MultiPointSample>& points)
+{
+	std::wstring text;
+	for (const MultiPointSample& point : points)
+	{
+		wchar_t item[64] = {};
+		swprintf_s(item, _countof(item), L"%d,%d,%02X%02X%02X",
+			point.x, point.y, point.bgr[2], point.bgr[1], point.bgr[0]);
+		if (!text.empty())
+			text += L';';
+		text += item;
+	}
+	return text;
+}
+}
+
+static bool ApplySeedColorPreview(cv::Mat& scaled, const cv::Mat& sourceView,
+	const wchar_t* seedPointText, int tolerance, int zoomPercent)
+{
+	if (seedPointText == nullptr || seedPointText[0] == L'\0')
+		return true;
+
+	std::vector<MultiPointSample> seeds;
+	if (!ParseMultiPointData(seedPointText, seeds))
+	{
+		SetImageError(L"预览基准点数据无效");
+		return false;
+	}
+
+	tolerance = std::max(0, std::min(255, tolerance));
+	std::vector<cv::Vec3b> seedColors;
+	seedColors.reserve(seeds.size());
+	for (const MultiPointSample& seed : seeds)
+	{
+		const bool alreadyAdded = std::any_of(seedColors.begin(), seedColors.end(),
+			[&seed](const cv::Vec3b& color)
+			{
+				return color[0] == seed.bgr[0] && color[1] == seed.bgr[1] && color[2] == seed.bgr[2];
+			});
+		if (!alreadyAdded)
+			seedColors.push_back(seed.bgr);
+	}
+
+	cv::Mat mask(sourceView.rows, sourceView.cols, CV_8UC1, cv::Scalar(0));
+	for (int y = 0; y < sourceView.rows; ++y)
+	{
+		const uchar* src = sourceView.ptr<uchar>(y);
+		uchar* maskRow = mask.ptr<uchar>(y);
+		for (int x = 0; x < sourceView.cols; ++x)
+		{
+			const uchar* pixel = src + x * 4;
+			if (pixel[3] < 128)
+				continue;
+			for (const cv::Vec3b& seedColor : seedColors)
+			{
+				if (std::abs(static_cast<int>(pixel[0]) - seedColor[0]) <= tolerance
+					&& std::abs(static_cast<int>(pixel[1]) - seedColor[1]) <= tolerance
+					&& std::abs(static_cast<int>(pixel[2]) - seedColor[2]) <= tolerance)
+				{
+					maskRow[x] = 255;
+					break;
+				}
+			}
+		}
+	}
+
+	cv::Mat scaledMask;
+	const int interpolation = zoomPercent < 100 ? cv::INTER_AREA : cv::INTER_NEAREST;
+	cv::resize(mask, scaledMask, scaled.size(), 0, 0, interpolation);
+	for (int y = 0; y < scaled.rows; ++y)
+	{
+		uchar* pixels = scaled.ptr<uchar>(y);
+		const uchar* maskRow = scaledMask.ptr<uchar>(y);
+		for (int x = 0; x < scaled.cols; ++x)
+		{
+			const double brightness = 0.28 + 0.72 * (maskRow[x] / 255.0);
+			uchar* pixel = pixels + x * 4;
+			pixel[0] = cv::saturate_cast<uchar>(pixel[0] * brightness);
+			pixel[1] = cv::saturate_cast<uchar>(pixel[1] * brightness);
+			pixel[2] = cv::saturate_cast<uchar>(pixel[2] * brightness);
+		}
+	}
+	return true;
+}
+
+extern "C" IMAGEFINDER_API int __cdecl AutoSelectImageMultiPoints(
+	const wchar_t* targetPath, const wchar_t* existingPoints, int density,
+	int tolerance, const wchar_t* ignoreData, wchar_t* output, int outputCapacity)
+{
+	ClearImageError();
+	if (targetPath == nullptr || output == nullptr || outputCapacity <= 1)
+	{
+		SetImageError(L"参数非法：模板路径或输出缓冲区无效");
+		return -6;
+	}
+	output[0] = L'\0';
+	density = std::max(0, std::min(100, density));
+	tolerance = std::max(0, std::min(255, tolerance));
+
+	try
+	{
+		cv::Mat tpl;
+		bool hasAlpha = false;
+		if (!LoadTemplateBgra(targetPath, tpl, hasAlpha))
+		{
+			SetImageError(L"模板读取失败：%s", targetPath);
+			return -1;
+		}
+
+		std::vector<SuperIgnoreOperation> ignoreOperations;
+		if (!ParseSuperIgnoreData(ignoreData, ignoreOperations))
+		{
+			SetImageError(L"忽略蒙版数据无效");
+			return -4;
+		}
+		const cv::Mat ignoreMask = BuildSuperIgnoreMask(tpl.cols, tpl.rows, ignoreOperations);
+
+		std::vector<MultiPointSample> selected;
+		if (existingPoints != nullptr && existingPoints[0] != L'\0'
+			&& !ParseMultiPointData(existingPoints, selected))
+		{
+			SetImageError(L"已有多点数据格式无效");
+			return -4;
+		}
+		if (selected.empty())
+		{
+			SetImageError(L"自动选点前请先选择一个基准点");
+			return -4;
+		}
+		for (const MultiPointSample& point : selected)
+		{
+			if (point.x < 0 || point.y < 0 || point.x >= tpl.cols || point.y >= tpl.rows)
+			{
+				SetImageError(L"已有点位越界：(%d,%d)", point.x, point.y);
+				return -4;
+			}
+			if (!IsOpaquePixel(tpl, hasAlpha, point.x, point.y))
+			{
+				SetImageError(L"已有点位落在透明区域：(%d,%d)", point.x, point.y);
+				return -4;
+			}
+		}
+
+		const std::vector<MultiPointSample> seedColors = selected;
+		selected.erase(std::remove_if(selected.begin(), selected.end(),
+			[&ignoreMask](const MultiPointSample& point)
+			{
+				return !ignoreMask.empty() && ignoreMask.ptr<uchar>(point.y)[point.x] != 0;
+			}), selected.end());
+
+		const int seedCount = static_cast<int>(seedColors.size());
+		int left = tpl.cols, top = tpl.rows, right = 0, bottom = 0;
+		std::vector<int> groupCounts(static_cast<size_t>(seedCount), 0);
+		constexpr int colorBinCount = 64;
+		constexpr int colorPrefixSide = colorBinCount + 1;
+		std::vector<int> histogram(static_cast<size_t>(colorBinCount) * colorBinCount * colorBinCount, 0);
+		int eligiblePixels = 0;
+
+		// 第一遍只统计各基准颜色组和有效区域，不建立 mask。
+		for (int y = 0; y < tpl.rows; ++y)
+		{
+			const uchar* row = tpl.ptr<uchar>(y);
+			for (int x = 0; x < tpl.cols; ++x)
+			{
+				const uchar* pixel = row + x * 4;
+				if (hasAlpha && pixel[3] < 128)
+					continue;
+				if (!ignoreMask.empty() && ignoreMask.ptr<uchar>(y)[x] != 0)
+					continue;
+				const cv::Vec3b color(pixel[0], pixel[1], pixel[2]);
+				const int group = MatchSeedColor(color, seedColors, tolerance, nullptr);
+				if (group >= 0)
+				{
+					++groupCounts[static_cast<size_t>(group)];
+					++eligiblePixels;
+					left = std::min(left, x);
+					top = std::min(top, y);
+					right = std::max(right, x + 1);
+					bottom = std::max(bottom, y + 1);
+				}
+				if (!hasAlpha || pixel[3] >= 128)
+				{
+					const int b = pixel[0] / 4, g = pixel[1] / 4, r = pixel[2] / 4;
+					++histogram[(static_cast<size_t>(r) * colorBinCount + g) * colorBinCount + b];
+				}
+			}
+		}
+
+		if (eligiblePixels <= 0 || right <= left || bottom <= top)
+		{
+			SetImageError(L"模板中没有落在任一基准颜色容差内的像素");
+			return -4;
+		}
+
+		if (density == 100 && eligiblePixels <= 256)
+		{
+			std::vector<MultiPointSample> allEligible;
+			allEligible.reserve(static_cast<size_t>(eligiblePixels));
+			for (int y = 0; y < tpl.rows; ++y)
+			{
+				const uchar* row = tpl.ptr<uchar>(y);
+				for (int x = 0; x < tpl.cols; ++x)
+				{
+					const uchar* pixel = row + x * 4;
+					if (hasAlpha && pixel[3] < 128)
+						continue;
+					if (!ignoreMask.empty() && ignoreMask.ptr<uchar>(y)[x] != 0)
+						continue;
+					const cv::Vec3b color(pixel[0], pixel[1], pixel[2]);
+					if (MatchSeedColor(color, seedColors, tolerance, nullptr) >= 0)
+						allEligible.push_back({ x, y, color });
+				}
+			}
+			const std::wstring serialized = SerializeMultiPoints(allEligible);
+			if (serialized.size() + 1 > static_cast<size_t>(outputCapacity))
+			{
+				SetImageError(L"输出缓冲区不足");
+				return -6;
+			}
+			wcscpy_s(output, outputCapacity, serialized.c_str());
+			ClearImageError();
+			return static_cast<int>(allEligible.size());
+		}
+
+		// 颜色频率前缀表只用于候选排序，不是参与筛选或搜索的像素 mask。
+		std::vector<int> colorPrefix(static_cast<size_t>(colorPrefixSide)
+			* colorPrefixSide * colorPrefixSide, 0);
+		auto prefixAt = [&colorPrefix, colorPrefixSide](int r, int g, int b) -> int&
+		{
+			return colorPrefix[(static_cast<size_t>(r) * colorPrefixSide + g) * colorPrefixSide + b];
+		};
+		for (int r = 1; r <= colorBinCount; ++r)
+		{
+			for (int g = 1; g <= colorBinCount; ++g)
+			{
+				for (int b = 1; b <= colorBinCount; ++b)
+				{
+					const int value = histogram[(static_cast<size_t>(r - 1) * colorBinCount + (g - 1))
+						* colorBinCount + (b - 1)];
+					prefixAt(r, g, b) = value + prefixAt(r - 1, g, b) + prefixAt(r, g - 1, b)
+						+ prefixAt(r, g, b - 1) - prefixAt(r - 1, g - 1, b)
+						- prefixAt(r - 1, g, b - 1) - prefixAt(r, g - 1, b - 1)
+						+ prefixAt(r - 1, g - 1, b - 1);
+				}
+			}
+		}
+
+		const int width = right - left, height = bottom - top;
+		const int area = std::max(1, width * height);
+		const int maxPointCount = std::max(static_cast<int>(selected.size()),
+			std::min(256, eligiblePixels));
+		const int targetCount = static_cast<int>(selected.size())
+			+ static_cast<int>(std::round((maxPointCount - selected.size()) * density / 100.0));
+		if (static_cast<int>(selected.size()) >= targetCount)
+		{
+			const std::wstring serialized = SerializeMultiPoints(selected);
+			if (serialized.size() + 1 > static_cast<size_t>(outputCapacity))
+			{
+				SetImageError(L"输出缓冲区不足");
+				return -6;
+			}
+			wcscpy_s(output, outputCapacity, serialized.c_str());
+			ClearImageError();
+			return static_cast<int>(selected.size());
+		}
+
+		const double desiredSpacing = std::sqrt(static_cast<double>(area)
+			/ std::max(1, targetCount)) * (0.45 + (100 - density) / 220.0);
+		const int minSpacing = std::max(1, static_cast<int>(std::round(desiredSpacing)));
+		int gridCols = static_cast<int>(std::ceil(std::sqrt(targetCount
+			* (static_cast<double>(width) / std::max(1, height)))));
+		gridCols = std::max(1, std::min(targetCount, gridCols));
+		const int gridRows = std::max(1, static_cast<int>(std::ceil(
+			static_cast<double>(targetCount) / gridCols)));
+		const int cells = gridCols * gridRows;
+		const int sampleStep = std::max(1, static_cast<int>(std::ceil(
+			std::sqrt(static_cast<double>(area) / 1500000.0))));
+		const size_t candidatesPerCell = static_cast<size_t>(std::max(8,
+			std::min(24, targetCount / 3 + 4)));
+		std::vector<std::vector<AutoPointCandidate>> buckets(
+			static_cast<size_t>(seedCount) * cells);
+
+		// 第二遍仍然只逐像素比较基准色；候选按颜色组和空间单元保存。
+		for (int y = top; y < bottom; y += sampleStep)
+		{
+			const uchar* row = tpl.ptr<uchar>(y);
+			for (int x = left; x < right; x += sampleStep)
+			{
+				const uchar* pixel = row + x * 4;
+				if (hasAlpha && pixel[3] < 128)
+					continue;
+				if (!ignoreMask.empty() && ignoreMask.ptr<uchar>(y)[x] != 0)
+					continue;
+				const cv::Vec3b color(pixel[0], pixel[1], pixel[2]);
+				const int group = MatchSeedColor(color, seedColors, tolerance, nullptr);
+				if (group < 0)
+					continue;
+				const int cellX = std::min(gridCols - 1, (x - left) * gridCols / width);
+				const int cellY = std::min(gridRows - 1, (y - top) * gridRows / height);
+				const int cell = cellY * gridCols + cellX;
+				AutoPointCandidate candidate = {
+					{ x, y, color }, group, groupCounts[static_cast<size_t>(group)],
+					LocalColorGradient(tpl, hasAlpha, x, y, left, top, right, bottom)
+				};
+				candidate.colorFrequency = CountColorsWithinTolerance(color, tolerance,
+					colorPrefix, colorPrefixSide);
+				auto& bucket = buckets[static_cast<size_t>(group) * cells + cell];
+				auto position = std::lower_bound(bucket.begin(), bucket.end(), candidate, BetterAutoPoint);
+				if (position != bucket.end() || bucket.size() < candidatesPerCell)
+				{
+					bucket.insert(position, candidate);
+					if (bucket.size() > candidatesPerCell)
+						bucket.pop_back();
+				}
+			}
+		}
+
+		for (int group = 0; group < seedCount; ++group)
+		{
+			for (int cell = 0; cell < cells; ++cell)
+			{
+				auto& bucket = buckets[static_cast<size_t>(group) * cells + cell];
+				std::sort(bucket.begin(), bucket.end(), BetterAutoPoint);
+			}
+		}
+
+		int extra = targetCount - static_cast<int>(selected.size());
+		std::vector<int> quotas(static_cast<size_t>(seedCount), 0);
+		std::vector<double> fractions(static_cast<size_t>(seedCount), 0.0);
+		int quotaTotal = 0;
+		for (int group = 0; group < seedCount; ++group)
+		{
+			if (groupCounts[static_cast<size_t>(group)] <= 0)
+				continue;
+			const double exact = extra * static_cast<double>(groupCounts[static_cast<size_t>(group)])
+				/ std::max(1, eligiblePixels);
+			quotas[static_cast<size_t>(group)] = static_cast<int>(std::floor(exact));
+			fractions[static_cast<size_t>(group)] = exact - quotas[static_cast<size_t>(group)];
+			quotaTotal += quotas[static_cast<size_t>(group)];
+		}
+		while (quotaTotal < extra)
+		{
+			int bestGroup = -1;
+			for (int group = 0; group < seedCount; ++group)
+				if (groupCounts[static_cast<size_t>(group)] > 0
+					&& (bestGroup < 0 || fractions[static_cast<size_t>(group)] > fractions[static_cast<size_t>(bestGroup)]))
+					bestGroup = group;
+			if (bestGroup < 0)
+				break;
+			++quotas[static_cast<size_t>(bestGroup)];
+			fractions[static_cast<size_t>(bestGroup)] = 0.0;
+			++quotaTotal;
+		}
+		// 只要还有足够的新增点，保证每个颜色组至少拿到一个自动点。
+		if (extra >= seedCount)
+		{
+			for (int group = 0; group < seedCount; ++group)
+			{
+				if (groupCounts[static_cast<size_t>(group)] <= 0 || quotas[static_cast<size_t>(group)] > 0)
+					continue;
+				int donor = -1;
+				for (int other = 0; other < seedCount; ++other)
+					if (quotas[static_cast<size_t>(other)] > 1
+						&& (donor < 0 || quotas[static_cast<size_t>(other)] > quotas[static_cast<size_t>(donor)]))
+						donor = other;
+				if (donor < 0)
+					break;
+				--quotas[static_cast<size_t>(donor)];
+				++quotas[static_cast<size_t>(group)];
+			}
+		}
+
+		// 轮流遍历空间单元和颜色组，避免高评分候选集中在同一片区域。
+		auto selectWithSpacing = [&](int spacing, bool respectQuotas) {
+			bool anyAdded = false;
+			bool passAdded = true;
+			while (passAdded && static_cast<int>(selected.size()) < targetCount)
+			{
+				passAdded = false;
+				for (int cell = 0; cell < cells && static_cast<int>(selected.size()) < targetCount; ++cell)
+				{
+					for (int group = 0; group < seedCount && static_cast<int>(selected.size()) < targetCount; ++group)
+					{
+						int& quota = quotas[static_cast<size_t>(group)];
+						if (groupCounts[static_cast<size_t>(group)] <= 0
+							|| (respectQuotas && quota <= 0))
+							continue;
+
+						auto& bucket = buckets[static_cast<size_t>(group) * cells + cell];
+						for (const AutoPointCandidate& candidate : bucket)
+						{
+							if (!IsFarEnoughFromPoints(candidate.point, selected, spacing * spacing))
+								continue;
+							selected.push_back(candidate.point);
+							if (respectQuotas)
+								--quota;
+							passAdded = true;
+							anyAdded = true;
+							break;
+						}
+					}
+				}
+			}
+			return anyAdded;
+		};
+		selectWithSpacing(minSpacing, true);
+		selectWithSpacing(std::max(1, minSpacing / 2), true);
+		selectWithSpacing(1, true);
+		if (static_cast<int>(selected.size()) < targetCount)
+			selectWithSpacing(1, false);
+
+		const std::wstring serialized = SerializeMultiPoints(selected);
+		if (serialized.size() + 1 > static_cast<size_t>(outputCapacity))
+		{
+			SetImageError(L"输出缓冲区不足");
+			return -6;
+		}
+		wcscpy_s(output, outputCapacity, serialized.c_str());
+		ClearImageError();
+		return static_cast<int>(selected.size());
+	}
+	catch (const cv::Exception& ex)
+	{
+		SetImageError(L"OpenCV 自动选点异常：%hs", ex.what());
+		return -3;
+	}
+	catch (...)
+	{
+		SetImageError(L"自动选点异常");
+		return -3;
+	}
 }
