@@ -1890,6 +1890,12 @@ class MacroGraphFormalHandlersMixin {
             this._RefreshFormalScreenShotVisibility(id)
         else if (d.type == GetLang("注释"))
             this._RefreshCommentInline(id, d)
+        else if (d.type == GetLang("等待"))
+            this._RefreshWaitVisibility(id)
+        else if (d.type == GetLang("等待确定"))
+            this._RefreshWaitConfirmVisibility(id)
+        else if (d.type == GetLang("时间") || d.type == GetLang("倒计时"))
+            this._RefreshTimeVisibility(id)
     }
 
     ; 编辑器确定后：就地把数据写回内联控件值（不整窗 _Render，避免闪烁）。
@@ -1960,6 +1966,256 @@ class MacroGraphFormalHandlersMixin {
             return true
         }
         return false
+    }
+
+    _OnFormalWait(id, state, ctrl, event) {
+        data := this._FormalIniData(id)
+        if (data == "")
+            return
+        if (!IsObject(state))
+            state := Map()
+        typeNames := GetLangArr(this._WaitTypeKeys())
+        dateUnits := GetLangArr(["分钟", "小时", "天", "具体时间", "时间变量"])
+        this._EnsureComboInState(state, "WaitTypeCmb_" id, typeNames)
+        this._EnsureComboInState(state, "WaitDateUnitCmb_" id, dateUnits)
+        if (state.Has("WaitTypeCmb_" id) && state["WaitTypeCmb_" id] != "")
+            data.WaitType := this._IndexInLangArr(typeNames, state["WaitTypeCmb_" id]) + 1
+        if (state.Has("WaitInterval_" id) && state["WaitInterval_" id] != "")
+            data.Interval := state["WaitInterval_" id]
+        t := IsNumber(data.WaitType) ? Integer(data.WaitType) : 1
+        panel := this._WaitPanelName(t)
+        if (panel == "Var") {
+            if (state.Has("WaitVarName_" id))
+                data.Param1 := GetVarName(state["WaitVarName_" id])
+            if (state.Has("WaitVarVal_" id))
+                data.Param2 := GetLangKey(state["WaitVarVal_" id])
+        } else if (panel == "Key") {
+            if (state.Has("WaitKey_" id))
+                data.Param1 := state["WaitKey_" id]
+        } else if (panel == "Range") {
+            if (state.Has("WaitSX_" id))
+                data.StartPosX := state["WaitSX_" id]
+            if (state.Has("WaitSY_" id))
+                data.StartPosY := state["WaitSY_" id]
+            if (state.Has("WaitEX_" id))
+                data.EndPosX := state["WaitEX_" id]
+            if (state.Has("WaitEY_" id))
+                data.EndPosY := state["WaitEY_" id]
+        } else if (panel == "Proc") {
+            if (state.Has("WaitProc_" id))
+                data.Param1 := state["WaitProc_" id]
+        } else if (panel == "Win") {
+            if (state.Has("WaitWin_" id))
+                data.Param1 := state["WaitWin_" id]
+        } else if (panel == "File") {
+            if (state.Has("WaitFile_" id))
+                data.Param1 := state["WaitFile_" id]
+        } else if (panel == "Date") {
+            if (state.Has("WaitDateVal_" id))
+                data.Param1 := state["WaitDateVal_" id]
+            if (state.Has("WaitDateUnitCmb_" id) && state["WaitDateUnitCmb_" id] != "")
+                data.Param2 := GetLangKey(state["WaitDateUnitCmb_" id])
+        }
+        SaveMacroCMDData(data)
+        this._RefreshWaitVisibility(id)
+        this._Apply()
+    }
+
+    _RefreshWaitVisibility(id) {
+        if (this.ui == "")
+            return
+        d := this._FormalDFromId(id)
+        panel := this._WaitPanelName(d.HasOwnProp("waitType") ? d.waitType : 1)
+        this._FormalSetVis(id, "WaitVarNameRow_" id, panel == "Var")
+        this._FormalSetVis(id, "WaitVarValRow_" id, panel == "Var")
+        this._FormalSetVis(id, "WaitKeyRow_" id, panel == "Key")
+        this._FormalSetVis(id, "WaitSXRow_" id, panel == "Range")
+        this._FormalSetVis(id, "WaitSYRow_" id, panel == "Range")
+        this._FormalSetVis(id, "WaitEXRow_" id, panel == "Range")
+        this._FormalSetVis(id, "WaitEYRow_" id, panel == "Range")
+        this._FormalSetVis(id, "WaitProcRow_" id, panel == "Proc")
+        this._FormalSetVis(id, "WaitWinRow_" id, panel == "Win")
+        this._FormalSetVis(id, "WaitFileRow_" id, panel == "File")
+        this._FormalSetVis(id, "WaitDateValRow_" id, panel == "Date")
+        this._FormalSetVis(id, "WaitDateUnitRow_" id, panel == "Date")
+    }
+
+    _OnWaitWinEdit(id, *) {
+        data := this._FormalIniData(id)
+        if (data == "")
+            return
+        adapter := { Value: data.Param1 }
+        MyFrontInfoGui.OwnerHwnd := ""
+        MyFrontInfoGui.HideAction := ""
+        MyFrontInfoGui.SureAction := this._OnWaitWinEditSure.Bind(this, id, adapter)
+        MyFrontInfoGui.ShowGui(adapter)
+    }
+
+    _OnWaitWinEditSure(id, adapter, *) {
+        data := this._FormalIniData(id)
+        if (data == "")
+            return
+        data.Param1 := adapter.Value
+        SaveMacroCMDData(data)
+        if (this.ui != "")
+            this.ui.Update("WaitWin_" id, "Text", adapter.Value)
+        this._Apply()
+    }
+
+    _OnWaitFileBrowse(id, *) {
+        data := this._FormalIniData(id)
+        if (data == "")
+            return
+        start := data.Param1 != "" ? data.Param1 : ""
+        path := FileSelect(1, start, GetLang("选择文件"))
+        if (path == "")
+            return
+        data.Param1 := path
+        SaveMacroCMDData(data)
+        if (this.ui != "")
+            this.ui.Update("WaitFile_" id, "Text", path)
+        this._Apply()
+    }
+
+    _OnFormalWaitConfirm(id, state, ctrl, event) {
+        data := this._FormalIniData(id)
+        if (data == "")
+            return
+        if (!IsObject(state))
+            state := Map()
+        typeItems := GetLangArr(["继续", "继续&终止&暂停"])
+        pauseItems := GetLangArr(["暂停当前宏", "暂停所有宏"])
+        timeoutItems := GetLangArr(["无", "自动继续", "自动终止", "自动暂停"])
+        termItems := GetLangArr(["终止当前宏", "终止所有宏"])
+        this._EnsureComboInState(state, "WcTypeCmb_" id, typeItems)
+        this._EnsureComboInState(state, "WcPauseCmb_" id, pauseItems)
+        this._EnsureComboInState(state, "WcToActCmb_" id, timeoutItems)
+        this._EnsureComboInState(state, "WcTermCmb_" id, termItems)
+        this._EnsureComboInState(state, "WcPauseBtnCmb_" id, pauseItems)
+        if (state.Has("WcTypeCmb_" id) && state["WcTypeCmb_" id] != "")
+            data.Type := GetLangKey(state["WcTypeCmb_" id])
+        if (state.Has("WcPauseCmb_" id) && state["WcPauseCmb_" id] != "")
+            data.PauseType := GetLangKey(state["WcPauseCmb_" id])
+        if (state.Has("WcPrompt_" id))
+            data.Prompt := state["WcPrompt_" id]
+        if (state.Has("WcTimeout_" id))
+            data.TimeoutMs := state["WcTimeout_" id]
+        if (state.Has("WcToActCmb_" id) && state["WcToActCmb_" id] != "")
+            data.TimeoutAction := GetLangKey(state["WcToActCmb_" id])
+        if (state.Has("WcTermCmb_" id) && state["WcTermCmb_" id] != "")
+            data.TerminateType := GetLangKey(state["WcTermCmb_" id])
+        if (state.Has("WcPauseBtnCmb_" id) && state["WcPauseBtnCmb_" id] != "")
+            data.PauseBtnType := GetLangKey(state["WcPauseBtnCmb_" id])
+        SaveMacroCMDData(data)
+        this._RefreshWaitConfirmVisibility(id)
+        this._Apply()
+    }
+
+    _RefreshWaitConfirmVisibility(id) {
+        if (this.ui == "")
+            return
+        d := this._FormalDFromId(id)
+        isTriple := GetLangKey(d.HasOwnProp("wcType") ? d.wcType : "继续") == "继续&终止&暂停"
+        this._FormalSetVis(id, "WcTermRow_" id, isTriple)
+        this._FormalSetVis(id, "WcPauseBtnRow_" id, isTriple)
+    }
+
+    _OnFormalTime(id, state, ctrl, event) {
+        data := this._FormalIniData(id)
+        if (data == "")
+            return
+        if (!IsObject(state))
+            state := Map()
+        d := this._FormalDFromId(id)
+        isCdCmd := (d.type == GetLang("倒计时"))
+        modeItems := GetLangArr(["等待", "区间判断", "倒计时"])
+        unitItems := GetLangArr(TimeGui.WaitUnitKeys)
+        winKinds := GetLangArr(TimeGui.WindowKindKeys)
+        acts := GetLangArr(TimeGui.MismatchActionKeys)
+        this._EnsureComboInState(state, "TimeModeCmb_" id, modeItems)
+        this._EnsureComboInState(state, "TimeUnitCmb_" id, unitItems)
+        this._EnsureComboInState(state, "TimeWinKindCmb_" id, winKinds)
+        this._EnsureComboInState(state, "TimeActCmb_" id, acts)
+        this._EnsureComboInState(state, "CdKindCmb_" id, unitItems)
+        sub := isCdCmd ? "倒计时" : TimeGraphNormSubMode(d)
+        if (!isCdCmd && state.Has("TimeModeCmb_" id) && state["TimeModeCmb_" id] != "") {
+            sub := GetLangKey(state["TimeModeCmb_" id])
+            data.SubMode := sub
+        }
+        if (sub == "等待") {
+            if (state.Has("TimeUnitCmb_" id) && state["TimeUnitCmb_" id] != "")
+                data.Param2 := TimeNormWaitType(state["TimeUnitCmb_" id])
+            if (state.Has("TimeTarget_" id))
+                data.Param1 := state["TimeTarget_" id]
+            if (state.Has("TimeTimeout_" id))
+                data.Timeout := state["TimeTimeout_" id]
+            if (state.Has("TimeInterval_" id))
+                data.CheckInterval := state["TimeInterval_" id]
+        } else if (sub == "区间判断") {
+            if (state.Has("TimeWinKindCmb_" id) && state["TimeWinKindCmb_" id] != "")
+                data.Param5 := TimeNormWindowType(state["TimeWinKindCmb_" id])
+            if (state.Has("TimeStart_" id))
+                data.Param1 := state["TimeStart_" id]
+            if (state.Has("TimeEnd_" id))
+                data.Param2 := state["TimeEnd_" id]
+            if (state.Has("TimeActCmb_" id) && state["TimeActCmb_" id] != "")
+                data.Param4 := GetLangKey(state["TimeActCmb_" id])
+        } else {
+            if (state.Has("CdKindCmb_" id) && state["CdKindCmb_" id] != "")
+                data.Param2 := TimeNormWaitType(state["CdKindCmb_" id])
+            kind := TimeNormWaitType(ObjHasOwnProp(data, "Param2") ? data.Param2 : "时长")
+            if (kind == "时间戳") {
+                if (state.Has("CdVar_" id))
+                    data.Param1 := state["CdVar_" id]
+            } else {
+                if (state.Has("CdHour_" id))
+                    data.Hour := state["CdHour_" id]
+                if (state.Has("CdMin_" id))
+                    data.Min := state["CdMin_" id]
+                if (state.Has("CdSec_" id))
+                    data.Sec := state["CdSec_" id]
+                if (IsNumber(data.Hour) && IsNumber(data.Min) && IsNumber(data.Sec))
+                    data.Seconds := Integer(data.Hour) * 3600 + Integer(data.Min) * 60 + Integer(data.Sec)
+            }
+            if (state.Has("CdPosX_" id))
+                data.PosX := state["CdPosX_" id]
+            if (state.Has("CdPosY_" id))
+                data.PosY := state["CdPosY_" id]
+            if (ObjHasOwnProp(data, "WaitEnd"))
+                data.WaitEnd := "不等待"
+        }
+        SaveMacroCMDData(data)
+        this._RefreshTimeVisibility(id)
+        this._Apply()
+    }
+
+    _RefreshTimeVisibility(id) {
+        if (this.ui == "")
+            return
+        d := this._FormalDFromId(id)
+        isCdCmd := (d.type == GetLang("倒计时"))
+        sub := TimeGraphNormSubMode(d)
+        showWait := !isCdCmd && sub == "等待"
+        showWin := !isCdCmd && sub == "区间判断"
+        showCd := isCdCmd || sub == "倒计时"
+        kind := TimeNormWaitType(d.HasOwnProp("cdKind") ? d.cdKind : (d.HasOwnProp("timeParam2") ? d.timeParam2 : "时长"))
+        if (!isCdCmd) {
+            this._FormalSetVis(id, "TimeUnitRow_" id, showWait)
+            this._FormalSetVis(id, "TimeTargetRow_" id, showWait)
+            this._FormalSetVis(id, "TimeTimeoutRow_" id, showWait)
+            this._FormalSetVis(id, "TimeIntervalRow_" id, showWait)
+            this._FormalSetVis(id, "TimeWinKindRow_" id, showWin)
+            this._FormalSetVis(id, "TimeStartRow_" id, showWin)
+            this._FormalSetVis(id, "TimeEndRow_" id, showWin)
+            this._FormalSetVis(id, "TimeActRow_" id, showWin)
+        }
+        this._FormalSetVis(id, "CdKindRow_" id, showCd)
+        this._FormalSetVis(id, "CdHourRow_" id, showCd && kind != "时间戳")
+        this._FormalSetVis(id, "CdMinRow_" id, showCd && kind != "时间戳")
+        this._FormalSetVis(id, "CdSecRow_" id, showCd && kind != "时间戳")
+        this._FormalSetVis(id, "CdVarRow_" id, showCd && kind == "时间戳")
+        this._FormalSetVis(id, "CdPosXRow_" id, showCd)
+        this._FormalSetVis(id, "CdPosYRow_" id, showCd)
     }
 
     ; 注释节点：正文写回 Content，并同步 CurCMD 备注后缀（与 CommentGui.GetCommandStr 一致）
@@ -2298,6 +2554,15 @@ class MacroGraphFormalHandlersMixin {
             idx := d.HasOwnProp("ssType") ? d.ssType : 1
             return GetLang(ssKeys[idx])
         }
+        if (d.type == GetLang("等待")) {
+            keys := this._WaitTypeKeys()
+            idx := d.HasOwnProp("waitType") && IsNumber(d.waitType) ? Integer(d.waitType) : 1
+            if (idx < 1 || idx > keys.Length)
+                idx := 1
+            return GetLang(keys[idx])
+        }
+        if (d.type == GetLang("等待确定"))
+            return GetLang(d.HasOwnProp("wcType") ? d.wcType : "继续")
         if (TimeGraphNormSubMode(d) == "倒计时") {
             sec := d.HasOwnProp("cdSec") ? d.cdSec : 10
             return CountDownFormatText(sec)

@@ -78,7 +78,7 @@ class MacroGraphEventsMixin {
             this._BindCtrl("Time2_" id, "LostFocus", this._OnField.Bind(this, id, "time2"), runtime)
             this._BindCtrl("Time2_" id, "SelectionChanged", this._OnField.Bind(this, id, "time2"), runtime)
         }
-        else if (d.type == GetLang("按键")) {
+        else if (d.type == GetLang("按键") || d.type == GetLang("手柄")) {
             this._TrackCtrl("TypeCmb_" id, runtime)
             this._TrackCtrl("Hold_" id, runtime)
             this._TrackCtrl("Count_" id, runtime)

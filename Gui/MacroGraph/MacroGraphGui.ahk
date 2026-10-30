@@ -13,13 +13,8 @@
 ;   - 右上角「逻辑树」：保存后切换到逻辑树编辑器（多链路需确认强行切换）。
 ;   - 关闭窗口时持久化图结构并回写 MacroArr（内存）；真正落盘需主界面「应用并保存」。
 ;   - 画布空白处右键：弹出若梦兔全部指令菜单，点击生成对应节点。
-;       · 间隔 / 按键：生成可内联编辑的完整节点。
-;       · 其它指令：先生成临时节点（占位，后续完善）。
-;   - 节点参数可直接在节点面板上内联编辑：
-;       · 间隔节点：直接编辑时间(ms)
-;       · 按键节点：下拉选择按键类型；类型为"点击"时显示点击时长/点击次数；
-;                   点击次数>1 时再显示每次间隔。
-;   - 双击间隔/按键节点：打开对应完整编辑器（IntervalGui / KeyGui）。
+;   - 节点参数可直接在节点面板上内联编辑，字段与对应指令编辑器对齐。
+;   - 双击节点：打开对应完整编辑器。
 ;   - 关闭窗口或任何内联修改时，按连线顺序重建宏并实时回写。
 ;
 ; 架构：维护数据模型 cmdNodes(数据) + order(存在列表) + pos(各节点位置) + links(连线)。
@@ -658,19 +653,21 @@ class MacroGraphGui {
     ; 重算按键节点 点击时长/次数/间隔 行的显隐；同时同步控件值，避免切换后显示旧值
     _RefreshKeyVisibility(id) {
         d := this._Parse(this.cmdNodes[id].CurCMD)
-        if (d.type != GetLang("按键") || this.ui == "")
+        if ((d.type != GetLang("按键") && d.type != GetLang("手柄")) || this.ui == "")
             return
+        isAnalog := d.type == GetLang("手柄") && (InStr(d.key, ":") || InStr(d.HasOwnProp("raw") ? d.raw : "", ":"))
         ; 显隐以当前下拉 SelectedIndex 为准，避免 CurCMD 尚未跟上时行仍残留显示
         ktype := this._KeyTypeFromState("TypeCmb_" id, Map(), d.ktype)
         isClick := ktype == GetLang("点击")
         showInter := isClick && IsNumber(d.count) && (d.count + 0) > 1
         ; 同步控件值，确保切换类型后控件内容与数据模型一致
-        this.ui.Update("Hold_" id, "Text", d.hold)
-        this.ui.Update("Count_" id, "Text", d.count)
-        this.ui.Update("Inter_" id, "Text", d.inter)
-        this.ui.Update("HoldRow_" id, "Visibility", isClick ? "Visible" : "Collapsed")
-        this.ui.Update("CountRow_" id, "Visibility", isClick ? "Visible" : "Collapsed")
-        this.ui.Update("InterRow_" id, "Visibility", showInter ? "Visible" : "Collapsed")
+        try this.ui.Update("Hold_" id, "Text", d.hold)
+        try this.ui.Update("Count_" id, "Text", d.count)
+        try this.ui.Update("Inter_" id, "Text", d.inter)
+        this.ui.Update("TypeRow_" id, "Visibility", isAnalog ? "Collapsed" : "Visible")
+        this.ui.Update("HoldRow_" id, "Visibility", (!isAnalog && isClick) ? "Visible" : "Collapsed")
+        this.ui.Update("CountRow_" id, "Visibility", (!isAnalog && isClick) ? "Visible" : "Collapsed")
+        this.ui.Update("InterRow_" id, "Visibility", (!isAnalog && showInter) ? "Visible" : "Collapsed")
     }
 
     ; ----------------------------------------------------------------- 双击打开编辑器
@@ -815,6 +812,11 @@ class MacroGraphGui {
             }
             else if (d.type == GetLang("手柄")) {
                 this.ui.Update("JoySum_" id, "Text", this._JoyCmdSummary(d))
+                try this.ui.Update("TypeCmb_" id, "Text", d.ktype)
+                try this.ui.Update("Hold_" id, "Text", d.hold)
+                try this.ui.Update("Count_" id, "Text", d.count)
+                try this.ui.Update("Inter_" id, "Text", d.inter)
+                this._RefreshKeyVisibility(id)
             }
             else if (IsMoveCmd(d.type)) {
                 this.ui.Update("PosX_" id, "Text", d.posx)

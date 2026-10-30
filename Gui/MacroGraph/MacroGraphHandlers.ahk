@@ -123,6 +123,15 @@ class MacroGraphHandlersMixin {
                     keys.Push(ps "Name_" id, ps "Var_" id)
                 }
             }
+        } else if (type == GetLang("等待")) {
+            keys := ["WaitInterval_" id, "WaitVarName_" id, "WaitVarVal_" id, "WaitKey_" id,
+                "WaitSX_" id, "WaitSY_" id, "WaitEX_" id, "WaitEY_" id, "WaitProc_" id,
+                "WaitWin_" id, "WaitFile_" id, "WaitDateVal_" id]
+        } else if (type == GetLang("等待确定"))
+            keys := ["WcPrompt_" id, "WcTimeout_" id]
+        else if (type == GetLang("时间") || type == GetLang("倒计时")) {
+            keys := ["TimeTarget_" id, "TimeStart_" id, "TimeEnd_" id, "TimeTimeout_" id, "TimeInterval_" id,
+                "CdHour_" id, "CdMin_" id, "CdSec_" id, "CdVar_" id, "CdPosX_" id, "CdPosY_" id]
         }
         for key in keys
             this._PullEditTextIntoState(state, key)
@@ -1603,7 +1612,7 @@ class MacroGraphHandlersMixin {
         else if (d.type == GetLang("按键"))
             this._FlushKeyInline(id, d, state)
         else if (d.type == GetLang("手柄"))
-            return
+            this._FlushKeyInline(id, d, state)
         else if (IsMoveCmd(d.type))
             this._FlushMoveInline(id, d, state)
         else if (IsDeltaMoveCmd(d.type))
@@ -1627,8 +1636,12 @@ class MacroGraphHandlersMixin {
         if (this.ui != "") {
             live := this.ui.Query("*")
             if (IsObject(live)) {
-                for k, v in live
-                    state[k] := v
+                suf := "_" id
+                sufLen := StrLen(suf)
+                for k, v in live {
+                    if (sufLen > 0 && StrLen(k) >= sufLen && SubStr(k, StrLen(k) - sufLen + 1) == suf)
+                        state[k] := v
+                }
             }
             keys := []
             for k, _ in state
@@ -1679,6 +1692,12 @@ class MacroGraphHandlersMixin {
                 this._OnFormalIf(id, state, "", "Flush")
             else if (t == GetLang("如果Pro"))
                 this._OnFormalIfPro(id, state, "", "Flush")
+            else if (t == GetLang("等待"))
+                this._OnFormalWait(id, state, "", "Flush")
+            else if (t == GetLang("等待确定"))
+                this._OnFormalWaitConfirm(id, state, "", "Flush")
+            else if (t == GetLang("时间") || t == GetLang("倒计时"))
+                this._OnFormalTime(id, state, "", "Flush")
         } finally {
             this._flushSilent := prev
         }

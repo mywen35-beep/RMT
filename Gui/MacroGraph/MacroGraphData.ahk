@@ -623,13 +623,38 @@ class MacroGraphDataMixin {
         } else if (cmdKey == "等待确定") {
             d.wcType := data.Type
             d.wcPrompt := ObjHasOwnProp(data, "Prompt") ? data.Prompt : ""
+            d.wcPause := ObjHasOwnProp(data, "PauseType") ? data.PauseType : "暂停当前宏"
+            d.wcTimeout := ObjHasOwnProp(data, "TimeoutMs") ? data.TimeoutMs : 0
+            d.wcTimeoutAct := ObjHasOwnProp(data, "TimeoutAction") ? data.TimeoutAction : "无"
+            d.wcTerm := ObjHasOwnProp(data, "TerminateType") ? data.TerminateType : "终止当前宏"
+            d.wcPauseBtn := ObjHasOwnProp(data, "PauseBtnType") ? data.PauseBtnType : "暂停当前宏"
         } else if (cmdKey == "倒计时") {
             d.cdSec := ObjHasOwnProp(data, "Seconds") ? data.Seconds : 10
-            d.cdWait := ObjHasOwnProp(data, "WaitEnd") ? data.WaitEnd : "等待结束"
+            d.cdWait := ObjHasOwnProp(data, "WaitEnd") ? data.WaitEnd : "不等待"
+            d.cdKind := ObjHasOwnProp(data, "Param2") ? data.Param2 : "时长"
+            d.timeParam1 := ObjHasOwnProp(data, "Param1") ? data.Param1 : ""
+            d.timeParam2 := ObjHasOwnProp(data, "Param2") ? data.Param2 : "时长"
+            d.cdHour := ObjHasOwnProp(data, "Hour") ? data.Hour : 0
+            d.cdMin := ObjHasOwnProp(data, "Min") ? data.Min : 0
+            d.cdSecPart := ObjHasOwnProp(data, "Sec") ? data.Sec : 10
+            d.cdPosX := ObjHasOwnProp(data, "PosX") ? data.PosX : 200
+            d.cdPosY := ObjHasOwnProp(data, "PosY") ? data.PosY : 200
         } else if (cmdKey == "时间") {
-            d.timeSub := ObjHasOwnProp(data, "SubMode") ? data.SubMode : 1
+            d.timeSub := ObjHasOwnProp(data, "SubMode") ? data.SubMode : "等待"
+            d.timeParam1 := ObjHasOwnProp(data, "Param1") ? data.Param1 : ""
+            d.timeParam2 := ObjHasOwnProp(data, "Param2") ? data.Param2 : ""
+            d.timeParam4 := ObjHasOwnProp(data, "Param4") ? data.Param4 : ""
+            d.timeParam5 := ObjHasOwnProp(data, "Param5") ? data.Param5 : ""
+            d.timeTimeout := ObjHasOwnProp(data, "Timeout") ? data.Timeout : 0
+            d.timeInterval := ObjHasOwnProp(data, "CheckInterval") ? data.CheckInterval : 500
             d.cdSec := ObjHasOwnProp(data, "Seconds") ? data.Seconds : 10
-            d.cdWait := ObjHasOwnProp(data, "WaitEnd") ? data.WaitEnd : "等待结束"
+            d.cdWait := ObjHasOwnProp(data, "WaitEnd") ? data.WaitEnd : "不等待"
+            d.cdKind := ObjHasOwnProp(data, "Param2") ? data.Param2 : "时长"
+            d.cdHour := ObjHasOwnProp(data, "Hour") ? data.Hour : 0
+            d.cdMin := ObjHasOwnProp(data, "Min") ? data.Min : 0
+            d.cdSecPart := ObjHasOwnProp(data, "Sec") ? data.Sec : 10
+            d.cdPosX := ObjHasOwnProp(data, "PosX") ? data.PosX : 200
+            d.cdPosY := ObjHasOwnProp(data, "PosY") ? data.PosY : 200
         } else if (cmdKey == "等待") {
             ; 等待编辑器使用统一的 WaitData 字段：类型、轮询间隔、参数和区域坐标。
             d.waitType := ObjHasOwnProp(data, "WaitType") ? data.WaitType : 1
@@ -1125,7 +1150,20 @@ class MacroGraphDataMixin {
             return "流程跳转_" GetLangKey(d.jumpAction)
         if (d.type == GetLang("间隔")) {
             timePart := (d.itype == GetLang("随机")) ? d.time "~" d.time2 : d.time
-            return CorrectRemark(GetLang("间隔") "_" timePart, d.HasOwnProp("remark") ? d.remark : "")
+            remark := d.HasOwnProp("remark") ? d.remark : ""
+            if (d.HasOwnProp("serialStr") && d.serialStr != "") {
+                try {
+                    data := GetMacroCMDData(d.serialStr)
+                    if (IsObject(data)) {
+                        data.Type := (d.itype == GetLang("随机")) ? 2 : 1
+                        data.Time1 := d.time
+                        data.Time2 := d.time2
+                        SaveMacroCMDData(data)
+                        return CorrectRemark(d.serialStr, remark)
+                    }
+                }
+            }
+            return CorrectRemark(GetLang("间隔") "_" timePart, remark)
         }
         ; 阶段5：配置化节点（有 serialStr）→ 更新 Data 并保存，返回序列码+备注
         if (d.HasOwnProp("serialStr") && d.serialStr != "") {
@@ -1187,8 +1225,22 @@ class MacroGraphDataMixin {
                 cmd .= "_" d.inter
             return cmd
         }
-        if (d.type == GetLang("手柄"))
-            return d.raw
+        if (d.type == GetLang("手柄")) {
+            if (InStr(d.raw, ":") || InStr(d.key, ":"))
+                return d.raw != "" ? d.raw : (GetLang("手柄") "_" d.key)
+            isClick := d.ktype == GetLang("点击")
+            hasHold := isClick
+            hasCount := hasHold && (d.count != "1" && d.count != 1)
+            hasInter := hasCount && (d.inter != "0" && d.inter != 0)
+            cmd := GetLang("手柄") "_" d.key "_" d.ktype
+            if (hasHold)
+                cmd .= "_" d.hold
+            if (hasCount)
+                cmd .= "_" d.count
+            if (hasInter)
+                cmd .= "_" d.inter
+            return cmd
+        }
 
         if (IsMoveCmd(d.type)) {
             ; 旧格式纯文本指令（无序列码）：按当前语言显示名重建（旧名/新名都兼容）

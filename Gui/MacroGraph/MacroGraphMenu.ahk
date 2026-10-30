@@ -217,7 +217,7 @@ class MacroGraphMenuMixin {
         ; 复制：选中节点或连线时可交互
         this.ui.Update("MG_Copy", "IsEnabled", (hasSelection || hasConnection) ? "True" : "False")
         ; 粘贴：有剪贴板且未选中节点/连线时可交互
-        this.ui.Update("MG_Paste", "IsEnabled", (hasClipboard && !hasSelection && !hasConnection) ? "True" : "False")
+        this.ui.Update("MG_Paste", "IsEnabled", hasClipboard ? "True" : "False")
         ; 删除：选中节点或连线时可交互
         this.ui.Update("MG_Delete", "IsEnabled", (hasSelection || hasConnection) ? "True" : "False")
 

@@ -62,7 +62,7 @@ class MacroGraphNodeUIMixin {
             body.Add("TextBlock").Name("KeyName_" id).Text(d.key).Foreground("{DynamicResource EditText}").FontWeight("Bold").FontSize(this._MGFontSize(13)).TextWrapping("Wrap")
 
             ; 按键类型下拉 —— 标签与下拉同行
-            this._AddComboRow(body, "TypeRow_" id, GetLang("按键类型") "：", "TypeCmb_" id
+            this._AddComboRow(body, "TypeRow_" id, GetLang("类型:"), "TypeCmb_" id
                 , [GetLang("按下"), GetLang("松开"), GetLang("点击")], this._TypeIndex(d.ktype), true)
 
             isClick := d.ktype == GetLang("点击")
@@ -73,7 +73,15 @@ class MacroGraphNodeUIMixin {
             this._AddFieldRow(body, "InterRow_" id, GetLang("每次间隔："), "Inter_" id, d.inter, showInter, true, id, "inter")
         }
         else if (d.type == GetLang("手柄")) {
+            isAnalog := InStr(d.key, ":") || InStr(d.HasOwnProp("raw") ? d.raw : "", ":")
             body.Add("TextBlock").Name("JoySum_" id).Text(this._JoyCmdSummary(d)).Foreground("{DynamicResource EditText}").FontWeight("Bold").FontSize(this._MGFontSize(13)).TextWrapping("Wrap")
+            this._AddComboRow(body, "TypeRow_" id, GetLang("类型:"), "TypeCmb_" id
+                , [GetLang("按下"), GetLang("松开"), GetLang("点击")], this._TypeIndex(d.ktype), !isAnalog)
+            isClick := d.ktype == GetLang("点击")
+            showInter := isClick && IsNumber(d.count) && (d.count + 0) > 1
+            this._AddFieldRow(body, "HoldRow_" id, GetLang("点击时长:"), "Hold_" id, d.hold, !isAnalog && isClick, true, id, "hold")
+            this._AddFieldRow(body, "CountRow_" id, GetLang("点击次数："), "Count_" id, d.count, !isAnalog && isClick, true, id, "count")
+            this._AddFieldRow(body, "InterRow_" id, GetLang("每次间隔："), "Inter_" id, d.inter, !isAnalog && showInter, true, id, "inter")
             body.Add("TextBlock").Text(GetLang("双击打开手柄编辑器")).Foreground("{DynamicResource TextSub}").FontSize(this._MGFontSize(11)).Margin("0,6,0,0")
         }
         else if (IsMoveCmd(d.type)) {
@@ -109,8 +117,8 @@ class MacroGraphNodeUIMixin {
             isSimpleDrag := actionType == 5 && mmmode == 0
             isTargetPoint := mmmode == 0 && !isABDrag
             ; 坐标X / 坐标Y：可编辑下拉（既能下拉选变量，也能手动输入数值）
-            this._AddEditableComboRow(body, "MPPosXRow_" id, GetLang(isABDrag ? "起始坐标X:" : (isTargetPoint ? "目标点：" : "偏移值")), "MPPosX_" id, varList, this._MMProVarText(d, "posVarX"), true)
-            this._AddEditableComboRow(body, "MPPosYRow_" id, GetLang(isABDrag || isTargetPoint ? "" : ""), "MPPosY_" id, varList, this._MMProVarText(d, "posVarY"), true)
+            this._AddEditableComboRow(body, "MPPosXRow_" id, GetLang(isABDrag ? "起始点" : (isTargetPoint ? "目标点：" : "偏移值")), "MPPosX_" id, varList, this._MMProVarText(d, "posVarX"), true)
+            this._AddEditableComboRow(body, "MPPosYRow_" id, GetLang(isABDrag || isTargetPoint ? "" : "偏移值Y:"), "MPPosY_" id, varList, this._MMProVarText(d, "posVarY"), true)
             this._AddEditableComboRow(body, "MPEndXRow_" id, GetLang("终止坐标X:"), "MPEndX_" id, varList, this._MMProVarText(d, "endPosVarX"), isABDrag)
             this._AddEditableComboRow(body, "MPEndYRow_" id, GetLang("终止坐标Y:"), "MPEndY_" id, varList, this._MMProVarText(d, "endPosVarY"), isABDrag)
             ; 移动速度（文本框，支持标签拖拽改值）；游戏视角固定100且禁用
@@ -189,7 +197,7 @@ class MacroGraphNodeUIMixin {
             this._AddComboRow(body, "InTypeRow_" id, GetLang("输入类型:"), "InTypeCmb_" id, typeNames, this._InputTypeIndex(typeKey), true)
             this._AddComboRow(body, "InPauseRow_" id, GetLang("交互时:"), "InPauseCmb_" id, pauseNames, this._InputPauseTypeIndex(pauseKey), true)
             this._AddComboRow(body, "InCancelRow_" id, GetLang("取消时:"), "InCancelCmb_" id, cancelNames, this._InputCancelTypeIndex(cancelKey), showCancel)
-            this._AddEditableComboRow(body, "InSaveRow_" id, GetLang("保存变量") "：", "InSave_" id, varList, saveName, showRes)
+            this._AddEditableComboRow(body, "InSaveRow_" id, GetLang("结果变量："), "InSave_" id, varList, saveName, showRes)
         }
         else if (d.type == GetLang("输出")) {
             outputTypeKey := d.HasOwnProp("outputType") ? d.outputType : "发送内容"
@@ -240,11 +248,11 @@ class MacroGraphNodeUIMixin {
 
         ; 搜索范围坐标（可编辑下拉，选变量或手输数值）：起点X|起点Y 一行，终点X|终点Y 一行
         rStart := body.Add("StackPanel").Orientation("Horizontal").Margin("0,5,0,0")
-        this._ProCellEdit(rStart, "SStartXRow_" id, GetLang("起点X："), "SStartX_" id, varList, "" (d.HasOwnProp("startPosX") ? d.startPosX : 0), true, LW, CW, false)
-        this._ProCellEdit(rStart, "SStartYRow_" id, GetLang("起点Y："), "SStartY_" id, varList, "" (d.HasOwnProp("startPosY") ? d.startPosY : 0), true, LW, CW, true)
+        this._ProCellEdit(rStart, "SStartXRow_" id, GetLang("起始坐标X："), "SStartX_" id, varList, "" (d.HasOwnProp("startPosX") ? d.startPosX : 0), true, LW, CW, false)
+        this._ProCellEdit(rStart, "SStartYRow_" id, GetLang("起始坐标Y："), "SStartY_" id, varList, "" (d.HasOwnProp("startPosY") ? d.startPosY : 0), true, LW, CW, true)
         rEnd := body.Add("StackPanel").Orientation("Horizontal").Margin("0,5,0,0")
-        this._ProCellEdit(rEnd, "SEndXRow_" id, GetLang("终点X："), "SEndX_" id, varList, "" (d.HasOwnProp("endPosX") ? d.endPosX : A_ScreenWidth), true, LW, CW, false)
-        this._ProCellEdit(rEnd, "SEndYRow_" id, GetLang("终点Y："), "SEndY_" id, varList, "" (d.HasOwnProp("endPosY") ? d.endPosY : A_ScreenHeight), true, LW, CW, true)
+        this._ProCellEdit(rEnd, "SEndXRow_" id, GetLang("终止坐标X："), "SEndX_" id, varList, "" (d.HasOwnProp("endPosX") ? d.endPosX : A_ScreenWidth), true, LW, CW, false)
+        this._ProCellEdit(rEnd, "SEndYRow_" id, GetLang("终止坐标Y："), "SEndY_" id, varList, "" (d.HasOwnProp("endPosY") ? d.endPosY : A_ScreenHeight), true, LW, CW, true)
 
         ; 搜索次数（含「无限」）| 每次间隔（次数为无限或大于1时显示）同一行
         cnt := d.HasOwnProp("searchCount") ? d.searchCount : 1
