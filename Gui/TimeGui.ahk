@@ -545,47 +545,47 @@ class TimeGui {
             case 1:
                 t := TimeNormWaitType(this._GetSelectedKey("WaitUnitCon", TimeGui.WaitUnitKeys))
                 if (t == "时刻" && this._HmsEmpty("WaitHourCon", "WaitMinCon", "WaitSecCon")) {
-                    MsgBox(GetLang("请输入目标时间或时长"))
+                    RmtDialog.Info(GetLang("请输入目标时间或时长"))
                     return false
                 }
                 if (t == "时长") {
                     hh := this.ui.Query("HourCon"), mm := this.ui.Query("MinCon"), ss := this.ui.Query("SecCon")
                     if (IsNumber(hh) && IsNumber(mm) && IsNumber(ss) && Number(hh) * 3600 + Number(mm) * 60 + Number(ss) <= 0) {
-                        MsgBox(GetLang("时长请输入大于0的秒数"))
+                        RmtDialog.Info(GetLang("时长请输入大于0的秒数"))
                         return false
                     }
                 }
                 if (t == "时间戳" && this.ui.Query("WaitVarCon") == "") {
-                    MsgBox(GetLang("请输入目标时间或时长"))
+                    RmtDialog.Info(GetLang("请输入目标时间或时长"))
                     return false
                 }
             case 2:
                 wt := TimeNormWindowType(this._GetSelectedKey("WinKindCon", TimeGui.WindowKindKeys))
                 if (wt == "时间戳") {
                     if (this.ui.Query("StartVarCon") == "" || this.ui.Query("EndVarCon") == "") {
-                        MsgBox(GetLang("请输入开始与结束时间"))
+                        RmtDialog.Info(GetLang("请输入开始与结束时间"))
                         return false
                     }
                 } else if (this._HmsEmpty("StartHourCon", "StartMinCon", "StartSecCon") || this._HmsEmpty("EndHourCon", "EndMinCon", "EndSecCon")) {
-                    MsgBox(GetLang("请输入开始与结束时间"))
+                    RmtDialog.Info(GetLang("请输入开始与结束时间"))
                     return false
                 }
             case 3:
                 ck := TimeNormWaitType(this._GetSelectedKey("CdKindCon", TimeGui.WaitUnitKeys))
                 if (ck == "时间戳") {
                     if (this.ui.Query("CdVarCon") == "") {
-                        MsgBox(GetLang("请输入目标时间或时长"))
+                        RmtDialog.Info(GetLang("请输入目标时间或时长"))
                         return false
                     }
                 } else if (ck == "时刻") {
                     if (this._HmsEmpty("CdWaitHourCon", "CdWaitMinCon", "CdWaitSecCon")) {
-                        MsgBox(GetLang("请输入目标时间或时长"))
+                        RmtDialog.Info(GetLang("请输入目标时间或时长"))
                         return false
                     }
                 } else {
                     hh := this.ui.Query("CdHourCon"), mm := this.ui.Query("CdMinCon"), ss := this.ui.Query("CdSecCon")
                     if (IsNumber(hh) && IsNumber(mm) && IsNumber(ss) && (Number(hh) < 0 || Number(mm) < 0 || Number(ss) < 0 || Number(hh) * 3600 + Number(mm) * 60 + Number(ss) <= 0)) {
-                        MsgBox(GetLang("时长请输入大于0的秒数"))
+                        RmtDialog.Info(GetLang("时长请输入大于0的秒数"))
                         return false
                     }
                 }

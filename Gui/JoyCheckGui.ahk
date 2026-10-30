@@ -237,12 +237,12 @@ class JoyCheckGui extends JoyGui {
 
     CheckIfValid() {
         if (this.AxisMap.Count == 0 && this.CheckedArr.Length == 0) {
-            MsgBox(GetLang("请选择要检测的手柄按键！"))
+            RmtDialog.Info(GetLang("请选择要检测的手柄按键！"))
             return false
         }
         varName := Trim(this.ui.Query("VarNameCon"))
         if (varName == "") {
-            MsgBox(GetLang("请输入变量名！"))
+            RmtDialog.Info(GetLang("请输入变量名！"))
             return false
         }
         return true

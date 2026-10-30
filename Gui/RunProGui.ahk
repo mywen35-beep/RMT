@@ -483,7 +483,7 @@ class RunProGui {
         if (this._SelIndex("RunModeCombo") + 1 == 3) {
             for enc in [this.ui.Query("EncIn"), this.ui.Query("EncOut")] {
                 if (enc != "UTF-8" && enc != "UTF-16" && (SubStr(enc, 1, 2) != "CP")) {
-                    MsgBox(Format("不支持{}编码", enc))
+                    RmtDialog.Info(Format("不支持{}编码", enc))
                     return
                 }
             }
@@ -505,7 +505,7 @@ class RunProGui {
 
     CheckIfValid() {
         if (this.ui.Query("PathTextCon") == "") {
-            MsgBox(GetLang("目标不能为空！"))
+            RmtDialog.Info(GetLang("目标不能为空！"))
             return false
         }
         return true

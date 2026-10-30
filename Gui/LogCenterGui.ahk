@@ -206,8 +206,8 @@ class LogCenterGui {
 
     OnClear(state, ctrl, event) {
         ; 清空当前 tab 对应的日志文件（确认后）
-        result := MsgBox(GetLang("确定清空当前日志文件？"), GetLang("日志中心"), "YesNo")
-        if (result == "No")
+        result := RmtDialog.Confirm(GetLang("确定清空当前日志文件？"), GetLang("日志中心"))
+        if (!result)
             return
         path := this._curTab == "System" ? this._SysPath() : this._BizPath()
         try FileDelete(path)

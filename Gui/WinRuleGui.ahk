@@ -125,7 +125,7 @@ class WinRuleGui {
 
     OnSureBtnClick(state, ctrl, event) {
         if (!IsNumber(this.ui.Query("WidthCon")) || !IsNumber(this.ui.Query("HeightCon"))) {
-            MsgBox(GetLang("屏幕宽高需要输入数字"))
+            RmtDialog.Info(GetLang("屏幕宽高需要输入数字"))
             return
         }
 

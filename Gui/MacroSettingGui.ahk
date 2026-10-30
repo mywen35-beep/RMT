@@ -57,33 +57,12 @@ class MacroSettingGui {
         ; === 内容 ===
         ; 边距：左/右 15，上 4（相对原 14 上移 10），下 10（相对原 14 略收）
         body := main.Add("Grid").Grid_Row(1).Margin("15,4,15,10")
-        body.Rows("36", "36", "36", "*")
-
-        ; 按键类型
-        tkRow := body.Add("StackPanel").Grid_Row(0).Orientation("Horizontal").VerticalAlignment("Center")
-        tkRow.Add("TextBlock").Text(GetLang("按键类型：")).Width(90).VerticalAlignment("Center")
-        tk := tkRow.Add("ComboBox").Name("TKTypeCombo").Width(125).Height(26).MinHeight(26)
-        for t in GetLangArr(["AHK Send", "keybd_event", "罗技", "AHI"])
-            tk.Add("ComboBoxItem").Content(t)
+        body.Rows("36", "36", "36", "36", "*")
         toolHover := FrontInfoGui._ToolBtnHoverStyle()
         okStyle := FrontInfoGui._OkBtnHoverStyle()
-        helpBtn := FrontInfoGui._AddSquareHelpBtn(tkRow, "BtnHelp")
-        helpBtn.InjectResources(toolHover)
 
-        ; 结束提示音右推：下拉右缘与下方「编辑」右缘对齐
-        tipGrid := body.Add("Grid").Grid_Row(1).VerticalAlignment("Center")
-        tipGrid.Cols("90", "125", "*", "90", "125")
-        tipGrid.Add("TextBlock").Grid_Column(0).Text(GetLang("开始提示音：")).VerticalAlignment("Center")
-        st := tipGrid.Add("ComboBox").Grid_Column(1).Name("StartTipCombo").Height(26).MinHeight(26)
-        for t in GetLangArr(["无", "触发提示", "循环首次提示"])
-            st.Add("ComboBoxItem").Content(t)
-        tipGrid.Add("TextBlock").Grid_Column(3).Text(GetLang("结束提示音：")).VerticalAlignment("Center").HorizontalAlignment("Right").Margin("0,0,8,0")
-        et := tipGrid.Add("ComboBox").Grid_Column(4).Name("EndTipCombo").Height(26).MinHeight(26).HorizontalAlignment("Stretch")
-        for t in GetLangArr(["无", "结束提示", "循环结束提示"])
-            et.Add("ComboBoxItem").Content(t)
-
-        ; §22 窗口绑定：文本框吃剩余宽度，编辑按钮 Auto，避免右侧被裁
-        bwGrid := body.Add("Grid").Grid_Row(2).VerticalAlignment("Center")
+        ; 窗口绑定放在首行，默认值由 MacroItem.BindWindow 提供
+        bwGrid := body.Add("Grid").Grid_Row(0).VerticalAlignment("Center")
         bwGrid.Cols("90", "*", "Auto")
         bwGrid.Add("TextBlock").Grid_Column(0).Text(GetLang("窗口绑定：")).VerticalAlignment("Center")
         bwGrid.Add("TextBox").Grid_Column(1).Name("BindWindowCon").Height(26).MinHeight(26).Margin("0,0,6,0")
@@ -94,17 +73,45 @@ class MacroSettingGui {
             .Foreground("{DynamicResource TextMain}")
         editBtn.InjectResources(toolHover)
 
-        btnRow := body.Add("StackPanel").Grid_Row(3).Orientation("Horizontal").HorizontalAlignment("Center").VerticalAlignment("Center")
+        ; 按键类型
+        tkRow := body.Add("StackPanel").Grid_Row(1).Orientation("Horizontal").VerticalAlignment("Center")
+        tkRow.Add("TextBlock").Text(GetLang("按键类型：")).Width(90).VerticalAlignment("Center")
+        tk := tkRow.Add("ComboBox").Name("TKTypeCombo").Width(125).Height(26).MinHeight(26)
+        for t in GetLangArr(["AHK Send", "keybd_event", "罗技", "AHI"])
+            tk.Add("ComboBoxItem").Content(t)
+        helpBtn := FrontInfoGui._AddSquareHelpBtn(tkRow, "BtnHelp")
+        helpBtn.InjectResources(toolHover)
+
+        ; 开始/结束提示音使用固定小间距，避免弹性列把结束提示音推到窗口边缘。
+        tipGrid := body.Add("Grid").Grid_Row(2).VerticalAlignment("Center")
+        tipGrid.Cols("90", "125", "8", "90", "125")
+        tipGrid.Add("TextBlock").Grid_Column(0).Text(GetLang("开始音效：")).VerticalAlignment("Center")
+        st := tipGrid.Add("ComboBox").Grid_Column(1).Name("StartTipCombo").Height(26).MinHeight(26)
+        for t in GetLangArr(["无", "触发提示", "循环首次提示"])
+            st.Add("ComboBoxItem").Content(t)
+        tipGrid.Add("TextBlock").Grid_Column(3).Text(GetLang("结束音效：")).VerticalAlignment("Center").HorizontalAlignment("Right").Margin("0,0,8,0")
+        et := tipGrid.Add("ComboBox").Grid_Column(4).Name("EndTipCombo").Height(26).MinHeight(26).HorizontalAlignment("Stretch")
+        for t in GetLangArr(["无", "结束提示", "循环结束提示"])
+            et.Add("ComboBoxItem").Content(t)
+
+        stopGrid := body.Add("Grid").Grid_Row(3).VerticalAlignment("Center")
+        stopGrid.Cols("90", "125", "*")
+        stopGrid.Add("TextBlock").Grid_Column(0).Text(GetLang("终止音效：")).VerticalAlignment("Center")
+        stop := stopGrid.Add("ComboBox").Grid_Column(1).Name("StopTipCombo").Height(26).MinHeight(26)
+        for t in GetLangArr(["无", "终止提示"])
+            stop.Add("ComboBoxItem").Content(t)
+
+        btnRow := body.Add("StackPanel").Grid_Row(4).Orientation("Horizontal").HorizontalAlignment("Center").VerticalAlignment("Center")
         okBtn := btnRow.Add("Button").Name("BtnOk").Content(GetLang("确定")).Width(80).Height(32).MinHeight(32).Cursor("Hand")
             .Background("{DynamicResource ActionBg}").Foreground("{DynamicResource ActionText}")
             .BorderBrush("{DynamicResource ActionStroke}").BorderThickness("1").FontSize(13).FontWeight("Bold")
         okBtn.InjectResources(okStyle)
 
         ; === 创建 XAMLHost ===
-        ; 宽约 15+90+125+12+90+125+15 ≈ 472，取 480；提示音并排后高度可收
+        ; 适配提示音标签完整显示，同时控制窗口宽度。
         tmp := StrReplace(XAML_TEMPLATE, "%CaptionHeight%", titleHeight)
         this.ui := XAMLHost(StrReplace(tmp, "%app%", main.ToString()), "", this.OwnerHwnd)
-        this.ui.xaml := StrReplace(this.ui.xaml, 'Width="940" Height="700"', 'Title="' this._EscapeXml(title) '" Width="480" Height="200" Opacity="0"')
+        this.ui.xaml := StrReplace(this.ui.xaml, 'Width="940" Height="700"', 'Title="' this._EscapeXml(title) '" Width="500" Height="250" Opacity="0"')
         this.ui.xaml := StrReplace(this.ui.xaml, 'FontFamily="Segoe UI Variable Display, Segoe UI, sans-serif"', 'FontFamily="' MainSoftData.FontType '"')
         this.ui.xaml := StrReplace(this.ui.xaml, '%resources%', '')
 
@@ -157,6 +164,7 @@ class MacroSettingGui {
         this.ui.Update("TKTypeCombo", "SelectedIndex", String(item.Mode - 1))
         this.ui.Update("StartTipCombo", "SelectedIndex", String(item.StartTipSound - 1))
         this.ui.Update("EndTipCombo", "SelectedIndex", String(item.EndTipSound - 1))
+        this.ui.Update("StopTipCombo", "SelectedIndex", String(item.StopTipSound - 1))
         ; §22 窗口绑定（旧配置无此字段时回退空）
         this.ui.Update("BindWindowCon", "Text", ObjHasOwnProp(item, "BindWindow") ? item.BindWindow : "")
     }
@@ -169,7 +177,7 @@ class MacroSettingGui {
         else {
             MyFrontInfoGui.OwnerHwnd := ""
         }
-        MyFrontInfoGui.ShowGui(XamlValueBridge(this.ui, "BindWindowCon"))
+        MyFrontInfoGui.ShowGui(XamlValueBridge(this.ui, "BindWindowCon"), false, "macro")
     }
 
     OnClickModeHelpBtn(state, ctrl, event) {
@@ -197,6 +205,7 @@ class MacroSettingGui {
         item.Mode := mode
         item.StartTipSound := this._SelIndex("StartTipCombo") + 1
         item.EndTipSound := this._SelIndex("EndTipCombo") + 1
+        item.StopTipSound := this._SelIndex("StopTipCombo") + 1
         ; §22 窗口绑定保存
         item.BindWindow := this.ui.Query("BindWindowCon")
         this._CloseWindow()

@@ -594,7 +594,7 @@ OnItemPasteMacroBtnClick(tableItem, foldIndex, *) {
         if (fold) {
             Count := GetFoldItemCount(tableItem, fold)
             if (Count >= 8) {
-                MsgBox(GetLang("轮盘最多只能添加8个"), GetLang("提示"))
+                RmtDialog.Info(GetLang("轮盘最多只能添加8个"), GetLang("提示"))
                 return
             }
         }
@@ -602,7 +602,7 @@ OnItemPasteMacroBtnClick(tableItem, foldIndex, *) {
 
     clipboardText := A_Clipboard
     if (clipboardText == "") {
-        MsgBox(GetLang("剪贴板为空"), GetLang("提示"))
+        RmtDialog.Info(GetLang("剪贴板为空"), GetLang("提示"))
         return
     }
 
@@ -630,8 +630,8 @@ OnItemPasteMacroBtnClick(tableItem, foldIndex, *) {
         isRMTFormat := false
     }
 
-    result := MsgBox(GetLang("是否粘贴宏？"), GetLang("确认粘贴"), 1)
-    if (result == "Cancel")
+    result := RmtDialog.Confirm(GetLang("是否粘贴宏？"), GetLang("确认粘贴"))
+    if (!result)
         return
 
     isMenu := CheckIsMenuMacroTable(tableItem.Index)
@@ -756,5 +756,5 @@ OnItemPasteMacroBtnClick(tableItem, foldIndex, *) {
     ; §17 热重载：粘贴宏插入新条目 → 重绑触发键（防索引错位）+ 语音/定时订阅者重建
     HotReloadPublish(tableItem.Index, 0)
 
-    MsgBox(GetLang("已粘贴宏"))
+    RmtDialog.Info(GetLang("已粘贴宏"))
 }

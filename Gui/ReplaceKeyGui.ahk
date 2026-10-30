@@ -102,7 +102,7 @@ class ReplaceKeyGui {
     OnSureBtnClick(state, ctrl, event) {
         isValid := this.CheckConfigValid()
         if (!isValid) {
-            MsgBox(GetLang("当前配置无效,请浏览勾选规则后，检查配置,有异议请联系UP: 浮生若梦的兔子。"))
+            RmtDialog.Info(GetLang("当前配置无效,请浏览勾选规则后，检查配置,有异议请联系UP: 浮生若梦的兔子。"))
             return
         }
         replaceKey := this.GetReplaceKey()

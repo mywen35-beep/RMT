@@ -102,16 +102,19 @@ GI_CollectStates() {
 JoyXInputEx(index := 0) {
     static proc := 0
     if (proc == 0) {
-        for dll in ["xinput1_4.dll", "xinput1_3.dll"] {
+        ; XInput 版本取决于系统/手柄驱动；xinput9_1_0 是很多 Xbox 手柄
+        ; 实际可用的兼容层，不能只尝试 1_4/1_3。
+        for dll in ["xinput1_4.dll", "xinput1_3.dll", "xinput9_1_0.dll", "xinput1_2.dll", "xinput1_1.dll"] {
             hMod := DllCall("GetModuleHandle", "Str", dll, "Ptr")
             if (!hMod)
                 hMod := DllCall("LoadLibrary", "Str", dll, "Ptr")
             if (!hMod)
                 continue
-            proc := DllCall("GetProcAddress", "Ptr", hMod, "Ptr", 100, "Ptr")
+            proc := DllCall("GetProcAddress", "Ptr", hMod, "AStr", "XInputGetState", "Ptr")
             if (proc)
                 break
-            proc := DllCall("GetProcAddress", "Ptr", hMod, "AStr", "XInputGetState", "Ptr")
+            ; 某些旧实现只导出 ordinal 100（含 Guide 位的扩展接口）。
+            proc := DllCall("GetProcAddress", "Ptr", hMod, "Ptr", 100, "Ptr")
             if (proc)
                 break
         }
@@ -121,7 +124,7 @@ JoyXInputEx(index := 0) {
     if (proc == -1)
         return 0
     buf := Buffer(16, 0)
-    if (DllCall(proc, "UInt", index, "Ptr", buf) != 0)
+    if (DllCall(proc, "UInt", index, "Ptr", buf.Ptr) != 0)
         return 0
     lx := Integer(Round(NumGet(buf, 8, "Short") * 100 / 32768))
     ly := Integer(Round(NumGet(buf, 10, "Short") * 100 / 32768))

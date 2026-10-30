@@ -323,12 +323,12 @@ class SearchGui {
 
     CheckIfDataValid() {
         if (!ObjHasOwnProp(this.Data, "SearchImagePath")) {
-            MsgBox(GetLang("这条指令不完整，请删除"))
+            RmtDialog.Info(GetLang("这条指令不完整，请删除"))
             return false
         }
 
         if (this.Data.SearchImagePath != "" && !FileExist(this.Data.SearchImagePath)) {
-            MsgBox(Format("{} {}`n{}", this.Data.SearchImagePath, GetLang("图片不存在"), GetLang(
+            RmtDialog.Info(Format("{} {}`n{}", this.Data.SearchImagePath, GetLang("图片不存在"), GetLang(
                 "如果是软件位置发生改变，请点击若梦兔-配置管理-配置校准")))
             return false
         }
@@ -342,19 +342,19 @@ class SearchGui {
         ey := this.ui.Query("EndPosYCon")
 
         if (!IsNumber(sx) || !IsNumber(sy) || !IsNumber(ex) || !IsNumber(ey)) {
-            MsgBox(GetLang("坐标中请输入数字"))
+            RmtDialog.Info(GetLang("坐标中请输入数字"))
             return false
         }
 
         if (Number(sx) > Number(ex) || Number(sy) > Number(ey)) {
-            MsgBox(GetLang("起始坐标不能大于终止坐标"))
+            RmtDialog.Info(GetLang("起始坐标不能大于终止坐标"))
             return false
         }
 
         curType := this._TypeIndex()
 
         if (curType == 1 && this.Data.SearchImagePath == "") {
-            MsgBox(GetLang("请设置搜索图片"))
+            RmtDialog.Info(GetLang("请设置搜索图片"))
             return false
         }
 
@@ -363,19 +363,19 @@ class SearchGui {
             searchHeight := Number(ey) - Number(sy)
             size := GetImageSize(this.Data.SearchImagePath)
             if (size[1] > searchWidth || size[2] > searchHeight) {
-                MsgBox(GetLang("搜索范围不能小于图片大小"))
+                RmtDialog.Info(GetLang("搜索范围不能小于图片大小"))
                 return false
             }
         }
 
         if (curType == 2 && !RegExMatch(this.ui.Query("HexColorCon"), "^([0-9A-Fa-f]{6})$")) {
-            MsgBox(GetLang("请输入正确的颜色值"))
+            RmtDialog.Info(GetLang("请输入正确的颜色值"))
             return false
         }
 
         if (curType == 3) {
             if (Number(sx) == Number(ex) || Number(sy) == Number(ey)) {
-                MsgBox(GetLang("搜索文本时：搜索范围中起始坐标不能和终止坐标相同"))
+                RmtDialog.Info(GetLang("搜索文本时：搜索范围中起始坐标不能和终止坐标相同"))
                 return false
             }
         }
@@ -532,7 +532,7 @@ class SearchGui {
     OnClickTargeterHelpBtn(*) {
         str := Format("{}`n{}`n{}", GetLang("1.左键拖拽改变位置"), GetLang("2.上下左右方向键微调位置"), GetLang("3.左键双击或回车键关闭取色器，同时确定点位信息"
         ))
-        MsgBox(str, GetLang("定位取色器操作说明"))
+        RmtDialog.Info(str, GetLang("定位取色器操作说明"))
     }
 
     OnScreenShotGetArea(x1, y1, x2, y2) {

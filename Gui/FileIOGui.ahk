@@ -553,7 +553,7 @@ class FileIOGui {
 
     CheckIfValid() {
         if (this.ui.Query("FilePathCombo") == "") {
-            MsgBox("文件路径不能为空")
+            RmtDialog.Info("文件路径不能为空")
             return false
         }
         if (this.ui.Query("ResultRow>Visibility") != "Collapsed") {
@@ -568,7 +568,7 @@ class FileIOGui {
         if (HasExcelRegion) {
             err := CheckExcelRegionBounds(this.ui.Query("RowCombo"), this.ui.Query("ColCombo"), this.ui.Query("RowEndCombo"), this.ui.Query("ColEndCombo"))
             if (err != "") {
-                MsgBox(err)
+                RmtDialog.Info(err)
                 return false
             }
         }
@@ -591,7 +591,7 @@ class FileIOGui {
             if (Res != "") {
                 tip1 := Format(GetLang("变量：{}"), this.Data.SaveName)
                 tip2 := Format(GetLang("值：{}"), Res)
-                MsgBox(tip1 "`n" tip2)
+                RmtDialog.Info(tip1 "`n" tip2)
             }
         }
     }

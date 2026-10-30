@@ -130,7 +130,7 @@ WaitCheckOnce(tableItem, index, Data) {
 ; ---------- 检测辅助 ----------
 
 WaitHwndList(tableItem, index, winInfo) {
-    winInfo := GetReplaceVarText(tableItem, index, winInfo)
+    winInfo := GetReplaceVarText(tableItem, index, ResolveBindWindow(tableItem, index, winInfo))
     return GetHwndList(ResolveBindWindow(tableItem, index, winInfo))
 }
 

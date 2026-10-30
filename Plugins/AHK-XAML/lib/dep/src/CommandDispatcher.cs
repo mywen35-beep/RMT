@@ -33,6 +33,9 @@ using DocumentFormat.OpenXml.Wordprocessing;
 #endif
 public partial class AhkWpfEngine
 {
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowDisplayAffinity(IntPtr hwnd, uint affinity);
+
     bool _maxBtnPressed = false; // HTMAXBUTTON 不走 WPF IsMouseOver/IsPressed，需在 NC 消息里补 hover/按下底
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -618,6 +621,15 @@ public partial class AhkWpfEngine
         }
 
         if (parts.Length < 3) return;
+        // 必须在拥有 HWND 的 WPF 进程调用；取色准星的可拖拽底层不能污染屏幕采样。
+        if (parts[0] == "Window" && parts[1] == "ExcludeFromCapture")
+        {
+            var captureHwnd = new WindowInteropHelper(win).Handle;
+            uint affinity = string.Equals(parts[2], "True", StringComparison.OrdinalIgnoreCase) ? 0x11u : 0u;
+            if (!SetWindowDisplayAffinity(captureHwnd, affinity))
+                throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            return;
+        }
         if (parts[0] == "Window" && parts[1] == "DWM")
         {
             string[] p = parts[2].Split(',');

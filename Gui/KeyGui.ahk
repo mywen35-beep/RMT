@@ -447,13 +447,13 @@ class KeyGui {
         }
 
         if (!IsInteger(this.ui.Query("KeyCountCon")) || Integer(this.ui.Query("KeyCountCon")) <= 0) {
-            MsgBox(GetLang("按键次数必须为大于零的整数！"))
+            RmtDialog.Info(GetLang("按键次数必须为大于零的整数！"))
             return false
         }
 
         if (this._KeyTypeIndex() == 3) {
             if (IsFloat(this.ui.Query("HoldTimeCon")) || this.ui.Query("HoldTimeCon") < 0) {
-                MsgBox(GetLang("按键时间请输入大于0的整数"))
+                RmtDialog.Info(GetLang("按键时间请输入大于0的整数"))
                 return false
             }
         }

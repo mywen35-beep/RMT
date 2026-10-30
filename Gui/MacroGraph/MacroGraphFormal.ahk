@@ -532,7 +532,7 @@ class MacroGraphFormalMixin {
         exStrRow.Add("Button").Name("ExStrEdit_" id).Content(GetLang("编辑")).FontSize(this._MGFontSize(11)).Height("20").Margin("4,0,0,0").Padding("8,0").Cursor("Hand")
 
         ; 窗口信息（窗口类型才显示）
-        this._AddFieldRow(body, "ExWinRow_" id, GetLang("窗口信息："), "ExWin_" id, wi, isWin, true, "", "", "", LW, "226")
+        this._AddFieldRow(body, "ExWinRow_" id, GetLang("窗口绑定："), "ExWin_" id, wi, isWin, true, "", "", "", LW, "226")
 
         ; 起始X | 起始Y
         r := body.Add("StackPanel").Orientation("Horizontal").Margin("0,5,0,0")

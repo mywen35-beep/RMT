@@ -23,8 +23,12 @@
 
     InitWorkFilePath() {
         global VBSPath := A_WorkingDir "\..\MinTool\PlayAudio.vbs"
-        global StartTipAudio := A_WorkingDir "\..\Audio\Start.wav"
-        global EndTipAudio := A_WorkingDir "\..\Audio\End.wav"
+        startCfg := CfgRead(SettingFile, "UserSettings", "StartTipAudio", "")
+        endCfg := CfgRead(SettingFile, "UserSettings", "EndTipAudio", "")
+        stopCfg := CfgRead(SettingFile, "UserSettings", "StopTipAudio", endCfg)
+        global StartTipAudio := (startCfg != "" && FileExist(startCfg)) ? startCfg : A_WorkingDir "\..\Audio\Start.wav"
+        global EndTipAudio := (endCfg != "" && FileExist(endCfg)) ? endCfg : A_WorkingDir "\..\Audio\End.wav"
+        global StopTipAudio := (stopCfg != "" && FileExist(stopCfg)) ? stopCfg : EndTipAudio
         global ViGEmDllPath := A_WorkingDir "\..\Plugins\ViGEm\ViGEmWrapper.dll"
         global AHIDllDir := A_WorkingDir "\..\Plugins\AhiDriver"
         global AHIPluginDir := A_WorkingDir "\..\Plugins\AhiDriver\installer"
@@ -599,9 +603,16 @@ ReloadWorkerConfig() {
         OnTriggerMacroKeyAndInit(tableItem, macro, itemIndex)
     }
 
-    WorkStopMacro(tableItem, itemIndex) {
+    WorkStopMacro(tableItem, itemIndex, playStopTip := false) {
+        if (!IsObject(tableItem))
+            tableItem := GetTableByID(String(tableItem))
+        if (IsObject(tableItem) && !IsNumber(itemIndex))
+            itemIndex := GetItemIndexInTable(tableItem, String(itemIndex))
+        item := IsObject(tableItem) && IsNumber(itemIndex) && itemIndex >= 1 ? tableItem.Items[itemIndex] : ""
         tID := IsObject(tableItem) ? tableItem.ID : String(tableItem)
         iID := WorkResolveItemID(tableItem, itemIndex)
+        if (playStopTip && IsObject(item) && item.StopTipSound == 2)
+            PlayTipSound(3)
         MsgSendHandler("StopMacro", tID, iID)
     }
 

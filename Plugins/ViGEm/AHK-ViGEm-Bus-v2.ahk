@@ -45,7 +45,7 @@ ShowViGEmInstallTip() {
     exePath := A_WorkingDir "\Joy\ViGEmBus.exe"
     JoyDebugLog(Format("ShowViGEmInstallTip enter exePath='{}' exists={}", exePath, FileExist(exePath)), "vigeminstall")
     if (!FileExist(exePath)) {
-        MsgBox(GetLang("未找到 ViGEm 驱动安装程序") "`n" exePath, GetLang("提示"), 48)
+        RmtDialog.Info(GetLang("未找到 ViGEm 驱动安装程序") "`n" exePath, GetLang("提示"), 48)
         return false
     }
 
@@ -84,20 +84,20 @@ class ViGEmWrapper {
             dllPath := ViGEmDllPath
 
             if !FileExist(dllPath) {
-                MsgBox "No se encuentra ViGEmWrapper.dll en:`n" dllPath, "Error", 16
+                RmtDialog.Info("No se encuentra ViGEmWrapper.dll en:`n" dllPath, "Error")
                 ExitApp
             }
 
             try {
                 this.asm := CLR_LoadLibrary(dllPath)
             } catch as err {
-                MsgBox "Error al cargar ViGEmWrapper.dll:`n" err.Message, "Error de carga", 16
+                RmtDialog.Info("Error al cargar ViGEmWrapper.dll:`n" err.Message, "Error de carga")
                 ExitApp
             }
 
             ; Chequeo relajado: solo verifica que no sea vacío/0
             if !this.asm {
-                MsgBox "CLR_LoadLibrary devolvió vacío. Verifica dependencias (ViGEmClient.dll).", "Error", 16
+                RmtDialog.Info("CLR_LoadLibrary devolvió vacío. Verifica dependencias (ViGEmClient.dll).", "Error")
                 ExitApp
             }
 
@@ -119,7 +119,7 @@ class ViGEmWrapper {
             ; ExitApp
             str1 := GetLang("ViGEm创建实例失败,手柄功能无法生效")
             str2 := GetLang("请先安装Joy目录下ViGEmBus.exe后运行软件")
-            MsgBox(Format("{}`n{}", str1, str2))
+            RmtDialog.Info(Format("{}`n{}", str1, str2))
         }
     }
 }

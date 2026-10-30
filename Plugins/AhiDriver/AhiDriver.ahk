@@ -133,7 +133,7 @@ ShowInterceptionInstallTip() {
     ahiDir := GetAHIPluginDir()
     installPs1 := ahiDir "\install.ps1"
     if !FileExist(installPs1) {
-        MsgBox(GetLang("未找到 Interception 安装脚本") "`n" installPs1, GetLang("提示"), 48)
+        RmtDialog.Info(GetLang("未找到 Interception 安装脚本") "`n" installPs1, GetLang("提示"), 48)
         return false
     }
 
@@ -143,9 +143,9 @@ ShowInterceptionInstallTip() {
     cmd := Format('"{1}" -NoProfile -ExecutionPolicy Bypass -File "{2}" -Action install -NoPause', ps, installPs1)
     exitCode := RunWait(cmd, ahiDir)
     if (exitCode = 0) {
-        MsgBox(GetLang("Interception 安装完成，可直接使用 AHI 按键类型"), GetLang("提示"), 64)
+        RmtDialog.Info(GetLang("Interception 安装完成，可直接使用 AHI 按键类型"), GetLang("提示"), 64)
     } else {
-        MsgBox(GetLang("Interception 安装失败，可手动运行 Plugins/AhiDriver/installer/安装卸载.bat"), GetLang("提示"), 48)
+        RmtDialog.Info(GetLang("Interception 安装失败，可手动运行 Plugins/AhiDriver/installer/安装卸载.bat"), GetLang("提示"), 48)
     }
     return true
 }
@@ -171,7 +171,7 @@ InitAHI() {
         AHI_Driver.SetState(false)
         return true
     } catch as err {
-        MsgBox(
+        RmtDialog.Info(
             "❌ AHI 驱动加载失败！`n`n"
             "错误信息: " err.Message "`n`n"
             "请检查：`n"

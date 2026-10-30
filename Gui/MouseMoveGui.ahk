@@ -27,6 +27,7 @@ class MouseMoveGui {
         this.Init(cmd)
         if (!XamlWin.Open(this.ui, "", XamlWin.Owner(this)))
             this._closed := true
+        ShowMousePreviewButton(this.ui)
         this.ToggleFunc(true)
     }
 
@@ -65,11 +66,11 @@ class MouseMoveGui {
         body.Add("TextBlock").Grid_Row(0).Grid_ColumnSpan(4).Name("MousePosCon").Text(GetLang("当前鼠标位置:0,0")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
 
         ; 行1：坐标位置X/Y
-        body.Add("TextBlock").Grid_Row(1).Grid_Column(0).Text(GetLang("坐标位置X:")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
+        body.Add("TextBlock").Grid_Row(1).Grid_Column(0).Name("PosXLabel").Text(GetLang("坐标位置X:")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
         body.Add("TextBox").Grid_Row(1).Grid_Column(1).Name("PosXCon").Height(26).MinHeight(26).VerticalContentAlignment("Center").FontSize("11").Padding("4,0")
             .Background("{DynamicResource InputBg}").Foreground("{DynamicResource InputText}")
             .BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
-        body.Add("TextBlock").Grid_Row(1).Grid_Column(2).Text(GetLang("坐标位置Y:")).VerticalAlignment("Center").Margin("10,0,0,0").Foreground("{DynamicResource TextMain}").FontSize("12")
+        body.Add("TextBlock").Grid_Row(1).Grid_Column(2).Name("PosYLabel").Text(GetLang("坐标位置Y:")).VerticalAlignment("Center").Margin("10,0,0,0").Foreground("{DynamicResource TextMain}").FontSize("12")
         body.Add("TextBox").Grid_Row(1).Grid_Column(3).Name("PosYCon").Height(26).MinHeight(26).Margin("10,0,0,0").VerticalContentAlignment("Center").FontSize("11").Padding("4,0")
             .Background("{DynamicResource InputBg}").Foreground("{DynamicResource InputText}")
             .BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
@@ -181,15 +182,15 @@ class MouseMoveGui {
 
     CheckIfValid() {
         if (!IsNumber(this.ui.Query("PosXCon"))) {
-            MsgBox(GetLang("坐标X请输入数字"))
+            RmtDialog.Info(GetLang("坐标X请输入数字"))
             return false
         }
         if (!IsNumber(this.ui.Query("PosYCon"))) {
-            MsgBox(GetLang("坐标Y请输入数字"))
+            RmtDialog.Info(GetLang("坐标Y请输入数字"))
             return false
         }
         if (!IsInteger(this.ui.Query("SpeedCon"))) {
-            MsgBox(GetLang("移动速度请输入整数"))
+            RmtDialog.Info(GetLang("移动速度请输入整数"))
             return false
         }
         return true
@@ -199,6 +200,8 @@ class MouseMoveGui {
         if (!IsObject(this.ui))
             return
         MoveMode := this._MoveMode()
+        this.ui.Update("PosXLabel", "Text", GetLang(MoveMode == 1 ? "偏移值X:" : "坐标位置X:"))
+        this.ui.Update("PosYLabel", "Text", GetLang(MoveMode == 1 ? "偏移值Y:" : "坐标位置Y:"))
         CommandStr := GetLang("移动")
         CommandStr .= "_" this.ui.Query("PosXCon")
         CommandStr .= "_" this.ui.Query("PosYCon")

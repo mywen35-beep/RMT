@@ -279,6 +279,11 @@ CheckFrontWindowActive(frontInfoStr) {
     if (frontInfoStr == "")
         return true
 
+    if (IsMouseWindowBinding(frontInfoStr)) {
+        MouseGetPos , , &hwnd
+        return hwnd != 0 && WinActive("ahk_id " hwnd)
+    }
+
     ; 句柄ID格式：❖hwnd1|hwnd2|...
     if (InStr(frontInfoStr, "❖")) {
         hwndList := StrSplit(StrReplace(frontInfoStr, "❖"), "|")
@@ -785,9 +790,11 @@ OnMMProOnce(tableItem, index, Data) {
     if (MoveMode == 2)
         return MouseMoveGameViewByKeyMode(keyMode, PosX, PosY, Speed)
 
-    isDrag := Data.ActionType == 4
+    ; 动作 4 为 A 到 B 拖拽（旧配置兼容），动作 5 为绝对模式下从当前鼠标位置拖到目标点。
+    isDrag := Data.ActionType == 4 || Data.ActionType == 5
+    isABDrag := Data.ActionType == 4
     EndX := 0, EndY := 0
-    if (isDrag && MoveMode == 0) {
+    if (isABDrag && MoveMode == 0) {
         if (!TryGetTabVarValue(&EndX, tableItem, index, Data.HasOwnProp("EndPosVarX") ? Data.EndPosVarX : 200)
             || !TryGetTabVarValue(&EndY, tableItem, index, Data.HasOwnProp("EndPosVarY") ? Data.EndPosVarY : 200))
             return
@@ -811,10 +818,16 @@ OnMMProOnce(tableItem, index, Data) {
         }
     }
 
-    if (isDrag)
+    if (isDrag) {
+        if (Data.ActionType == 5 && MoveMode == 0) {
+            CoordMode("Mouse", "Screen")
+            MouseGetPos(&startX, &startY)
+            return MouseDragByStrategy(keyMode, MoveMode, startX, startY, PosX, PosY, Speed, IsHumanMouse)
+        }
         return MouseDragByStrategy(keyMode, MoveMode, PosX, PosY, EndX, EndY, Speed, IsHumanMouse)
+    }
 
-    ; ActionType: 1 移动 | 2 单击 | 3 双击 | 4 拖拽
+    ; ActionType: 1 移动 | 2 单击 | 3 双击 | 4 A 到 B 拖拽 | 5 普通拖拽
     clickCount := (Data.ActionType == 1) ? 0 : (Data.ActionType == 2 ? 1 : 2)
     MouseMoveByStrategy(keyMode, MoveMode, PosX, PosY, Speed, clickCount, IsHumanMouse)
 }
@@ -857,7 +870,8 @@ OnDeltaMove(tableItem, cmd, index) {
             return
         dX := GetFloatValue(dX, MainSoftData.CoordXFloat)
         dY := GetFloatValue(dY, MainSoftData.CoordYFloat)
-        MouseMoveGameViewByKeyMode(keyMode, dX, dY, 100)
+        ; DeltaX/DeltaY 是本次总偏移，按次数拆成等量步骤执行。
+        MouseMoveGameViewByKeyMode(keyMode, dX / cnt, dY / cnt, 100)
 
         if (A_Index != cnt) {
             hasInterval := TryGetTabVarValue(&iv, tableItem, index, interval)
@@ -1059,7 +1073,7 @@ OnSubMacro(tableItem, cmd, index) {
         MySetItemPauseState(macroTableID, targetItemID, 0)
     }
     else if (Data.CallType == "终止") {  ;终止
-        MyStopMacro(macroTableID, targetItemID)
+        MyStopMacro(macroTableID, targetItemID, true)
     }
 }
 
@@ -1783,7 +1797,7 @@ OnBootStartChanged(ctrl, *) {
         MainSoftData.IsBootStart := !MainSoftData.IsBootStart
         try MyMainWin.ui.Update("ChkBootStart", "IsChecked", MainSoftData.IsBootStart ? "True" : "False")
         CfgWrite(MainSoftData.IsBootStart ? 1 : 0, SettingFile, SettingSection, "IsBootStart")
-        MsgBox(GetLang("开机自启设置失败，请检查是否被安全软件拦截，或勿通过兼容性强制管理员运行。"), GetLang("提示"), 48)
+        RmtDialog.Info(GetLang("开机自启设置失败，请检查是否被安全软件拦截，或勿通过兼容性强制管理员运行。"), GetLang("提示"), 48)
     }
 }
 
@@ -1960,7 +1974,7 @@ OnWindowManage(tableItem, cmd, index) {
     paramArr := StrSplit(cmd, "_")
     Data := GetMacroCMDData(paramArr[1])
 
-    searchValue := GetReplaceVarText(tableItem, index, Data.SearchValue)
+    searchValue := GetReplaceVarText(tableItem, index, ResolveBindWindow(tableItem, index, Data.SearchValue))
     winTitle := GetParamsWinInfoStr(searchValue)
     if (winTitle == "")
         return
@@ -2242,8 +2256,7 @@ OnScreenShot(tableItem, cmd, index) {
     }
 
     if (Data.ScreenShotType == 2) {
-        winInfo := GetReplaceVarText(tableItem, index, Data.WinInfo)
-        winInfo := ResolveBindWindow(tableItem, index, winInfo)   ; §22 绑定窗口替换
+        winInfo := GetReplaceVarText(tableItem, index, ResolveBindWindow(tableItem, index, Data.WinInfo))
         if (winInfo == "") {
             ShotDebugLog("窗口抓图：窗口信息为空，已终止")
             return

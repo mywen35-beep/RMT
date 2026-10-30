@@ -115,7 +115,7 @@ class WindowManageGui {
         ; 行1：窗口信息
         wiRow := body.Add("Grid").Grid_Row(1).Grid_ColumnSpan(5)
         wiRow.Cols("108", "*", "8", "70")
-        wiRow.Add("TextBlock").Grid_Column(0).Text(GetLang("窗口信息:")).VerticalAlignment("Center")
+        wiRow.Add("TextBlock").Grid_Column(0).Text(GetLang("窗口绑定:")).VerticalAlignment("Center")
         wiRow.Add("TextBox").Grid_Column(1).Name("SearchValueCon").Height(26).MinHeight(26).MaxHeight(26).VerticalAlignment("Center")
             .VerticalContentAlignment("Center").Padding("2,0")
             .Background("{DynamicResource InputBg}").Foreground("{DynamicResource InputText}")
@@ -246,13 +246,13 @@ class WindowManageGui {
     CheckIfValid() {
         actionType := IsObject(this.ui) ? this.ui.Query("ActionTypeCon") : ""
         if (this.ui.Query("SearchValueCon") == "") {
-            MsgBox(GetLang("目标窗口信息不能为空"))
+            RmtDialog.Info(GetLang("窗口绑定不能为空"))
             return false
         }
 
         if (actionType == GetLang("修改标题")) {
             if (this.ui.Query("NewTitleCon") == "") {
-                MsgBox(GetLang("新标题不能为空！"), "", "Owner" this.Hwnd())
+                RmtDialog.Info(GetLang("新标题不能为空！"), "", "Owner" this.Hwnd())
                 return false
             }
         }

@@ -3,7 +3,7 @@
 SelfCheckMissingFiles() {
     ; 带 F 后缀的测试版（如 1.2F23）无对应资源 tag，不提供自动下载
     if (RegExMatch(RMT_VERSION, "i)\d+\.\d+F")) {
-        MsgBox(GetLang("带 F 后缀的测试版本不支持文件校验自动下载") "`n"
+        RmtDialog.Info(GetLang("带 F 后缀的测试版本不支持文件校验自动下载") "`n"
             . GetLang("资源仓库仅对应正式版本 tag（如 v1.2_x64）"), GetLang("RMT 资源自检"), 64)
         return
     }
@@ -96,7 +96,7 @@ SelfCheckMissingFiles() {
 
     totalMissing := allMissing.Length
     if (totalMissing == 0) {
-        MsgBox(GetLang("资源文件校验通过，未发现缺失文件"), GetLang("RMT 资源自检"), 64)
+        RmtDialog.Info(GetLang("资源文件校验通过，未发现缺失文件"), GetLang("RMT 资源自检"), 64)
         return
     }
 
@@ -115,13 +115,13 @@ SelfCheckMissingFiles() {
     tipMsg := "检测到 " totalMissing " 个资源文件缺失`n" detailStr "`n`n" fileListStr "`n版本：" tag "`n点击【是】从 GitHub 自动下载`n点击【否】跳过（部分功能可能不可用）"
 
     btnStyle := missingCritical.Length > 0 ? (4 + 256 + 48) : (4 + 256 + 64)
-    result := MsgBox(tipMsg, "RMT 资源自检", btnStyle)
-    if (result != "Yes") {
+    result := RmtDialog.Confirm(tipMsg, "RMT 资源自检")
+    if (!result) {
         if (missingCritical.Length > 0) {
             criticalNames := ""
             for item in missingCritical
                 criticalNames .= item[2] "`n"
-            MsgBox("以下关键文件缺失，软件可能无法正常运行：`n`n" criticalNames "`n`n请在QQ群 837661891 或者项目仓库寻求帮助", "RMT 警告", 16)
+            RmtDialog.Info("以下关键文件缺失，软件可能无法正常运行：`n`n" criticalNames "`n`n请在QQ群 837661891 或者项目仓库寻求帮助", "RMT 警告", 16)
         }
         return
     }
@@ -204,7 +204,7 @@ SelfCheckMissingFiles() {
         cancelMsg := "下载已取消。`n已成功下载 " successCount "/" total " 个文件。`n可再次点击「文件校验」继续下载。"
         if (stillCritical)
             cancelMsg .= "`n`n存在关键文件未下载完成，软件可能无法正常工作。`n`n请在QQ群 837661891 或者项目仓库寻求帮助"
-        MsgBox(cancelMsg, "RMT 资源自检", 64)
+        RmtDialog.Info(cancelMsg, "RMT 资源自检", 64)
         return
     }
 
@@ -219,10 +219,10 @@ SelfCheckMissingFiles() {
             }
         }
         iconType := stillCritical ? 16 : 48
-        MsgBox("下载完成：成功 " successCount "/" total "`n`n以下文件下载失败（可能是网络问题）：`n" failStr, "RMT 资源自检", iconType)
+        RmtDialog.Info("下载完成：成功 " successCount "/" total "`n`n以下文件下载失败（可能是网络问题）：`n" failStr, "RMT 资源自检", iconType)
 
         if (stillCritical) {
-            MsgBox("存在关键文件下载失败，软件可能无法正常工作。`n`n请检查网络连接后重启软件重试。`n`n如仍无法解决，请在QQ群 837661891 或者项目仓库寻求帮助", "RMT 警告", 16)
+            RmtDialog.Info("存在关键文件下载失败，软件可能无法正常工作。`n`n请检查网络连接后重启软件重试。`n`n如仍无法解决，请在QQ群 837661891 或者项目仓库寻求帮助", "RMT 警告", 16)
         }
     }
 }

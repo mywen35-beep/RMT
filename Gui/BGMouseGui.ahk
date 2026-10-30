@@ -101,7 +101,7 @@ class BGMouseGui {
             .BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
 
         ; 行1：窗口信息
-        body.Add("TextBlock").Grid_Row(1).Grid_Column(0).Text(GetLang("窗口信息:")).VerticalAlignment("Center")
+        body.Add("TextBlock").Grid_Row(1).Grid_Column(0).Text(GetLang("窗口绑定:")).VerticalAlignment("Center")
             .Foreground("{DynamicResource TextMain}").FontSize("12").ToolTip(this._BGHelpText())
         body.Add("TextBox").Grid_Row(1).Grid_Column(1).Grid_ColumnSpan(2).Name("TargetTitleCon").Height(26).MinHeight(26)
             .VerticalContentAlignment("Center").FontSize("11").Padding("4,0")
@@ -340,7 +340,7 @@ class BGMouseGui {
 
     CheckIfValid() {
         if (this.ui.Query("TargetTitleCon") == "") {
-            MsgBox(GetLang("目标窗口信息不能为空"))
+            RmtDialog.Info(GetLang("窗口绑定不能为空"))
             return false
         }
         return true
@@ -348,7 +348,7 @@ class BGMouseGui {
 
     TriggerMacro(state := "", ctrl := "", event := "") {
         if (!IsNumber(this.ui.Query("PosVarX")) || !IsNumber(this.ui.Query("PosVarY"))) {
-            MsgBox(GetLang("坐标中存在变量，无法在编辑器模式下执行指令"))
+            RmtDialog.Info(GetLang("坐标中存在变量，无法在编辑器模式下执行指令"))
             return
         }
         this.SaveBGMouseData()

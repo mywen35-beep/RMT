@@ -531,6 +531,9 @@ class XAMLHost {
             if (t != "")
                 f1Tip := StrReplace(t, "F1:", "F1：")
         }
+        ; 双点编辑与路径预览分开显示：编辑按钮在定位类按钮最左侧，预览按钮保留原图标。
+        chrome.PointEdit := XAMLHost.AddTitleChromeBtn(chrome.Btns, "BtnCmdPointEdit", titleHeight, Chr(0xE8A7), "Collapsed", "{StaticResource TitleBarChromeButton}", cmdBtnW, glyphSize)
+        chrome.Preview := XAMLHost.AddTitleChromeBtn(chrome.Btns, "BtnCmdPreview", titleHeight, Chr(0xE890), "Collapsed", "{StaticResource TitleBarChromeButton}", cmdBtnW, glyphSize)
         chrome.F1 := XAMLHost.AddTitleChromeBtn(chrome.Btns, "BtnCmdF1", titleHeight, Chr(0xECAF), "Collapsed", "{StaticResource TitleBarChromeButton}", cmdBtnW, glyphSize)
         chrome.F1.ToolTip(f1Tip)
         f2Tip := "F2：截图"
@@ -551,11 +554,10 @@ class XAMLHost {
         chrome.F3.ToolTip(f3Tip)
         tgtTip := "定位取色器"
         try tgtTip := GetLang("定位取色器")
-        chrome.Targeter := XAMLHost.AddTitleChromeBtn(chrome.Btns, "BtnCmdTargeter", titleHeight, Chr(0xE707), "Collapsed", "{StaticResource TitleBarChromeButton}", cmdBtnW, glyphSize)
-        chrome.Targeter.ToolTip(tgtTip)
         playTip := "Alt + L：执行"
         try playTip := CmdEditorPlayTip("!l")
-        chrome.Preview := XAMLHost.AddTitleChromeBtn(chrome.Btns, "BtnCmdPreview", titleHeight, Chr(0xE890), "Collapsed", "{StaticResource TitleBarChromeButton}", cmdBtnW, glyphSize)
+        chrome.Targeter := XAMLHost.AddTitleChromeBtn(chrome.Btns, "BtnCmdTargeter", titleHeight, Chr(0xE707), "Collapsed", "{StaticResource TitleBarChromeButton}", cmdBtnW, glyphSize)
+        chrome.Targeter.ToolTip(tgtTip)
         chrome.Play := XAMLHost.AddTitleChromeBtn(chrome.Btns, "BtnCmdPlay", titleHeight, Chr(0xE768), "Collapsed", "{StaticResource TitleBarChromeButton}", cmdBtnW, glyphSize)
         chrome.Play.ToolTip(playTip)
         chrome.Help := XAMLHost.AddTitleChromeBtn(chrome.Btns, "BtnCmdHelp", titleHeight, Chr(0xE8F1), "Visible", "{StaticResource TitleBarChromeButton}", cmdBtnW, glyphSize)
@@ -575,7 +577,7 @@ class XAMLHost {
         if (!macroStyle) {
             try chrome.Btns.VerticalAlignment("Stretch")
             sq := cmdBtnW
-            for btn in [chrome.F1, chrome.F2, chrome.F3, chrome.Targeter, chrome.Preview, chrome.Play, chrome.Help, chrome.Video] {
+            for btn in [chrome.PointEdit, chrome.Preview, chrome.F1, chrome.F2, chrome.F3, chrome.Targeter, chrome.Play, chrome.Help, chrome.Video] {
                 try btn.Width(sq).MinWidth(sq).Height(sq).MinHeight(sq).VerticalAlignment("Center").Margin("0")
             }
             ; 关闭钮贴齐标题栏右上角：全高 Stretch + TitleBarCloseButton 圆角，hover 才贴窗口弧
@@ -994,7 +996,7 @@ class XAMLHost {
 
     static _SyncEditorTitleGlyphs(host, glyphSize) {
         gs := String(glyphSize)
-        for name in ["BtnClosePanelGlyph", "BtnMinimizeGlyph", "BtnMaximizeGlyph", "BtnPinGlyph", "BtnCmdF1Glyph", "BtnCmdF2Glyph", "BtnCmdF3Glyph", "BtnCmdTargeterGlyph", "BtnCmdPlayGlyph", "BtnCmdHelpGlyph", "BtnCmdVideoGlyph"] {
+        for name in ["BtnClosePanelGlyph", "BtnMinimizeGlyph", "BtnMaximizeGlyph", "BtnPinGlyph", "BtnCmdPointEditGlyph", "BtnCmdPreviewGlyph", "BtnCmdF1Glyph", "BtnCmdF2Glyph", "BtnCmdF3Glyph", "BtnCmdTargeterGlyph", "BtnCmdPlayGlyph", "BtnCmdHelpGlyph", "BtnCmdVideoGlyph"] {
             try host.Update(name, "FontSize", gs)
         }
         iconFs := InStr(host.xaml, 'Name="MacroEditorTitle"') ? "20" : "14"
@@ -1004,7 +1006,7 @@ class XAMLHost {
     static _SyncCmdChromeCentered(host) {
         w := String(XAMLHost.CmdChromeBtnWidth())
         h := String(XAMLHost.CmdTitleBarHeight())
-        for name in ["BtnCmdF1", "BtnCmdF2", "BtnCmdF3", "BtnCmdTargeter", "BtnCmdPlay", "BtnCmdHelp", "BtnCmdVideo"] {
+        for name in ["BtnCmdPointEdit", "BtnCmdPreview", "BtnCmdF1", "BtnCmdF2", "BtnCmdF3", "BtnCmdTargeter", "BtnCmdPlay", "BtnCmdHelp", "BtnCmdVideo"] {
             try host.Update(name, "Width", w)
             try host.Update(name, "MinWidth", w)
             try host.Update(name, "Height", w)
@@ -1024,7 +1026,7 @@ class XAMLHost {
 
     static _SyncChromeBtnWidth(host, w) {
         ws := String(w)
-        for name in ["BtnClosePanel", "BtnCmdF1", "BtnCmdF2", "BtnCmdF3", "BtnCmdTargeter", "BtnCmdPlay", "BtnCmdHelp", "BtnCmdVideo"] {
+        for name in ["BtnClosePanel", "BtnCmdPointEdit", "BtnCmdPreview", "BtnCmdF1", "BtnCmdF2", "BtnCmdF3", "BtnCmdTargeter", "BtnCmdPlay", "BtnCmdHelp", "BtnCmdVideo"] {
             try host.Update(name, "Width", ws)
             try host.Update(name, "MinWidth", ws)
             try host.Update(name, "Margin", "0")

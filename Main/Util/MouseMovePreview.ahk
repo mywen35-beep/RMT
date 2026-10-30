@@ -2,12 +2,25 @@
 
 ; Preview reads unsaved editor values and draws only; it never saves or sends input.
 BindMouseMovePreview(ui, kind) {
+    ; 预览按钮同时承担路径预览与双点编辑，保留一个入口避免两个按钮状态分裂。
+    ui.Update("BtnCmdPointEdit", "Visibility", "Collapsed")
     ui.Update("BtnCmdPreview", "Visibility", "Visible")
     ui.Update("BtnCmdPreview", "ToolTip", GetLang("预览移动路径"))
+    ; 标题栏按钮在 XAML 窗口真正加载后再补一次可见性，避免预加载 BatchUpdate 被模板初值覆盖。
+    SetTimer(() => ShowMousePreviewButton(ui), -1)
     ui.OnEvent("BtnCmdPreview", "Click", (*) => PreviewMouseMovement(ui, kind))
 }
 
+ShowMousePreviewButton(ui) {
+    if (!IsObject(ui))
+        return
+    try ui.Update("BtnCmdPointEdit", "Visibility", "Collapsed")
+    try ui.Update("BtnCmdPreview", "Visibility", "Visible")
+    try ui.Update("BtnCmdPreview", "ToolTip", GetLang("预览移动路径"))
+}
+
 PreviewMouseMovement(ui, kind) => MouseMovePreview.Toggle(ui, kind)
+PreviewMousePath(ui, kind) => MouseMovePreview.TogglePath(ui, kind)
 
 ; Read all editor values in one IPC request. Timer refreshes do not show modal errors
 ; while the user is in the middle of typing a coordinate.
@@ -23,20 +36,21 @@ ReadMousePreview(ui, kind, cx, cy, notify := false) {
         mode := state.Get("MouseMoveModeCombo>SelectedIndex", 0)
         if (kind == "pro") {
             x := state.Get("PosVarX", ""), y := state.Get("PosVarY", "")
-            action := state.Get("ActionTypeCombo>SelectedIndex", 0) + 1
+            actionIdx := state.Get("ActionTypeCombo>SelectedIndex", 0)
+            action := (mode == 0 && actionIdx == 3) ? 5 : ((mode == 0 && actionIdx == 4) ? 4 : actionIdx + 1)
             if (action == 4 && mode == 0)
                 endX := state.Get("EndPosVarX", ""), endY := state.Get("EndPosVarY", "")
             if (mode == 0 && state.Get("RefCombo>SelectedIndex", 0) == 1) {
                 hwnds := GetHwndList(GetLangKey(state.Get("WinInfoCon", "")))
                 if (!IsObject(hwnds) || hwnds.Length == 0) {
                     if (notify)
-                        MsgBox(GetLang("预览未找到目标窗口。"))
+                        RmtDialog.Info(GetLang("预览未找到目标窗口。"))
                     return ""
                 }
                 try WinGetPos(&wx, &wy, , , "ahk_id " hwnds[1])
                 catch {
                     if (notify)
-                        MsgBox(GetLang("预览未找到目标窗口。"))
+                        RmtDialog.Info(GetLang("预览未找到目标窗口。"))
                     return ""
                 }
             }
@@ -47,7 +61,7 @@ ReadMousePreview(ui, kind, cx, cy, notify := false) {
     for value in [x, y, endX, endY, count] {
         if (!IsNumber(value)) {
             if (notify)
-                MsgBox(GetLang("预览需要数值坐标和次数，请先将变量替换为数值。"))
+                RmtDialog.Info(GetLang("预览需要数值坐标和次数，请先将变量替换为数值。"))
             return ""
         }
     }
@@ -62,12 +76,16 @@ ReadMousePreview(ui, kind, cx, cy, notify := false) {
 MousePreviewPoints(kind, x, y, cx, cy, mode := 0, action := 1, endX := 0, endY := 0, count := 1, wx := 0, wy := 0) {
     if (kind == "delta") {
         steps := Max(1, Integer(count)), dx := Integer(x), dy := Integer(y)
-        return {X1: cx, Y1: cy, X2: cx + dx*steps, Y2: cy + dy*steps, StepX: dx, StepY: dy, Steps: steps}
+        ; 增量值表示本次总偏移，次数只决定分成多少个等量步骤。
+        stepX := dx / steps, stepY := dy / steps
+        return {X1: cx, Y1: cy, X2: cx + dx, Y2: cy + dy, StepX: stepX, StepY: stepY, Steps: steps}
     }
     if (mode == 1)
         return {X1: cx, Y1: cy, X2: cx + Integer(x), Y2: cy + Integer(y)}
     if (kind == "pro" && action == 4)
         return {X1: Round(wx + x), Y1: Round(wy + y), X2: Round(wx + endX), Y2: Round(wy + endY)}
+    if (kind == "pro" && action == 5)
+        return {X1: cx, Y1: cy, X2: Round(wx + x), Y2: Round(wy + y)}
     return {X1: cx, Y1: cy, X2: Round(wx + x), Y2: Round(wy + y)}
 }
 
@@ -81,9 +99,77 @@ class MouseMovePreview {
     static Revision := 0
     static LastPathKey := ""
     static LastPath := []
+    static LastEditFrame := ""
     static RefreshTimer := ObjBindMethod(MouseMovePreview, "Refresh")
+    static EditHandles := []
+    static EditTimer := ObjBindMethod(MouseMovePreview, "RefreshEditHandles")
+    static EditMode := false
+    static DragIndex := 0
+    static DragOffsetX := 0
+    static DragOffsetY := 0
 
     static Toggle(ui, kind) {
+        ; 相对位移与 A 到 B 拖拽进入双点编辑：再次点击同一按钮提交点位。
+        if (this.Editor == ui && this.EditMode) {
+            this.CommitEdit()
+            return
+        }
+        if (this.Editor == ui) {
+            this.Clear()
+            return
+        }
+        this.Clear()
+        this.Editor := ui, this.Kind := kind
+        CoordMode("Mouse", "Screen")
+        MouseGetPos(&cx, &cy)
+        this.OriginX := cx, this.OriginY := cy
+        ; 三种移动编辑器都支持双点编辑：绝对移动/普通拖拽以当前点到目标点显示，
+        ; 相对位移和 A 到 B 拖拽则把两点结果写回对应字段。
+        if (this.StartEdit(ui, kind))
+            return
+        if (!this.Refresh(true)) {
+            this.Clear()
+            return
+        }
+        SetTimer(this.RefreshTimer, 300)
+    }
+
+    static Clear(ui := "") {
+        ; A different editor closing must not dismiss the current editor's preview.
+        if (IsObject(ui) && this.Editor != ui)
+            return
+        SetTimer(this.RefreshTimer, 0)
+        SetTimer(this.EditTimer, 0)
+        this.DestroyEditHandles()
+        this.EditMode := false
+        this.DragIndex := 0
+        this.LastEditFrame := ""
+        this.Revision += 1
+        if (IsObject(this.Editor))
+            this.SetButton(false)
+        this.Editor := "", this.Kind := "", this.LastFrame := ""
+        this.LastPathKey := "", this.LastPath := []
+        this.HideOverlay()
+    }
+
+    static StartEdit(ui, kind) {
+        points := ReadMousePreview(ui, kind, this.OriginX, this.OriginY, true)
+        if (!IsObject(points))
+            return false
+        this.Editor := ui, this.Kind := kind, this.EditMode := true
+        this.LastFrame := ""
+        this.EditPoints := [{x: points.X1, y: points.Y1}, {x: points.X2, y: points.Y2}]
+        this.CreateEditHandles()
+        this.Show(points, this.Palette())
+        this.SetButton(true)
+        this.Editor.Update("BtnCmdPreview", "ToolTip", GetLang("再次点击确定点位"))
+        SetTimer(this.EditTimer, 60)
+        return true
+    }
+
+    static TogglePath(ui, kind) {
+        if (this.Editor == ui && this.EditMode)
+            return
         if (this.Editor == ui) {
             this.Clear()
             return
@@ -100,17 +186,133 @@ class MouseMovePreview {
         SetTimer(this.RefreshTimer, 300)
     }
 
-    static Clear(ui := "") {
-        ; A different editor closing must not dismiss the current editor's preview.
-        if (IsObject(ui) && this.Editor != ui)
+    static CreateEditHandles() {
+        this.DestroyEditHandles()
+        handleSize := 44
+        halfSize := handleSize // 2
+        for point in this.EditPoints {
+            h := Gui("+AlwaysOnTop -Caption +ToolWindow -DPIScale")
+            ; 使用透明的大点击区域；可见圆点由下方主题色预览层绘制，确保箭头连接圆心。
+            h.BackColor := "FFFFFF"
+            t := h.AddText("x0 y0 w" handleSize " h" handleSize " Center", " ")
+            t.OnEvent("Click", ObjBindMethod(this, "OnEditHandleClick"))
+            h.Show("NA x" (point.x - halfSize) " y" (point.y - halfSize) " w" handleSize " h" handleSize)
+            ; 使用低透明度窗口而不是颜色键透明：颜色键会让鼠标穿透到桌面，拖拽时触发系统框选。
+            try WinSetTransparent(1, h.Hwnd)
+            this.EditHandles.Push(h)
+        }
+    }
+
+    static DestroyEditHandles() {
+        for h in this.EditHandles
+            try h.Destroy()
+        this.EditHandles := []
+    }
+
+    static OnEditHandleClick(ctrl, info := "", *) {
+        ; 句柄窗口是无标题透明窗口，直接发送 HTCAPTION 在部分系统/缩放下不会开始拖动。
+        ; 实际拖动由 RefreshEditHandles 按鼠标按下状态接管，Click 事件只负责兼容点击。
+        return
+    }
+
+    static RefreshEditHandles(*) {
+        if (!this.EditMode || this.EditHandles.Length < 2)
             return
-        SetTimer(this.RefreshTimer, 0)
-        this.Revision += 1
-        if (IsObject(this.Editor))
-            this.SetButton(false)
-        this.Editor := "", this.Kind := "", this.LastFrame := ""
-        this.LastPathKey := "", this.LastPath := []
-        this.HideOverlay()
+        ; 拖动时提高刷新频率，松开后恢复较低频率，减少 IPC 与重绘开销。
+        SetTimer(this.EditTimer, GetKeyState("LButton", "P") ? 15 : 60)
+        ; 轮询按键状态并直接移动句柄窗口，避免透明无标题窗口的系统拖动消息不可靠。
+        CoordMode("Mouse", "Screen")
+        MouseGetPos(&mx, &my)
+        if (GetKeyState("LButton", "P")) {
+            if (!this.DragIndex) {
+                for i, point in this.EditPoints {
+                    if (Abs(mx - point.x) <= 28 && Abs(my - point.y) <= 28) {
+                        this.DragIndex := i
+                        this.DragOffsetX := mx - point.x
+                        this.DragOffsetY := my - point.y
+                        break
+                    }
+                }
+            }
+            if (this.DragIndex) {
+                dragHwnd := this.EditHandles[this.DragIndex].Hwnd
+                try WinMove(mx - this.DragOffsetX - 22, my - this.DragOffsetY - 22, , , "ahk_id " dragHwnd)
+            }
+        } else {
+            this.DragIndex := 0
+        }
+        for i, h in this.EditHandles {
+            try WinGetPos(&x, &y, &w, &hgt, "ahk_id " h.Hwnd)
+            catch
+                continue
+            this.EditPoints[i].x := x + 22, this.EditPoints[i].y := y + 22
+        }
+        p1 := this.EditPoints[1], p2 := this.EditPoints[2]
+        editFrame := p1.x "," p1.y "," p2.x "," p2.y
+        if (editFrame == this.LastEditFrame)
+            return
+        this.LastEditFrame := editFrame
+        if (this.Kind == "delta") {
+            count := this.Editor.Query("CountCon")
+            count := IsNumber(count) && Number(count) > 0 ? Number(count) : 1
+            ; 编辑框保存本次总偏移，执行时再按次数拆分。
+            this.Editor.Update("DeltaXCon", "Text", String(Round(p2.x - p1.x)))
+            this.Editor.Update("DeltaYCon", "Text", String(Round(p2.y - p1.y)))
+        } else if (this.Kind == "move") {
+            mode := this.Editor.Query("MouseMoveModeCombo>SelectedIndex")
+            if (mode == 1) {
+                this.Editor.Update("PosXCon", "Text", String(Round(p2.x - p1.x)))
+                this.Editor.Update("PosYCon", "Text", String(Round(p2.y - p1.y)))
+            } else {
+                this.Editor.Update("PosXCon", "Text", String(Round(p2.x)))
+                this.Editor.Update("PosYCon", "Text", String(Round(p2.y)))
+            }
+        } else {
+            mode := this.Editor.Query("MouseMoveModeCombo>SelectedIndex")
+            actionIdx := this.Editor.Query("ActionTypeCombo>SelectedIndex")
+            if (mode == 1) {
+                this.Editor.Update("PosVarX", "Text", String(Round(p2.x - p1.x)))
+                this.Editor.Update("PosVarY", "Text", String(Round(p2.y - p1.y)))
+                this.Show({X1: p1.x, Y1: p1.y, X2: p2.x, Y2: p2.y}, this.Palette())
+                return
+            }
+            ; 普通绝对移动/普通拖拽只需要目标点；A 到 B 拖拽写入两点。
+            if (actionIdx == 4) {
+                this.Editor.Update("PosVarX", "Text", String(Round(p1.x)))
+                this.Editor.Update("PosVarY", "Text", String(Round(p1.y)))
+            }
+            ox := 0, oy := 0
+            if (this.Editor.Query("RefCombo>SelectedIndex") == 1) {
+                try {
+                    hwnds := GetHwndList(GetLangKey(this.Editor.Query("WinInfoCon")))
+                    if (IsObject(hwnds) && hwnds.Length)
+                        WinGetPos(&ox, &oy, , , "ahk_id " hwnds[1])
+                }
+            }
+            if (actionIdx != 4) {
+                this.Editor.Update("PosVarX", "Text", String(Round(p2.x - ox)))
+                this.Editor.Update("PosVarY", "Text", String(Round(p2.y - oy)))
+            } else {
+                this.Editor.Update("PosVarX", "Text", String(Round(p1.x - ox)))
+                this.Editor.Update("PosVarY", "Text", String(Round(p1.y - oy)))
+            }
+            this.Editor.Update("EndPosVarX", "Text", String(Round(p2.x - ox)))
+            this.Editor.Update("EndPosVarY", "Text", String(Round(p2.y - oy)))
+        }
+        preview := {X1: p1.x, Y1: p1.y, X2: p2.x, Y2: p2.y}
+        if (this.Kind == "delta") {
+            count := this.Editor.Query("CountCon")
+            count := IsNumber(count) && Number(count) > 0 ? Integer(count) : 1
+            preview.Steps := count
+            preview.StepX := (p2.x - p1.x) / count
+            preview.StepY := (p2.y - p1.y) / count
+        }
+        this.Show(preview, this.Palette())
+    }
+
+    static CommitEdit() {
+        this.RefreshEditHandles()
+        this.Clear(this.Editor)
     }
 
     static HideOverlay() {
@@ -123,7 +325,8 @@ class MouseMovePreview {
         try {
             this.Editor.Update("BtnCmdPreview", "Background", enabled ? "$Theme:ActionBg" : "Transparent")
             this.Editor.Update("BtnCmdPreview", "Foreground", enabled ? "$Theme:ActionText" : "$Theme:TitleBarForeground")
-            this.Editor.Update("BtnCmdPreview", "ToolTip", GetLang(enabled ? "关闭指令预览" : "预览移动路径"))
+            tipKey := enabled ? (this.EditMode ? "再次点击确定点位" : "关闭指令预览") : "预览移动路径"
+            this.Editor.Update("BtnCmdPreview", "ToolTip", GetLang(tipKey))
         }
     }
 
@@ -162,6 +365,7 @@ class MouseMovePreview {
         if (frame != this.LastFrame) {
             this.Show(points, palette)
             this.LastFrame := frame
+            ; 预览和双点编辑都属于按钮的开启状态，均保持选中背景。
             this.SetButton(true)
         }
         return true
@@ -201,6 +405,20 @@ class MouseMovePreview {
                         break
                 }
             }
+            ; 先绘制端点和增量中间点，再绘制线与箭头，保证箭头层级在圆点之上。
+            Gdip_DrawEllipse(g, outline, x1-11, y1-11, 22, 22)
+            Gdip_FillEllipse(g, brush, x1-11, y1-11, 22, 22)
+            Gdip_DrawEllipse(g, outline, x2-11, y2-11, 22, 22)
+            Gdip_FillEllipse(g, brush, x2-11, y2-11, 22, 22)
+            if (p.HasOwnProp("Steps")) {
+                range := MousePreviewVisibleSteps(p, left, top, width, height)
+                loop Max(0, range.Last - range.First + 1) {
+                    step := range.First + A_Index - 1
+                    px := x1 + p.StepX * step, py := y1 + p.StepY * step
+                    Gdip_DrawEllipse(g, outline, px-4, py-4, 8, 8)
+                    Gdip_FillEllipse(g, brush, px-4, py-4, 8, 8)
+                }
+            }
             length := Sqrt(dx*dx + dy*dy)
             if (length > 0) {
                 ux := dx/length, uy := dy/length
@@ -217,19 +435,6 @@ class MouseMovePreview {
                     Gdip_DrawLine(g, linePen, bx, by, x2, y2)
                 }
             }
-            if (p.HasOwnProp("Steps")) {
-                range := MousePreviewVisibleSteps(p, left, top, width, height)
-                loop Max(0, range.Last - range.First + 1) {
-                    step := range.First + A_Index - 1
-                    px := x1 + p.StepX * step, py := y1 + p.StepY * step
-                    Gdip_DrawEllipse(g, outline, px-3, py-3, 6, 6)
-                    Gdip_FillEllipse(g, brush, px-3, py-3, 6, 6)
-                }
-            }
-            Gdip_DrawEllipse(g, outline, x1-5, y1-5, 10, 10)
-            Gdip_FillEllipse(g, brush, x1-5, y1-5, 10, 10)
-            ; A ring also marks a zero-length move.
-            Gdip_DrawEllipse(g, pen, x2-8, y2-8, 16, 16)
             if (!IsObject(this.Overlay))
                 this.Overlay := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x08080020 -DPIScale")
             this.Overlay.Show("NA x" left " y" top " w" width " h" height)
@@ -256,7 +461,10 @@ class MouseMovePreview {
 
 ; Skip only off-screen steps; retain every visible step even for very large counts.
 MousePreviewVisibleSteps(p, left, top, width, height) {
-    first := 1, last := p.Steps
+    ; 终点单独绘制大圆，这里只返回真正的中间落点。
+    first := 1, last := Max(0, p.Steps - 1)
+    if (last < first)
+        return {First: 1, Last: 0}
     for axis in [{Origin: p.X1, Delta: p.StepX, Low: left-7, High: left+width+7},
         {Origin: p.Y1, Delta: p.StepY, Low: top-7, High: top+height+7}] {
         if (axis.Delta == 0) {

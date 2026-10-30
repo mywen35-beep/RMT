@@ -835,7 +835,7 @@ class MacroGraphGui {
                     this.ui.Update("MPPosX_" id, "Text", GetLang(data.PosVarX))
                     this.ui.Update("MPPosY_" id, "Text", GetLang(data.PosVarY))
                     this.ui.Update("MPSpeed_" id, "Text", data.Speed)
-                    this.ui.Update("MPActionCmb_" id, "SelectedIndex", this._MMProActionIndex(data.ActionType))
+                    this.ui.Update("MPActionCmb_" id, "SelectedIndex", this._MMProActionIndex(data.ActionType, data.MouseMoveMode))
                     this.ui.Update("MPModeCmb_" id, "SelectedIndex", this._MoveModeIndex(data.MouseMoveMode))
                     this.ui.Update("MPHuman_" id, "IsChecked", (ObjHasOwnProp(data, "IsHumanMouse") && (data.IsHumanMouse == 1 || data.IsHumanMouse == "1")) ? "True" : "False")
                     this.ui.Update("MPCount_" id, "Text", ObjHasOwnProp(data, "Count") ? data.Count : 1)

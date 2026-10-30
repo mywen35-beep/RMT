@@ -302,6 +302,11 @@ class JoyPickerHook {
         z := ""
         if (IsObject(ahk) && ahk.HasProp("trigAxis") && IsNumber(ahk.trigAxis))
             z := Integer(ahk.trigAxis)
+        ; Xbox/XInput 的 LT、RT 是两根独立扳机轴。若同时存在 AHK
+        ; DirectInput 设备，JoyZ 常会返回中位值 50；不能让这个中位值
+        ; 覆盖 XInput 的真实 LT/RT，否则自动选择和宏触发都会失效。
+        if (IsObject(xi))
+            z := ""
         tr := JoyPickerHook._ResolveSharedTrigger(gi.lt, gi.rt, z)
         gi.lt := tr.ltVal
         gi.rt := tr.rtVal

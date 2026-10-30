@@ -331,9 +331,15 @@ class MacroGraphHandlersMixin {
     }
 
     ; 鼠标动作编号(1/2/3/4) -> 下拉项索引
-    _MMProActionIndex(at) {
-        if (at == "4" || at == 4)
+    _MMProActionIndex(at, mode := 1) {
+        if (mode == 0) {
+            if (at == "4" || at == 4)
+                return 4
+            if (at == "5" || at == 5)
+                return 3
+        } else if (at == "4" || at == 4) {
             return 3
+        }
         if (at == "2" || at == 2)
             return 1
         if (at == "3" || at == 3)
@@ -342,9 +348,11 @@ class MacroGraphHandlersMixin {
     }
 
     ; 下拉项文本 -> 鼠标动作编号(1=移动 2=移动后单击 3=移动后双击 4=拖拽)
-    _MMProActionFromText(text) {
-        if (text == GetLang("拖拽"))
+    _MMProActionFromText(text, mode := 1) {
+        if (text == GetLang("A到B拖拽"))
             return 4
+        if (text == GetLang("拖拽"))
+            return mode == 0 ? 5 : 4
         if (text == GetLang("移动后单击") || text == GetLang("移动点击1次"))
             return 2
         if (text == GetLang("移动后双击") || text == GetLang("移动点击2次"))
@@ -421,15 +429,20 @@ class MacroGraphHandlersMixin {
     }
 
     ; 从引擎当前选中项解析鼠标动作编号(1/2/3/4)：SelectedIndex 优先
-    _MMProActionFromState(key, state, fallback := 1) {
+    _MMProActionFromState(key, state, fallback := 1, mode := 1) {
         idx := this._ComboSelectedIndex(key)
-        if (idx >= 0 && idx <= 3)
+        if (idx >= 0 && idx <= (mode == 0 ? 4 : 3)) {
+            if (mode == 0 && idx == 3)
+                return 5
+            if (mode == 0 && idx == 4)
+                return 4
             return idx + 1
+        }
         txt := this._ComboText(key, state)
         if (txt != "")
-            return this._MMProActionFromText(txt)
+            return this._MMProActionFromText(txt, mode)
         fb := Integer(fallback)
-        return (fb >= 1 && fb <= 4) ? fb : 1
+        return (fb >= 1 && fb <= 5) ? fb : 1
     }
 
     ; 鼠标动作下拉变更
@@ -438,7 +451,7 @@ class MacroGraphHandlersMixin {
         if (data == "")
             return
         key := "MPActionCmb_" id
-        data.ActionType := this._MMProActionFromState(key, state, data.ActionType)
+        data.ActionType := this._MMProActionFromState(key, state, data.ActionType, data.MouseMoveMode)
         SaveMacroCMDData(data)
         this._MMProApply()
     }
@@ -450,14 +463,29 @@ class MacroGraphHandlersMixin {
             return
         key := "MPModeCmb_" id
         data.MouseMoveMode := Integer(this._MoveModeFromState(key, state, data.MouseMoveMode))
+        ; 普通拖拽只存在于绝对模式；切换到相对模式时沿用拖拽动作编号 4。
+        if (data.MouseMoveMode == 1 && data.ActionType == 5)
+            data.ActionType := 4
         if (data.MouseMoveMode == 2) {
             data.ActionType := 1
             data.Speed := 100
             data.IsHumanMouse := 0
         }
         SaveMacroCMDData(data)
+        this._RefreshMMProActionItems(id, data)
         this._RefreshMMProVisibility(id)
         this._MMProApply()
+    }
+
+    _RefreshMMProActionItems(id, data) {
+        if (this.ui == "")
+            return
+        mode := Integer(data.MouseMoveMode)
+        items := mode == 0 ? ["移动", "移动后单击", "移动后双击", "拖拽", "A到B拖拽"] : ["移动", "移动后单击", "移动后双击", "拖拽"]
+        this.ui.Update("MPActionCmb_" id, "ClearItems", "")
+        for it in GetLangArr(items)
+            this.ui.Update("MPActionCmb_" id, "AddItem", it)
+        this.ui.Update("MPActionCmb_" id, "SelectedIndex", this._MMProActionIndex(data.ActionType, mode))
     }
 
     ; 启用拟真轨迹勾选：勾选后强制动作=移动并禁用动作/方式下拉（与 MMProGui 一致）；若处于游戏视角则切回相对移动
@@ -515,7 +543,7 @@ class MacroGraphHandlersMixin {
             this.ui.Update("MPActionCmb_" id, "IsEnabled", "False")
         }
         else {
-            actionIdx := this._MMProActionIndex(ObjHasOwnProp(data, "ActionType") ? data.ActionType : 1)
+            actionIdx := this._MMProActionIndex(ObjHasOwnProp(data, "ActionType") ? data.ActionType : 1, data.MouseMoveMode)
             this.ui.Update("MPActionCmb_" id, "SelectedIndex", actionIdx)
             this.ui.Update("MPActionCmb_" id, "IsEnabled", "True")
         }
@@ -534,9 +562,18 @@ class MacroGraphHandlersMixin {
             this.ui.Update("MPHuman_" id, "IsChecked", "False")
             this.ui.Update("MPHuman_" id, "IsEnabled", "False")
         }
+
         else {
             this.ui.Update("MPHuman_" id, "IsEnabled", "True")
         }
+
+        ; 坐标行：A 到 B 拖拽需要终止点，普通绝对拖拽只需要目标点。
+        isABDrag := !isGameView && data.MouseMoveMode == 0 && data.ActionType == 4
+        isSimpleDrag := !isGameView && data.MouseMoveMode == 0 && data.ActionType == 5
+        this.ui.Update("MPEndXRow_" id, "Visibility", isABDrag ? "Visible" : "Collapsed")
+        this.ui.Update("MPEndYRow_" id, "Visibility", isABDrag ? "Visible" : "Collapsed")
+        this.ui.Update("MPPosXRow_" id "Label", "Text", GetLang(isABDrag ? "起始坐标X:" : (isSimpleDrag ? "目标点：" : (data.MouseMoveMode == 1 ? "偏移值" : "坐标位置X:"))))
+        this.ui.Update("MPPosYRow_" id "Label", "Text", GetLang(isABDrag || isSimpleDrag || data.MouseMoveMode == 1 ? "" : "坐标位置Y:"))
 
         ; 移动次数 / 每次间隔：仅游戏视角显示；同步控件值
         this.ui.Update("MPCount_" id, "Text", ObjHasOwnProp(data, "Count") ? data.Count : "1")
@@ -1745,12 +1782,15 @@ class MacroGraphHandlersMixin {
             data.%field% := val
             dirty := true
         }
+        midx := this._ComboSelectedIndex("MPModeCmb_" id)
+        if (midx < 0 || midx > 1)
+            midx := Integer(data.MouseMoveMode)
         aidx := this._ComboSelectedIndex("MPActionCmb_" id)
-        if (aidx >= 0 && aidx <= 3) {
-            data.ActionType := aidx + 1
+        if (aidx >= 0 && aidx <= (midx == 0 ? 4 : 3)) {
+            data.ActionType := (midx == 0 && aidx == 3) ? 5 : ((midx == 0 && aidx == 4) ? 4 : aidx + 1)
             dirty := true
         } else if (this._InlineVal(state, "MPActionCmb_" id, &actTxt)) {
-            data.ActionType := this._MMProActionFromText(actTxt)
+            data.ActionType := this._MMProActionFromText(actTxt, midx)
             dirty := true
         }
         midx := this._ComboSelectedIndex("MPModeCmb_" id)

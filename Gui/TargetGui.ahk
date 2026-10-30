@@ -1,147 +1,155 @@
 ﻿#Requires AutoHotkey v2.0
 
+; XAML 准星：窗口中心即采样点，中心留空，避免将定位标记采进预览。
 class TargetGui {
-    __new() {
+    __New() {
         this.Gui := ""
-
-        this.GuiWidth := 64
-        this.GuiHeight := 64
-
+        this.ui := ""
         this.SureAction := ""
         this._hkIds := []
         this._lbuttonCb := ""
+        this.active := false
+        this._tick := ObjBindMethod(this, "_Refresh")
     }
 
-    Hwnd() {
-        return IsObject(this.Gui) ? this.Gui.Hwnd : 0
-    }
+    Hwnd() => IsObject(this.ui) ? this.ui.wpfHwnd : 0
 
     ShowGui() {
-        if (this.Gui != "") {
-            this.Gui.Show()
-        }
-        else {
-            this.AddGui()
-        }
-        MyColorPanel.SureAction := this.SureAction
-        MyColorPanel.ShowGui()
-        ; 注册方向键热键（目标窗口活动期间有效）
-        if (this._hkIds.Length == 0) {
-            this._hkIds := WinHotkey.Register(["Left", "Right", "Up", "Down"], ObjBindMethod(this, "_OnHotkey"))
-        }
-        ; 订阅 LButton 热键（目标窗口活动期间有效）
-        if (!this._lbuttonCb) {
-            this._lbuttonCb := ObjBindMethod(this, "_OnLButton")
-            WinHotkey.SubscribeMouse("LButton", this._lbuttonCb)
-        }
+        if (this.active)
+            return
+        ; XAML 事件中延后建窗，避免嵌套 CREATE_WINDOW。
+        SetTimer(ObjBindMethod(this, "_Open"), -1)
     }
 
-    HideGui() {
-        if (this._hkIds.Length > 0) {
-            WinHotkey.UnregisterAll(this._hkIds)
-            this._hkIds := []
-        }
-        if (this._lbuttonCb) {
-            WinHotkey.UnsubscribeMouse("LButton", this._lbuttonCb)
-            this._lbuttonCb := ""
+    _Open(*) {
+        if (this.active)
+            return
+        this.active := true
+        try {
+            CoordMode("Mouse", "Screen")
+            MouseGetPos(&startX, &startY)
+            this.startX := startX, this.startY := startY
+            this.AddGui()
+            MyColorPanel.SureAction := this.SureAction
+            MyColorPanel.ShowGui()
+            this._hkIds := WinHotkey.Register(["Left", "Right", "Up", "Down", "Enter", "Escape"], ObjBindMethod(this, "_OnHotkey"))
+            SetTimer(this._tick, 60)
+        } catch as err {
+            MyColorPanel.OnClose()
+            RmtDialog.Info(err.Message, GetLang("定位取色器"))
         }
     }
 
     AddGui() {
-        this.Gui := Gui("+AlwaysOnTop +ToolWindow -Caption -Resize -DPIScale")
-        this.Gui.Title := "RMT-Target"
-        this.Gui.SetFont("S13 W550 Q2", MainSoftData.FontType)
-        this.Gui.MarginX := 0
-        this.Gui.MarginY := 0
-        this.Gui.BackColor := "EEAA99" ; 这个颜色必须设置，但具体是什么颜色不重要
-        WinSetTransColor("EEAA99", this.Gui)
-        this.Gui.Add("Pic", Format("w{} h{}", 64, 64), "Images\Soft\Target.png")
-
-        this.OverlayCon := this.Gui.Add("Text", "x0 y0 w" this.GuiWidth " h" this.GuiHeight " BackgroundTrans")
-        this.OverlayCon.OnEvent("Click", this.GuiDrag.Bind(this))
-        this.OverlayCon.OnEvent("DoubleClick", this.GuiDoubleClick.Bind(this))
-        this.Gui.Show(Format("w{} h{}", this.GuiWidth, this.GuiHeight))
+        win := ColorPanelGui.Window("RMT-Target", 72)
+        win.Height(72).Cursor("SizeAll")
+        canvas := win.Add("ContentControl").Name("DragArea").Add("Canvas").Width(72).Height(72).Background("#01000000")
+        ; 三层描边：黑白轮廓保证对比度，主题主色突出准星。1/255 的底层让空白区域也能拖动。
+        for index, stroke in ["#FF111827", "#FFFFFFFF", "{DynamicResource ActionBg}"] {
+            thick := index == 1 ? 9 : index == 2 ? 7 : 4
+            canvas.Add("Ellipse").Width(40).Height(40).Canvas_Left(16).Canvas_Top(16).Stroke(stroke).StrokeThickness(thick)
+            for p in [[36, 3, 36, 22], [36, 50, 36, 69], [3, 36, 22, 36], [50, 36, 69, 36]]
+                canvas.Add("Line").X1(p[1]).Y1(p[2]).X2(p[3]).Y2(p[4]).Stroke(stroke).StrokeThickness(thick)
+        }
+        this.ui := XAMLHost(win.ToString(), "", WinExist("A"))
+        this.ui.skipFontScale := true
+        this.ui.OnEvent("Window", "LoadedHwnd", ObjBindMethod(this, "_Loaded"))
+        this.ui.OnEvent("Window", "Closing", (*) => MyColorPanel.OnClose())
+        this.ui.OnEvent("DragArea", "MouseDoubleClick", ObjBindMethod(this, "GuiDoubleClick"))
+        XamlWin.QueueTheme(this.ui)
+        this.ui.Update("Window", "ExcludeFromCapture", "True")
+        this.ui.Show()
+        this.Gui := GuiAdapter(this.ui)
     }
 
-    ; 拖动函数
+    _Loaded(*) {
+        if (!this.active)
+            return
+        hwnd := this.Hwnd()
+        WinGetPos(, , &w, &h, hwnd)
+        WinMove(this.startX - Round(w / 2), this.startY - Round(h / 2), , , hwnd)
+        this.ui.Update("Window", "Opacity", "1")
+    }
+
     GuiDrag(*) {
-        PostMessage(0xA1, 2, , , this.Gui)
-        MyColorPanel.RefreshCoord()
+        if (this.active && this.Hwnd())
+            PostMessage(0xA1, 2, , , this.Hwnd())
     }
 
-    OnLButtonUp(*) {
-        this._OnLButton()
+    GetPoint(&x, &y) {
+        WinGetPos(&left, &top, &w, &h, this.Hwnd())
+        x := left + Round(w / 2)
+        y := top + Round(h / 2)
     }
 
-    _OnLButton(*) {
-        if (this.Gui == "")
+    _Refresh(*) {
+        if (!this.active || !this.Hwnd() || !IsObject(MyColorPanel.ui) || !MyColorPanel.ui.wpfHwnd)
             return
-        style := WinGetStyle(this.Gui.Hwnd)
-        isVisible := (style & 0x10000000)  ; 0x10000000 = WS_VISIBLE
-        if (!isVisible)
-            return
-
-        MyColorPanel.RefreshCoord()
-        MyColorPanel.RefreshMapImage()
+        try {
+            this.GetPoint(&x, &y)
+            ; 面板仅首次定位，用户拖动后保持当前位置。
+            MyColorPanel.RefreshCoord()
+            MyColorPanel.RefreshMapImage()
+        }
     }
 
     _OnHotkey(key) {
-        if (this.Gui == "")
+        if (!this.active)
             return
-        style := WinGetStyle(this.Gui.Hwnd)
-        isVisible := (style & 0x10000000)
-        if (!isVisible)
+        if (key == "Escape") {
+            MyColorPanel.OnClose()
             return
-
-        this.Gui.GetPos(&x, &y, &w, &h)
-        if (key == "Left")
-            x -= 1
-        else if (key == "Right")
-            x += 1
-        else if (key == "Up")
-            y -= 1
-        else if (key == "Down")
-            y += 1
-        else
+        }
+        if (key == "Enter") {
+            MyColorPanel.GuiDoubleClick()
             return
-
-        this.Gui.Move(x, y)
-        MyColorPanel.RefreshCoord()
-        MyColorPanel.RefreshMapImage()
+        }
+        hwnd := this.Hwnd()
+        if (!hwnd)
+            return
+        WinGetPos(&x, &y, &w, &h, hwnd)
+        dx := key == "Left" ? -1 : key == "Right" ? 1 : 0
+        dy := key == "Up" ? -1 : key == "Down" ? 1 : 0
+        this.GetPoint(&px, &py)
+        ; 物理像素微调，不受显示缩放影响，支持负坐标副屏。
+        if (px + dx < SysGet(76) || px + dx >= SysGet(76) + SysGet(78)
+            || py + dy < SysGet(77) || py + dy >= SysGet(77) + SysGet(79))
+            return
+        WinMove(x + dx, y + dy, , , hwnd)
+        this._Refresh()
     }
 
-    ;双击确定关闭
-    GuiDoubleClick(*) {
-        if (this.Gui == "")
+    ResetPosition(*) {
+        if (!this.active || !this.Hwnd())
             return
-        style := WinGetStyle(this.Gui.Hwnd)
-        isVisible := (style & 0x10000000)  ; 0x10000000 = WS_VISIBLE
-        if (!isVisible)
-            return
-
-        MyColorPanel.GuiDoubleClick()
+        ; 点击复位时以信息面板所在的显示器为准，包括负坐标副屏。
+        WinGetPos(&px, &py, &pw, &ph, MyColorPanel.ui.wpfHwnd)
+        cx := px + pw / 2, cy := py + ph / 2
+        monitor := MonitorGetPrimary()
+        loop MonitorGetCount() {
+            MonitorGet(A_Index, &l, &t, &r, &b)
+            if (cx >= l && cx < r && cy >= t && cy < b) {
+                monitor := A_Index
+                break
+            }
+        }
+        MonitorGet(monitor, &l, &t, &r, &b)
+        WinGetPos(, , &w, &h, this.Hwnd())
+        WinMove(Round((l + r) / 2) - Round(w / 2), Round((t + b) / 2) - Round(h / 2), , , this.Hwnd())
+        this._Refresh()
+    }
+    HideGui() {
+        this.active := false
+        SetTimer(this._tick, 0)
+        WinHotkey.UnregisterAll(this._hkIds)
+        this._hkIds := []
+        ui := this.ui
+        this.ui := ""
+        this.Gui := ""
+        if IsObject(ui)
+            try ui.Update("Window", "Close", "")
     }
 
-    OnArrowKeyDown(key) {
-        if (this.Gui == "")
-            return
-        style := WinGetStyle(this.Gui.Hwnd)
-        isVisible := (style & 0x10000000)  ; 0x10000000 = WS_VISIBLE
-        if (!isVisible)
-            return
-
-        this.Gui.GetPos(&x, &y, &w, &h)
-        if (key == "left")
-            x -= 1
-        if (key == "right")
-            x += 1
-        if (key == "up")
-            y -= 1
-        if (key == "down")
-            y += 1
-
-        this.Gui.Move(x, y)
-        MyColorPanel.RefreshCoord()
-        MyColorPanel.RefreshMapImage()
-    }
+    GuiDoubleClick(*) => MyColorPanel.GuiDoubleClick()
+    OnArrowKeyDown(key) => this._OnHotkey(key)
 }

@@ -237,7 +237,7 @@ class WaitConfirmGui {
     CheckIfValid() {
         timeout := this.ui.Query("TimeoutCon")
         if (timeout != "" && (!IsNumber(timeout) || Number(timeout) < 0)) {
-            MsgBox(GetLang("超时请输入大于等于0的数字（毫秒）"))
+            RmtDialog.Info(GetLang("超时请输入大于等于0的数字（毫秒）"))
             return false
         }
         return true

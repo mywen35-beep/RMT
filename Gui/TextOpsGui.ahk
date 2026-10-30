@@ -575,19 +575,19 @@ class TextOpsGui {
     CheckIfValid() {
         if (this._TypeText() == GetLang("文本替换")) {
             if (this.ui.Query("SearchCon") == "") {
-                MsgBox(GetLang("搜索文本不能为空"))
+                RmtDialog.Info(GetLang("搜索文本不能为空"))
                 return false
             }
         }
         if (this._TypeText() == GetLang("文本分割")) {
             if (this.ui.Query("ArgsNameCon") == "") {
-                MsgBox(GetLang("类型参数不能为空"))
+                RmtDialog.Info(GetLang("类型参数不能为空"))
                 return false
             }
         }
         if (this._TypeText() == GetLang("文本提取")) {
             if (this._ArgsTypeText() == GetLang("正则匹配") && this.ui.Query("ArgsNameCon") == "") {
-                MsgBox(GetLang("正则表达式不能为空"))
+                RmtDialog.Info(GetLang("正则表达式不能为空"))
                 return false
             }
         }
@@ -608,7 +608,7 @@ class TextOpsGui {
         if (Res != "") {
             tip1 := Format(GetLang("变量：{}"), this.Data.SaveName)
             tip2 := Format(GetLang("值：{}"), Res)
-            MsgBox(tip1 "`n" tip2)
+            RmtDialog.Info(tip1 "`n" tip2)
         }
     }
 

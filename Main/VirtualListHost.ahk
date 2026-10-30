@@ -214,7 +214,7 @@ class VirtualListHost {
         if (isTiming)
             return ""
         tkStr := FormatHotkeyDisplay(MySoftData.FormatJoyTriggerKey(item.TK))
-        if (tkStr == "" && CheckIsNormalTable(t))
+        if (tkStr == "" && (CheckIsNormalTable(t) || GetTableSymbol(t) == "Replace"))
             return ""
         return tkStr == "" ? GetLang("编辑") : tkStr
     }
@@ -272,6 +272,10 @@ class VirtualListHost {
             else if (IsObject(MyMainWin) && action != "Setting")
                 MyMainWin.SelectSideTreeItem(t, idx, false)
             switch action {
+                case "TKBtnKeyboard": OnTriggerEntry(tableItem, idx, false, "keyboard")
+                case "TKBtnJoy": OnTriggerEntry(tableItem, idx, false, "joy")
+                case "FoldTKEditKeyboard": OnTriggerEntry(tableItem, idx, true, "keyboard")
+                case "FoldTKEditJoy": OnTriggerEntry(tableItem, idx, true, "joy")
                 case "TKBtn": this._EditTK(tableItem, idx, event)
                 case "TKBtnR":
                     ; §23 网络宏：右键触发键列 = 直接复制单次 URL；其余表保持自定义触发串

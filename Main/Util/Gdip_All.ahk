@@ -1094,7 +1094,7 @@ Gdip_DrawLines(pGraphics, pPen, points)
 		coords := StrSplit(point, ",")
 		if (coords.Length != 2) {
 			if (coords.Length > 0) {
-				MsgBox("Skipping wrong points of length " coords.Length)
+				RmtDialog.Info("Skipping wrong points of length " coords.Length)
 			}
 			continue
 		}

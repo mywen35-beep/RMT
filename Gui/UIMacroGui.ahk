@@ -82,8 +82,10 @@ class UIMacroGui {
         tableItem := GetTableBySymbol("UI")
         if (!tableItem)
             return ""
+        if (!tableItem.Folds.Has(foldIndex))
+            return ""
         fold := tableItem.Folds[foldIndex]
-        if (!fold)
+        if (!fold || fold.ForbidState)
             return ""
         return { tableItem: tableItem, fold: fold, items: GetFoldItems(tableItem, fold) }
     }
@@ -101,7 +103,7 @@ class UIMacroGui {
 
         btnItems := []
         for i, item in ctx.items {
-            if (item.Forbid)
+            if (ParseBoolInt(item.Forbid))
                 continue
 
             remarkValue := item.Remark
@@ -178,7 +180,7 @@ class UIMacroGui {
 
         btnItems := []
         for i, item in ctx.items {
-            if (item.Forbid)
+            if (ParseBoolInt(item.Forbid))
                 continue
 
             remarkValue := item.Remark

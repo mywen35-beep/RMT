@@ -21,6 +21,7 @@ class MMProGui {
         this.PosAction := () => this.RefreshMousePos()
         this._posTarget := "PosVar"
         this._syncing := false   ; 程序初始化/刷新配置时抑制 SelectionChanged/Click 递归
+        this._actionMode := -1   ; 动作下拉已构建的移动方式，避免每次 SelectionChanged 重建导致闪烁
     }
 
     ShowGui(cmd) {
@@ -29,6 +30,7 @@ class MMProGui {
         if (IsObject(this.ui) && !this._closed)
             this._CloseWindow()
         this._BuildAndShow()
+        this._actionMode := -1
         
         if (this.OwnerHwnd != "" && MainSoftData.IsModalSubGui) {
             try SafeGuiFromHwnd(this.OwnerHwnd).Opt("+Disabled")
@@ -45,6 +47,7 @@ class MMProGui {
         }
         if (!XamlWin.Open(this.ui, "", XamlWin.Owner(this)))
             this._closed := true
+        ShowMousePreviewButton(this.ui)
         this.ToggleFunc(true)
         
     }
@@ -121,7 +124,7 @@ class MMProGui {
         ; 行2：窗口信息（坐标基准=窗口时显示）
         winRow := body.Add("Grid").Name("WinInfoRow").Grid_Row(2).Grid_ColumnSpan(4).Visibility("Hidden")
         winRow.Cols("90", "130", "110", "150")
-        winRow.Add("TextBlock").Grid_Column(0).Text(GetLang("窗口信息：")).VerticalAlignment("Center")
+        winRow.Add("TextBlock").Grid_Column(0).Text(GetLang("窗口绑定：")).VerticalAlignment("Center")
             .Foreground("{DynamicResource TextMain}").FontSize("12")
         winRow.Add("TextBox").Grid_Column(1).Grid_ColumnSpan(2).Name("WinInfoCon").Height(26).MinHeight(26)
             .VerticalContentAlignment("Center").FontSize("11").Padding("4,0")
@@ -143,7 +146,7 @@ class MMProGui {
         act := body.Add("ComboBox").Grid_Row(3).Grid_Column(3).Name("ActionTypeCombo").Height(26).MinHeight(26).Margin("20,0,0,0")
             .VerticalContentAlignment("Center").FontSize("11")
             .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}").BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
-        for a in GetLangArr(["移动", "移动后单击", "移动后双击", "拖拽"])
+        for a in GetLangArr(["移动", "移动后单击", "移动后双击", "拖拽", "A到B拖拽"])
             act.Add("ComboBoxItem").Content(a)
 
         ; 行4：坐标X/Y（绝对=坐标位置，相对=坐标偏移）
@@ -266,7 +269,17 @@ class MMProGui {
         return IsNumber(v) ? Integer(v) : 0
     }
 
-    _TypeValue() => this._SelIndex("ActionTypeCombo") + 1
+    _TypeValue() {
+        idx := this._SelIndex("ActionTypeCombo")
+        ; 绝对移动的第 4 项是普通拖拽（动作 5），第 5 项才是旧的 A 到 B 拖拽（动作 4）。
+        if (this._MoveMode() == 0) {
+            if (idx == 3)
+                return 5
+            if (idx == 4)
+                return 4
+        }
+        return idx + 1
+    }
     _MoveMode() => this._SelIndex("MouseMoveModeCombo")
     _RefMode() => this._SelIndex("RefCombo")
 
@@ -285,7 +298,7 @@ class MMProGui {
         this._SetCombo("PosVarY", this.DLVariableArr, GetLang(this.Data.PosVarY))
         this._SetCombo("EndPosVarX", this.DLVariableArr, GetLang(this.Data.HasOwnProp("EndPosVarX") ? this.Data.EndPosVarX : 200))
         this._SetCombo("EndPosVarY", this.DLVariableArr, GetLang(this.Data.HasOwnProp("EndPosVarY") ? this.Data.EndPosVarY : 200))
-        this.ui.Update("ActionTypeCombo", "SelectedIndex", String(this.Data.ActionType - 1))
+        this._RefreshActionItems(this.Data.ActionType)
 
         MoveMode := 0
         if (ObjHasOwnProp(this.Data, "MouseMoveMode"))
@@ -311,16 +324,16 @@ class MMProGui {
         if (!this.CheckIfValid())
             return
         if (!IsNumber(this.ui.Query("PosVarX"))) {
-            MsgBox(GetLang("坐标X是变量时，编辑模式下无法执行"))
+            RmtDialog.Info(GetLang("坐标X是变量时，编辑模式下无法执行"))
             return
         }
         if (!IsNumber(this.ui.Query("PosVarY"))) {
-            MsgBox(GetLang("坐标Y是变量时，编辑模式下无法执行"))
+            RmtDialog.Info(GetLang("坐标Y是变量时，编辑模式下无法执行"))
             return
         }
         if (this._TypeValue() == 4 && this._MoveMode() == 0
             && (!IsNumber(this.ui.Query("EndPosVarX")) || !IsNumber(this.ui.Query("EndPosVarY")))) {
-            MsgBox(GetLang("终止坐标是变量时，编辑模式下无法执行"))
+            RmtDialog.Info(GetLang("终止坐标是变量时，编辑模式下无法执行"))
             return
         }
         this.SaveMMProData()
@@ -349,7 +362,7 @@ class MMProGui {
             return
         frontCtrl := CtrlAdapter("WinInfoCon", this.ui, "Text")
         MyFrontInfoGui.SureAction := () => this.OnRefChange()
-        MyFrontInfoGui.ShowGui(frontCtrl, true)
+        MyFrontInfoGui.ShowGui(frontCtrl)
     }
 
     CheckIfValid() {
@@ -384,14 +397,49 @@ class MMProGui {
         if (this._syncing || !IsObject(this.ui))
             return
         isRel := this._MoveMode() == 1
-        isDrag := this._TypeValue() == 4 && !isRel
-        this.ui.Update("EndPosRow", "Visibility", isDrag ? "Visible" : "Collapsed")
-        ; 拖拽时右侧坐标框靠近 X 框，保留 20px 间距；其他动作恢复原位。
-        this.ui.Update("PosVarY", "Margin", isDrag ? "-90,0,0,0" : "20,0,0,0")
-        if (!isDrag)
+        action := this._TypeValue()
+        isABDrag := action == 4 && !isRel
+        isTargetPoint := !isRel && !isABDrag
+        this._RefreshActionItems(action)
+        this.ui.Update("EndPosRow", "Visibility", isABDrag ? "Visible" : "Collapsed")
+        ; A 到 B 拖拽显示起点和终点；其他绝对移动统一显示目标点 X/Y。
+        this.ui.Update("PosVarY", "Margin", "-90,0,0,0")
+        if (!isABDrag && !isTargetPoint)
             this._posTarget := "PosVar"
-        this.ui.Update("PosXLabel", "Text", GetLang(isRel ? "坐标偏移X:" : (isDrag ? "起始点" : "坐标位置X:")))
-        this.ui.Update("PosYLabel", "Text", GetLang(isRel ? "坐标偏移Y:" : (isDrag ? "" : "坐标位置Y:")))
+        this.ui.Update("PosXLabel", "Text", GetLang(isRel ? "偏移值" : (isABDrag ? "起始点" : "目标点：")))
+        this.ui.Update("PosYLabel", "Text", "")
+    }
+
+    _RefreshActionItems(action := 1) {
+        if (!IsObject(this.ui))
+            return
+        isRel := this._MoveMode() == 1
+        modeKey := isRel ? 1 : 0
+        items := isRel ? ["移动", "移动后单击", "移动后双击", "拖拽"] : ["移动", "移动后单击", "移动后双击", "拖拽", "A到B拖拽"]
+        idx := 0
+        if (isRel)
+            idx := (action >= 1 && action <= 4) ? action - 1 : 3
+        else if (action == 4)
+            idx := 4
+        else if (action == 5)
+            idx := 3
+        else
+            idx := (action >= 1 && action <= 3) ? action - 1 : 0
+        if (this._actionMode == modeKey) {
+            if (this.ui.Query("ActionTypeCombo>SelectedIndex") != String(idx))
+                this.ui.Update("ActionTypeCombo", "SelectedIndex", String(idx))
+            return
+        }
+        this._actionMode := modeKey
+        this._syncing := true
+        try {
+            this.ui.Update("ActionTypeCombo", "ClearItems", "")
+            for it in GetLangArr(items)
+                this.ui.Update("ActionTypeCombo", "AddItem", it)
+            this.ui.Update("ActionTypeCombo", "SelectedIndex", String(idx))
+        } finally {
+            this._syncing := false
+        }
     }
 
     OnSureTarget(PosX, PosY, Color) {
@@ -401,14 +449,16 @@ class MMProGui {
         }
     }
 
-    OnClickTargeterBtn(state := "", ctrl := "", event := "") {
+    OnClickTargeterBtn(*) {
+        ; 关闭路径预览/双点编辑，避免定位器打开期间旧 Timer 继续访问编辑器控件。
+        MouseMovePreview.Clear(this.ui)
         MyTargetGui.SureAction := this.OnSureTarget.Bind(this)
         MyTargetGui.ShowGui()
     }
 
     OnClickTargeterHelpBtn(state := "", ctrl := "", event := "") {
         str := Format("{}`n{}`n{}", GetLang("1.左键拖拽改变位置"), GetLang("2.上下左右方向键微调位置"), GetLang("3.左键双击或回车键关闭取色器，同时确定点位信息"))
-        MsgBox(str, GetLang("定位取色器操作说明"))
+        RmtDialog.Info(str, GetLang("定位取色器操作说明"))
     }
 
     OnClickSureBtn(state, ctrl, event) {

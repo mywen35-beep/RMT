@@ -338,7 +338,7 @@ class CompareProEditItemGui {
         if (!IsObject(this.ui) || this.EditType != 1)
             return
         if (this.ToggleArr.Length <= 1) {
-            MsgBox(GetLang("至少保留一个条件"), , "Owner" this.Hwnd())
+            RmtDialog.Info(GetLang("至少保留一个条件"), , "Owner" this.Hwnd())
             return
         }
         this._SaveCondiFromUi()

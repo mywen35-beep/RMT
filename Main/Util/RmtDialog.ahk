@@ -7,6 +7,7 @@
 class RmtDialog {
     ; 单按钮提示（确定）
     static Info(msg, title := "", owner := 0) {
+        owner := RmtDialog._NormalizeOwner(owner)
         RmtDialog._Trace("Info enter msg=" RmtDialog._Clip(msg))
         try {
             RmtDialog._Show(String(msg), title != "" ? title : GetLang("提示"), [GetLang("确定")], Chr(0xE946), "{DynamicResource Accent}", owner)
@@ -46,6 +47,52 @@ class RmtDialog {
             RmtDialog._Log("Choose", e)
             return 0
         }
+    }
+
+    ; 单行文本输入（兼容 AHK InputBox 返回对象），使用同一套 XAML 外壳。
+    static Input(prompt, title := "", defaultValue := "", owner := 0) {
+        owner := RmtDialog._NormalizeOwner(owner)
+        if (title == "")
+            title := GetLang("输入")
+        if (!owner)
+            owner := XamlWin.ActiveOwner()
+        try XAMLHost.EnsureDaemonHealthy()
+        fs := XAMLHost.FontSize()
+        ff := ""
+        try if (IsSet(MainSoftData) && MainSoftData.HasProp("FontType") && MainSoftData.FontType != "")
+            ff := MainSoftData.FontType
+        main := XAML_Generator("Grid").Background("{DynamicResource BgColor}").TextElement_FontSize(fs)
+        if (ff != "")
+            main.TextElement_FontFamily(ff)
+        main.Rows("30", "Auto", "48")
+        XAMLHost.AddTitleBar(main, title, "30", "BtnClosePanel", "DialogTitle", Chr(0xE70F), "{DynamicResource Accent}")
+        body := main.Add("StackPanel").Grid_Row(1).Margin("22,16,22,6")
+        body.Add("TextBlock").Text(String(prompt)).Foreground("{DynamicResource TextMain}").TextWrapping("Wrap").Margin("0,0,0,10")
+        body.Add("TextBox").Name("InputValue").Text(String(defaultValue)).Height(34).MinHeight(34).Padding("8,4").Background("{DynamicResource InputBg}").Foreground("{DynamicResource InputText}").BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
+        row := main.Add("StackPanel").Grid_Row(2).Orientation("Horizontal").HorizontalAlignment("Center").Margin("0,4,0,10")
+        row.Add("Button").Name("BtnOk").Content(GetLang("确定")).Width(96).Height(34).IsDefault("True").Background("{DynamicResource ActionBg}").Foreground("{DynamicResource ActionText}").Cursor("Hand")
+        row.Add("Button").Name("BtnCancel").Content(GetLang("取消")).Width(96).Height(34).Margin("14,0,0,0").IsCancel("True").Background("{DynamicResource ControlBg}").Foreground("{DynamicResource TextMain}").Cursor("Hand")
+        tmp := StrReplace(XAML_TEMPLATE, "%CaptionHeight%", "30")
+        ui := XAMLHost(StrReplace(tmp, "%app%", main.ToString()), "", owner)
+        ui.xaml := StrReplace(ui.xaml, 'Width="940" Height="700"', 'Title="' RmtDialog._XmlEsc(title) '" ShowInTaskbar="False" Width="420" SizeToContent="Height" Opacity="0"')
+        ui.xaml := StrReplace(ui.xaml, 'ResizeMode="CanResize"', 'ResizeMode="NoResize"')
+        ui.xaml := StrReplace(ui.xaml, "%resources%", "")
+        if (ff != "")
+            ui.xaml := StrReplace(ui.xaml, 'FontFamily="Segoe UI Variable Display, Segoe UI, sans-serif"', 'FontFamily="' RmtDialog._XmlEsc(ff) '"')
+        rec := { Done: false, OK: false, Value: String(defaultValue) }
+        finish := (ok) => (rec.Value := ok ? ui.Query("InputValue") : rec.Value, rec.OK := ok, rec.Done := true, ui.Update("Window", "Close", ""))
+        ui.OnEvent("Window", "Closing", (*) => (rec.Done := true))
+        ui.OnEvent("Window", "LoadedHwnd", (*) => XamlWin.OnLoadTheme(ui))
+        ui.OnEvent("BtnClosePanel", "Click", (*) => finish(false))
+        ui.OnEvent("BtnCancel", "Click", (*) => finish(false))
+        ui.OnEvent("BtnOk", "Click", (*) => finish(true))
+        if (!XamlWin.Open(ui, "", owner))
+            return { Value: String(defaultValue), Result: "Cancel" }
+        while (!rec.Done && WinExist("ahk_id " ui.wpfHwnd))
+            Sleep(50)
+        if (rec.Done && rec.OK)
+            return { Value: rec.Value, Result: "OK" }
+        return { Value: String(defaultValue), Result: "Cancel" }
     }
 
     ; 只读正文右键：只换菜单外观（与 AI 助手同色/同结构），不改弹窗正文字号
@@ -285,6 +332,18 @@ class RmtDialog {
             try WinActivate("ahk_id " owner)
         }
         try ui.Update("Window", "Close", "")
+    }
+
+    static _NormalizeOwner(owner) {
+        if (Type(owner) == "String") {
+            if RegExMatch(owner, "^Owner(\d+)$", &m)
+                return Integer(m[1])
+            return 0
+        }
+        ; 旧 MsgBox 的第三参数是图标/按钮选项（如 16、64），不能当窗口句柄。
+        if (Type(owner) == "Integer" && owner > 0 && owner < 4096)
+            return 0
+        return owner
     }
 
     static _XmlEsc(s) {

@@ -242,7 +242,7 @@ RmtCmdDispatch(args) {
     cmd := args[1]
     switch cmd {
         case "-help":
-            MsgBox(RmtCmdHelpText(), GetLang("RMT 命令行帮助"))
+            RmtDialog.Info(RmtCmdHelpText(), GetLang("RMT 命令行帮助"))
             return ""
         case "-min":
             MainSoftData.IsMinStart := true

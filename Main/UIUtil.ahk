@@ -423,7 +423,7 @@ AddHotkeyBadge(parent, hotkey, tip := "") {
 OnOpenRmtDoc(pageHash := "") {
     p := A_WorkingDir "\index.html"
     if (!FileExist(p)) {
-        MsgBox(GetLang("未找到帮助文档，请检查程序目录下的 index.html 是否完整。"), GetLang("提示"))
+        RmtDialog.Info(GetLang("未找到帮助文档，请检查程序目录下的 index.html 是否完整。"), GetLang("提示"))
         return
     }
     hash := Trim(pageHash)
@@ -462,7 +462,7 @@ OnOpenRmtDoc(pageHash := "") {
 OnOpenHelpDoc(pageHash := "") {
     p := GetHelpDocPath()
     if (!FileExist(p)) {
-        MsgBox(GetLang("未找到帮助文档，请检查程序目录下的 Web 文件夹是否完整。"), GetLang("提示"))
+        RmtDialog.Info(GetLang("未找到帮助文档，请检查程序目录下的 Web 文件夹是否完整。"), GetLang("提示"))
         return
     }
     if (HasWebView2Runtime() && HelpDocWin.Open(pageHash))

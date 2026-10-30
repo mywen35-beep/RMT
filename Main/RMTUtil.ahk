@@ -148,7 +148,7 @@ OnSaveSetting(*) {
     CheckAndAddDirty("CMDFontColor", MainSoftData.CMDFontColor)
     CheckAndAddDirty("CMDFontSize", MainSoftData.CMDFontSize)
     ; 内联设置不再经过各独立设置窗口的 SaveData，统一保存这些字段。
-    for key in ["CMDLogToFile", "CMDLogFilePath", "CMDLogAutoClear",
+    for key in ["CMDLogToFile", "CMDLogFilePath", "CMDLogAutoClear", "StartTipAudio", "EndTipAudio", "StopTipAudio",
         "FixedMenuWheel", "MenuWheelShowTooltip", "MenuWheelSelectMode", "MenuWheelScale",
         "UIPanelShowOnActive", "UIPanelDefaultPos", "UIPanelOffsetX", "UIPanelOffsetY",
         "UIPanelBtnWidth", "UIPanelBtnHeight", "UIPanelFontSize", "UIPanelCols",
@@ -175,7 +175,7 @@ OnSaveSetting(*) {
 
 CheckValueSettingValid(Name, Value) {
     if (!IsInteger(Value)) {
-        MsgBox(Format("{}{}", Name, GetLang("只能是整数")))
+        RmtDialog.Info(Format("{}{}", Name, GetLang("只能是整数")))
         return false
     }
     return true
@@ -203,7 +203,7 @@ CheckAllValueSettingValid() {
     ; §23 P2-1：端口 1-65535 范围校验（非法值如 99999 会被 htons 截断为 34463，静默监听错端口）。
     ; 拒绝本次保存并还原为 INI 中上次有效值（INI 读取端仍有钳制兜底），同时回写 UI 输入框。
     if (!NetworkIsValidPort(MainSoftData.NetworkPort)) {
-        MsgBox(GetLang("网络触发端口必须是 1-65535 之间的整数，本次保存已取消，端口已还原为上次有效值。"))
+        RmtDialog.Info(GetLang("网络触发端口必须是 1-65535 之间的整数，本次保存已取消，端口已还原为上次有效值。"))
         MainSoftData.NetworkPort := NetworkNormalizePort(CfgRead(SettingFile, SettingSection, "NetworkPort", 16888))
         return false
     }
@@ -704,8 +704,9 @@ InitFilePath() {
     }
 
     global VBSPath := A_WorkingDir "\MinTool\PlayAudio.vbs"
-    global StartTipAudio := A_WorkingDir "\Audio\Start.wav"
-    global EndTipAudio := A_WorkingDir "\Audio\End.wav"
+    global StartTipAudio := (MainSoftData.StartTipAudio != "" && FileExist(MainSoftData.StartTipAudio)) ? MainSoftData.StartTipAudio : A_WorkingDir "\Audio\Start.wav"
+    global EndTipAudio := (MainSoftData.EndTipAudio != "" && FileExist(MainSoftData.EndTipAudio)) ? MainSoftData.EndTipAudio : A_WorkingDir "\Audio\End.wav"
+    global StopTipAudio := (MainSoftData.StopTipAudio != "" && FileExist(MainSoftData.StopTipAudio)) ? MainSoftData.StopTipAudio : EndTipAudio
     global ViGEmDllPath := A_WorkingDir "\Plugins\ViGEm\ViGEmWrapper.dll"
     global AHIDllDir := A_WorkingDir "\Plugins\AhiDriver"
     global AHIPluginDir := A_WorkingDir "\Plugins\AhiDriver\installer"
@@ -755,7 +756,7 @@ InitFilePath() {
     global ProjectRootDir := A_ScriptDir
 }
 
-StopMacro(tableItem, itemIndex) {
+StopMacro(tableItem, itemIndex, playStopTip := false) {
     if (!IsObject(tableItem))
         tableItem := GetTableByID(String(tableItem))
     if (!tableItem)
@@ -770,6 +771,8 @@ StopMacro(tableItem, itemIndex) {
     item := tableItem.Items[itemIndex]
     if (!item)
         return
+    if (playStopTip && item.StopTipSound == 2)
+        PlayTipSound(3)
     item.GraphBranchCount := 0
 
     ; 多线程：搜图等 DllCall 会卡住 Worker，协作式 Killed/ST 不可靠，直接杀进程
@@ -1575,7 +1578,7 @@ SetSystemCursor(Cursor:="") {
     pos := InStr(SystemCursors "|", searchStr)
 
     if (!pos) {
-        MsgBox("无效的指针名字！", A_ScriptName " - SetSystemCursor(): Error", "Icon!")
+        RmtDialog.Info("无效的指针名字！", A_ScriptName " - SetSystemCursor(): Error", "Icon!")
         return
     }
 

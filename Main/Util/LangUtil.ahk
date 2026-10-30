@@ -102,7 +102,7 @@ LangRemoveRepeat() {
     for value in ResultArr {
         FileAppend(value "`n", NewLangFilePath, "UTF-8")
     }
-    MsgBox("中文Key去重成功")
+    RmtDialog.Info("中文Key去重成功")
 }
 
 ; getstatus 的 language：中文 zh，英文 en，其它语言包用文件名（小写、去空格）

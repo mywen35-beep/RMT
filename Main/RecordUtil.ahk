@@ -606,7 +606,7 @@ OnFinishRecordMacro() {
             macroLineStr := StrReplace(macroStr, ",", "`n")
             UIControls.ToolText.Value := macroLineStr
             SetClipboard(macroLineStr)
-            MsgBox(GetLang("录制指令已复制到剪切板！`n`n请在【按键宏】页签下粘贴宏，`n配置触发键后，即可通过按键回放指令。"), GetLang("录制完成提示"))
+            RmtDialog.Info(GetLang("录制指令已复制到剪切板！`n`n请在【按键宏】页签下粘贴宏，`n配置触发键后，即可通过按键回放指令。"), GetLang("录制完成提示"))
             return
         }
 
@@ -625,7 +625,7 @@ OnFinishRecordMacro() {
     macroLineStr := StrReplace(macroStr, ",", "`n")
     UIControls.ToolText.Value := macroLineStr
     SetClipboard(macroLineStr)
-    MsgBox(GetLang("录制指令已复制到剪切板！`n`n请在【按键宏】页签下粘贴宏，`n配置触发键后，即可通过按键回放指令。"), GetLang("录制完成提示"))
+    RmtDialog.Info(GetLang("录制指令已复制到剪切板！`n`n请在【按键宏】页签下粘贴宏，`n配置触发键后，即可通过按键回放指令。"), GetLang("录制完成提示"))
 }
 
 FilterMoveCmd(macroStr) {

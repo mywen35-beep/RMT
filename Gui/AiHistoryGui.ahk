@@ -220,11 +220,19 @@ class AiHistoryGui {
             return
         if (!IsSet(MyMainWin) || !IsObject(MyMainWin))
             return
+        if (MyMainWin._AiIsBusy(this.tabIdx)) {
+            Toast.Info(GetLang("正在等待上一条回复…"))
+            return
+        }
         MyMainWin.AiLoadSession(this.tabIdx, id)
         this.OnCloseClick("", "", "")
     }
 
     OnDelClick(id, state, ctrl, event) {
+        if (IsSet(MyMainWin) && IsObject(MyMainWin) && MyMainWin._AiAnyBusy()) {
+            Toast.Info(GetLang("正在等待上一条回复…"))
+            return
+        }
         this._skipRow := true
         SetTimer(() => (this._skipRow := false), -200)
         if (!RmtDialog.Confirm(GetLang("确定删除这条对话记录？"), GetLang("对话记录")))
@@ -241,6 +249,10 @@ class AiHistoryGui {
     OnNewChatClick(state, ctrl, event) {
         if (!IsSet(MyMainWin) || !IsObject(MyMainWin))
             return
+        if (MyMainWin._AiIsBusy(this.tabIdx)) {
+            Toast.Info(GetLang("正在等待上一条回复…"))
+            return
+        }
         MyMainWin.AiNewChat(this.tabIdx, true)
         this.OnCloseClick("", "", "")
     }

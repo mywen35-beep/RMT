@@ -17,9 +17,10 @@ class MacroItem {
         this.Mode := 1          ;按键模式   1.AHK Send 2.keybd_event 3.罗技 4.AHI
         this.StartTipSound := 1 ;开始提示音 1.无   2.触发提示  3.循环首次提示
         this.EndTipSound := 1   ;结束提示音 1.无   2.结束提示  3.循环结束提示
+        this.StopTipSound := 1  ;终止提示音 1.无   2.终止提示
         this.IcoPath := ""      ;菜单宏ICO路径
         this.VoiceKeywords := "" ;语音触发关键词（多个用英文逗号 , 分隔）
-        this.BindWindow := ""   ;§22 宏级窗口绑定：宏内所有窗口信息填「{绑定窗口}」时运行时替换为此值（一改全改）
+        this.BindWindow := "{模块窗口绑定}"   ;新宏默认继承所属模块；运行时解析，父级修改自动生效
         this.FoldID := ""       ;所属折叠框 ID（FoldInfo 的 ID 引用，替代 IndexSpanArr 范围）
         this.Breakpoints := ""  ;断点集合：命令签名串，规范化 ",sig1,sig2,"（首尾逗号便于无歧义包含判定）
 
@@ -355,6 +356,10 @@ class MainConfig {
         this.CMDLogToFile := false      ; 是否输出到日志文件
         this.CMDLogFilePath := ""       ; 日志文件路径（空=默认，自动使用 Log/CMDLog.txt）
         this.CMDLogAutoClear := 0       ; 自动清理 0=从不, 1=每天, 2=每周
+        ; ========== 宏提示音文件 ==========
+        this.StartTipAudio := ""        ; 开始提示音文件路径（空=内置 Audio\\Start.wav）
+        this.EndTipAudio := ""          ; 结束/终止提示音文件路径（空=内置 Audio\\End.wav）
+        this.StopTipAudio := ""         ; 终止提示音文件路径（默认沿用结束提示音）
 
         ; ========== 变量监视器 ==========
         this.VarListenTop := true       ; 变量监视器窗口是否置顶（默认置顶）
@@ -1118,7 +1123,7 @@ class SearchData {
         this.SerialStr := ""
         this.ConfigName := Format("{}*{}_{}", A_ScreenWidth, A_ScreenHeight, GetLang("全屏"))
         this.SearchType := 1        ;1屏幕图片  2屏幕颜色  3屏幕文本 4窗口图片 5窗口颜色 6窗口文本
-        this.WinInfo := ""          ;窗口信息
+        this.WinInfo := "{宏设置窗口绑定}"          ;窗口信息
         this.SearchColor := "FFFFFF"
         this.SearchText := GetLang("检索文本")
         this.SearchImagePath := ""
@@ -1164,7 +1169,7 @@ class ScreenShotData {
     __New() {
         this.SerialStr := ""
         this.ScreenShotType := 1        ;1屏幕抓图  2窗口抓图
-        this.WinInfo := ""              ;窗口信息（窗口抓图时使用）
+        this.WinInfo := "{宏设置窗口绑定}"              ;窗口信息（窗口抓图时使用）
         this.StartPosX := 0
         this.StartPosY := 0
         this.EndPosX := A_ScreenWidth
@@ -1240,7 +1245,7 @@ class MMProData {
         this.ActionType := 1          ;鼠标动作 1移动 2移动后单击 3移动后双击 4拖拽
         this.MouseMoveMode := 0      ;§20 移动模式 0=绝对移动 1=相对移动（旧值 2=游戏视角 已拆为「增量移动」指令，仅旧配置兼容执行）
         this.RefMode := 0            ;§20 坐标基准 0=屏幕 1=窗口（选窗口时配合 WinInfo）
-        this.WinInfo := ""           ;§20 窗口信息（基准=窗口时的标题/类名等）
+        this.WinInfo := "{宏设置窗口绑定}"           ;§20 窗口信息（基准=窗口时的标题/类名等）
         this.Speed := 90           ;移动速度
     }
 }
@@ -1376,7 +1381,7 @@ class ExVariableData {
         this.VariableArr := ["Var1", "Var2", "Var3", "Var4", "Var5", "Var6"]
         this.ExtractStr := ""
         this.ExtractType := 1
-        this.WinInfo := ""
+        this.WinInfo := "{宏设置窗口绑定}"
         this.OCRType := 1
         this.StartPosX := 0
         this.StartPosY := 0
@@ -1399,7 +1404,7 @@ class OperationData {
 class BGMouseData {
     __New() {
         this.SerialStr := ""
-        this.TargetTitle := ""
+        this.TargetTitle := "{宏设置窗口绑定}"
         this.OperateType := 1 ;点击 双击 按下 松开
         this.MouseType := 1 ;左键 中键 右键
         this.PosVarX := 100
@@ -1413,7 +1418,7 @@ class BGMouseData {
 class BGKeyData {
     __New() {
         this.SerialStr := ""
-        this.FrontStr := ""
+        this.FrontStr := "{宏设置窗口绑定}"
         this.KeyArr := []
         this.Type := 1  ;1按下 2松开 3点击
         this.ClickTime := 100
@@ -1610,6 +1615,11 @@ class MouseWinData {
         if (FrontInfoStr == "" || this.HasError)
             return false
 
+        if (IsMouseWindowBinding(FrontInfoStr)) {
+            MouseGetPos , , &hwnd
+            return hwnd != 0 && this.WinId == hwnd
+        }
+
         if (InStr(FrontInfoStr, "❖")) {
             FrontInfoStr := StrReplace(FrontInfoStr, "❖")
             hwndList := StrSplit(FrontInfoStr, "|")
@@ -1689,7 +1699,7 @@ class WindowManageData {
     __New() {
         this.SerialStr := ""                 ;类型尽量使用中文 当做枚举使用  程序中有语义、也可以随时调整顺序
         this.ActionType := "激活窗口"        ;1激活窗口 2最大化窗口 3最小化窗口 4还原窗口 5关闭窗口 6移动窗口 7调整大小 8置顶窗口 9取消置顶 10修改标题 11修改透明度 12开启鼠标穿透 13关闭鼠标穿透
-        this.SearchValue := ""              ;查找值（格式：标题⎖类名⎖进程名，空表示未选择）
+        this.SearchValue := "{宏设置窗口绑定}"              ;查找值（格式：标题⎖类名⎖进程名，空表示未选择）
         this.PosX := 0                      ;移动窗口X坐标（移动窗口时使用）
         this.PosY := 0                      ;移动窗口Y坐标（移动窗口时使用）
         this.Width := 0                     ;窗口宽度（调整大小时使用）

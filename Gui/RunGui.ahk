@@ -182,7 +182,7 @@ class RunGui {
 
     CheckIfValid() {
         if (this.ui.Query("PathTextCon") == "") {
-            MsgBox(GetLang("目标不能为空！"))
+            RmtDialog.Info(GetLang("目标不能为空！"))
             return false
         }
         return true

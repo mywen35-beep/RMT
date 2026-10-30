@@ -114,8 +114,9 @@ namespace RMT
                     try { req.Headers.Accept.ParseAdd("text/event-stream"); } catch { }
                     req.Content = new StringContent(payload, Encoding.UTF8, "application/json");
 
-                    HttpResponseMessage resp = Client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, token)
-                        .ConfigureAwait(false).GetAwaiter().GetResult();
+                    using (HttpResponseMessage resp = Client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, token)
+                        .ConfigureAwait(false).GetAwaiter().GetResult())
+                    {
                     int code = (int)resp.StatusCode;
                     if (code < 200 || code >= 300)
                     {
@@ -130,13 +131,14 @@ namespace RMT
                     }
 
                     using (Stream stream = resp.Content.ReadAsStreamAsync().ConfigureAwait(false).GetAwaiter().GetResult())
+                    using (token.Register(() => { try { stream.Dispose(); } catch { } }))
                     using (var reader = new StreamReader(stream, Encoding.UTF8))
                     {
                         var content = new StringBuilder();
                         var reasoning = new StringBuilder();
                         var tools = new Dictionary<int, ToolAcc>();
                         string line;
-                        while ((line = reader.ReadLine()) != null)
+                        while ((line = ReadStreamLine(reader, token)) != null)
                         {
                             token.ThrowIfCancellationRequested();
                             if (CurrentSeq() != seq)
@@ -161,6 +163,7 @@ namespace RMT
                             ApplyStreamChunk(line, content, reasoning, tools, seq);
                         }
                         return BuildStreamResult(content, reasoning, tools);
+                    }
                     }
                 }
             }
@@ -212,7 +215,7 @@ namespace RMT
             if (!AppendDeltaString(after, "reasoning_content", reasoning)
                 && !AppendDeltaString(after, "reasoning", reasoning))
                 AppendDeltaString(after, "thinking", reasoning);
-            AccToolDelta(tools, after);
+            AccToolDelta(tools, json);
         }
 
         private static bool AppendDeltaString(string json, string key, StringBuilder dest)
@@ -228,31 +231,41 @@ namespace RMT
             return true;
         }
 
-        private static void AccToolDelta(Dictionary<int, ToolAcc> map, string json)
+        private static string ReadStreamLine(StreamReader reader, CancellationToken token)
         {
-            int tc = json.IndexOf("\"tool_calls\"");
-            if (tc < 0)
-                return;
-            string part = json.Substring(tc);
-            Match idxM = Regex.Match(part, "\"index\"\\s*:\\s*(\\d+)");
-            int idx = idxM.Success ? int.Parse(idxM.Groups[1].Value) : map.Count;
-            ToolAcc acc;
-            if (!map.TryGetValue(idx, out acc))
-            {
-                acc = new ToolAcc();
-                map[idx] = acc;
-            }
-            string id = ExtractJsonString(part, "id");
-            string name = ExtractJsonString(part, "name");
-            string args = ExtractJsonString(part, "arguments");
-            if (!string.IsNullOrEmpty(id))
-                acc.Id = id;
-            if (!string.IsNullOrEmpty(name))
-                acc.Name = name;
-            if (args != null)
-                acc.Args.Append(args);
+            Task<string> read = reader.ReadLineAsync();
+            if (!read.Wait(120000, token))
+                throw new TimeoutException("模型响应流超时，请重试");
+            return read.GetAwaiter().GetResult();
         }
 
+        private static void AccToolDelta(Dictionary<int, ToolAcc> map, string json)
+        {
+            // Decode every array entry; regex over the whole array loses parallel calls.
+            var doc = new System.Xml.XmlDocument();
+            using (var reader = System.Runtime.Serialization.Json.JsonReaderWriterFactory.CreateJsonReader(
+                Encoding.UTF8.GetBytes(json), System.Xml.XmlDictionaryReaderQuotas.Max))
+                doc.Load(reader);
+            foreach (System.Xml.XmlNode node in doc.SelectNodes("/root/choices/item/delta/tool_calls/item"))
+            {
+                int idx;
+                var indexNode = node.SelectSingleNode("index");
+                if (indexNode == null || !int.TryParse(indexNode.InnerText, out idx))
+                    continue;
+                ToolAcc acc;
+                if (!map.TryGetValue(idx, out acc))
+                {
+                    acc = new ToolAcc();
+                    map[idx] = acc;
+                }
+                var id = node.SelectSingleNode("id");
+                var name = node.SelectSingleNode("function/name");
+                var args = node.SelectSingleNode("function/arguments");
+                if (id != null && id.InnerText.Length > 0) acc.Id = id.InnerText;
+                if (name != null && name.InnerText.Length > 0) acc.Name = name.InnerText;
+                if (args != null) acc.Args.Append(args.InnerText);
+            }
+        }
         private static string BuildStreamResult(StringBuilder content, StringBuilder reasoning, Dictionary<int, ToolAcc> tools)
         {
             string text = content != null ? content.ToString() : "";

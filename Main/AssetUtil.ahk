@@ -83,22 +83,47 @@ GetCurMSec() {
     return A_Hour * 3600 * 1000 + A_Min * 60 * 1000 + A_Sec * 1000 + A_mSec
 }
 
-; §22 宏窗口绑定：窗口信息为「{绑定窗口}」时，替换为该宏（MacroItem.BindWindow）的绑定窗口，实现「一改全改」
+; 窗口绑定引用在运行时沿 指令 → 宏设置 → 所属模块 解析，不复制父级值。
+; 「{绑定窗口}」保留为旧版宏设置引用的别名。
 ResolveBindWindow(tableItem, index, winInfoStr) {
-    if (winInfoStr != "{绑定窗口}" && winInfoStr != GetLang("{绑定窗口}"))
+    isMacro := winInfoStr == "{宏设置窗口绑定}" || winInfoStr == "{绑定窗口}" || winInfoStr == GetLang("{绑定窗口}")
+    if (!isMacro && winInfoStr != "{模块窗口绑定}")
         return winInfoStr
     if (!IsObject(tableItem) || !tableItem.Items.Has(index))
-        return winInfoStr
+        return ""
     item := tableItem.Items[index]
-    if (IsObject(item) && ObjHasOwnProp(item, "BindWindow") && item.BindWindow != "")
-        return item.BindWindow
-    return winInfoStr
+    if (isMacro) {
+        winInfoStr := item.HasOwnProp("BindWindow") ? item.BindWindow : ""
+        if (winInfoStr != "{模块窗口绑定}") {
+            ; 禁止自身引用；旧占位符仍兼容，但不作为窗口标题匹配。
+            if (winInfoStr == "{宏设置窗口绑定}" || winInfoStr == "{绑定窗口}" || winInfoStr == GetLang("{绑定窗口}"))
+                return ""
+            return winInfoStr
+        }
+    }
+    return GetItemFrontInfo(tableItem, index)
+}
+
+IsMouseWindowBinding(infoStr) {
+    return infoStr == "❖{句柄ID}" || infoStr == "❖{" GetLang("句柄ID") "}"
+}
+
+WindowBindingMouseActive(*) {
+    MouseGetPos , , &hwnd
+    return hwnd != 0 && WinActive("ahk_id " hwnd)
 }
 
 GetHwndList(infoStr) {
     HwndList := []
     if (infoStr == "")
         return HwndList
+
+    if (IsMouseWindowBinding(infoStr)) {
+        MouseGetPos , , &hwnd
+        if (hwnd)
+            HwndList.Push(hwnd)
+        return HwndList
+    }
 
     if (InStr(infoStr, "❖")) {
         infoStr := StrReplace(infoStr, "❖")
@@ -887,6 +912,9 @@ LoadMainSetting() {
     MainSoftData.CMDLogToFile := CfgRead(SettingFile, SettingSection, "CMDLogToFile", false)
     MainSoftData.CMDLogFilePath := CfgRead(SettingFile, SettingSection, "CMDLogFilePath", "")
     MainSoftData.CMDLogAutoClear := CfgRead(SettingFile, SettingSection, "CMDLogAutoClear", 0)
+    MainSoftData.StartTipAudio := CfgRead(SettingFile, SettingSection, "StartTipAudio", A_WorkingDir "\Audio\Start.wav")
+    MainSoftData.EndTipAudio := CfgRead(SettingFile, SettingSection, "EndTipAudio", A_WorkingDir "\Audio\End.wav")
+    MainSoftData.StopTipAudio := CfgRead(SettingFile, SettingSection, "StopTipAudio", MainSoftData.EndTipAudio)
     MainSoftData.VarListenTop := CfgRead(SettingFile, SettingSection, "VarListenTop", 1)
     MainSoftData.VarListenWidth := CfgRead(SettingFile, SettingSection, "VarListenWidth", 400)
     MainSoftData.VarListenHeight := CfgRead(SettingFile, SettingSection, "VarListenHeight", 420)
@@ -1482,6 +1510,8 @@ ReadTableItemInfoNew(tableItem, segID := "") {
             item.Mode := TomlUtil_Str(mseg, "Mode", "1")
             item.StartTipSound := TomlUtil_Str(mseg, "StartTipSound", "1")
             item.EndTipSound := TomlUtil_Str(mseg, "EndTipSound", "1")
+            item.StopTipSound := TomlUtil_Str(mseg, "StopTipSound", "1")
+            item.BindWindow := TomlUtil_Str(mseg, "BindWindow", "")
             item.IcoPath := TomlUtil_Str(mseg, "IcoPath")
             item.VoiceKeywords := TomlUtil_Str(mseg, "VoiceKeywords")
             item.Macro := TomlUtil_Str(mseg, "Macro")
@@ -1836,6 +1866,8 @@ SaveTableItemInfoTomlCore(root, tableItem) {
             mseg["TimingSerial"] := item.TimingSerial
             mseg["StartTipSound"] := String(item.StartTipSound)
             mseg["EndTipSound"] := String(item.EndTipSound)
+            mseg["StopTipSound"] := String(item.StopTipSound)
+            mseg["BindWindow"] := item.BindWindow
             mseg["IcoPath"] := item.IcoPath
             mseg["UnorderedTrigger"] := item.UnorderedTrigger ? 1 : 0
             mseg["VoiceKeywords"] := item.VoiceKeywords
@@ -3181,60 +3213,8 @@ GetItemOffsetOfFold(tableItem, itemIndex) {
 }
 
 CustomMsgBox(Text := "", Title := "", Buttons := "") {
-    Result := -1
-
-    ; 解析按钮字符串
-    ButtonArray := StrSplit(Buttons, "|")
-    ButtonCount := ButtonArray.Length
-
-    ; 创建 GUI
-    MyGui := Gui()
-    MyGui.SetFont("S10 W550 Q2", MainSoftData.FontType)
-    MyGui.Title := Title
-    MyGui.OnEvent("Close", GuiClose)
-    MyGui.OnEvent("Escape", GuiClose)
-
-    ; 添加提示文本（支持多行）
-    MyGui.Add("Text", "w360 Center", Text)
-
-    ; 动态创建按钮 - 统一 Y 坐标；按文案略增宽，避免「强行切换」等被裁切
-    ButtonWidth := 80
-    for btnText in ButtonArray
-        ButtonWidth := Max(ButtonWidth, StrLen(btnText) * 14 + 16)
-    ButtonHeight := 30
-    ButtonSpacing := 10
-    ButtonY := 55
-
-    TotalWidth := (ButtonWidth * ButtonCount) + (ButtonSpacing * (ButtonCount - 1))
-    dialogW := Max(380, TotalWidth + 40)
-    StartX := (dialogW - TotalWidth) // 2
-
-    loop ButtonCount {
-        CurrentX := StartX + (ButtonWidth + ButtonSpacing) * (A_Index - 1)
-        Btn := MyGui.Add("Button", "w" ButtonWidth " h" ButtonHeight " x" CurrentX " y" ButtonY, ButtonArray[A_Index])
-        Btn.OnEvent("Click", ButtonClicked.Bind(A_Index))
-    }
-
-    ; 显示 GUI 并等待
-    MyGui.Show("w" dialogW)
-
-    ; 等待用户选择
-    while Result == -1
-        Sleep(50)
-
-    return Result
-
-    ; 按钮点击事件
-    ButtonClicked(Index, Ctrl, Info) {
-        Result := Index
-        MyGui.Destroy()
-    }
-
-    ; 关闭 GUI 事件
-    GuiClose(*) {
-        Result := 0
-        MyGui.Destroy()
-    }
+    ; 兼容旧调用：统一使用 XAML 对话框，返回按钮序号（关闭返回 0）。
+    return RmtDialog.Choose(Text, Title, StrSplit(Buttons, "|"))
 }
 
 IncrementText(strArr, str) {
@@ -3303,7 +3283,10 @@ HandTipSound(tableItem, itmeIndex, macroState, isFirst, isLast) {
 
 ;type 1 开始   2结束
 PlayTipSound(type) {
-    audioPathMap := Map(1, StartTipAudio, 2, EndTipAudio)
+    startPath := (IsSet(MainSoftData) && MainSoftData.StartTipAudio != "" && FileExist(MainSoftData.StartTipAudio)) ? MainSoftData.StartTipAudio : StartTipAudio
+    endPath := (IsSet(MainSoftData) && MainSoftData.EndTipAudio != "" && FileExist(MainSoftData.EndTipAudio)) ? MainSoftData.EndTipAudio : EndTipAudio
+    stopPath := (IsSet(MainSoftData) && MainSoftData.StopTipAudio != "" && FileExist(MainSoftData.StopTipAudio)) ? MainSoftData.StopTipAudio : endPath
+    audioPathMap := Map(1, startPath, 2, endPath, 3, stopPath)
     if (audioPathMap.Has(type) && FileExist(audioPathMap[type])) {
         SoundPlay(audioPathMap[type])
     }

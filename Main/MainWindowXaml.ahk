@@ -438,7 +438,8 @@ class MainWin {
         ; 当前配置名称：单行居中、非粗体；字号=主题字号；超长由 Viewbox 仅缩小不放大（改 FontSize 会被主题下限钳制）
         curNameBox := leftTop.Add("Viewbox").Margin("0,3,0,2").Stretch("Uniform").StretchDirection("DownOnly").HorizontalAlignment("Stretch")
         curNameBox.Add("TextBlock").Name("TxtCurSetting").Text(MySoftData.CurSettingName).TextAlignment("Center").HorizontalAlignment("Center").VerticalAlignment("Center").TextWrapping("NoWrap")
-        leftTop.Add("Button").Name("BtnConfig").Uid("gm:Main.Config").Content(GetLang("配置管理")).Height(33).MinHeight(33).Margin("0,3,0,2").Style("{StaticResource RmtSidebarBtn}")
+        sidebarButton := leftTop.Add("Button").Name("BtnConfig").Uid("gm:Main.Config").Height(33).MinHeight(33).Margin("0,3,0,2").Style("{StaticResource RmtSidebarBtn}")
+        this._AddSidebarButtonContent(sidebarButton, "配置管理", 0xE8B7)
         leftTop.Add("Rectangle").Height(1).Margin("2,6,2,6").Fill("{DynamicResource ControlBorder}").Stretch("Fill")
         ; 全局操作标题 + 右侧展开按钮（控制休眠/暂停/终止所有宏的快捷键提示显隐，默认显示）
         globalOps := leftTop.Add("Grid").Margin("4,0,0,4")
@@ -446,26 +447,34 @@ class MainWin {
         globalOps.Add("Button").Name("BtnToggleHotkeyHint").Content(Chr(0xE70D)).Width(24).Height(24).MinHeight(24).Margin("0,0,2,0").HorizontalAlignment("Right").VerticalAlignment("Center").FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets").FontSize(10).Style("{StaticResource RmtIconBtn}")
         ; 休眠按钮：激活（休眠中）时切换为主题 Action 色背景 + 右上角白点
         suspendGrid := leftTop.Add("Grid").Margin("2,0,0,0")
-        suspendGrid.Add("Button").Name("BtnSuspend").Content(GetLang("休眠")).Height(33).MinHeight(33).Style("{StaticResource RmtSidebarBtn}")
+        sidebarButton := suspendGrid.Add("Button").Name("BtnSuspend").Height(33).MinHeight(33).Style("{StaticResource RmtSidebarBtn}")
+        this._AddSidebarButtonContent(sidebarButton, "休眠", 0xE708)
         susGridAct := suspendGrid.Add("Grid").Name("SuspendActiveGrid").Visibility("Collapsed")
-        susGridAct.Add("Button").Name("BtnSuspendActive").Content(GetLang("休眠")).Height(33).MinHeight(33).Style("{StaticResource StateBtnActive}")
+        sidebarButton := susGridAct.Add("Button").Name("BtnSuspendActive").Height(33).MinHeight(33).Style("{StaticResource StateBtnActive}")
+        this._AddSidebarButtonContent(sidebarButton, "休眠", 0xE708)
         susGridAct.Add("Ellipse").Name("SuspendDot").Width(8).Height(8).Fill("#FFFFFFFF").HorizontalAlignment("Right").VerticalAlignment("Top").Margin("0,4,4,0").IsHitTestVisible("False")
         leftTop.Add("TextBlock").Name("TxtSuspendKey").Text(FormatHotkeyDisplay(MainSoftData.SuspendHotkey)).Opacity("0.6").FontSize(11).Margin("0,0,6,0").HorizontalAlignment("Right").TextAlignment("Right")
         ; 暂停按钮：激活（暂停中）时切换为主题 Action 色背景 + 右上角白点
         pauseGrid := leftTop.Add("Grid").Margin("2,8,0,0")
-        pauseGrid.Add("Button").Name("BtnPause").Content(GetLang("暂停")).Height(33).MinHeight(33).Style("{StaticResource RmtSidebarBtn}")
+        sidebarButton := pauseGrid.Add("Button").Name("BtnPause").Height(33).MinHeight(33).Style("{StaticResource RmtSidebarBtn}")
+        this._AddSidebarButtonContent(sidebarButton, "暂停", 0xE769)
         pauGridAct := pauseGrid.Add("Grid").Name("PauseActiveGrid").Visibility("Collapsed")
-        pauGridAct.Add("Button").Name("BtnPauseActive").Content(GetLang("暂停")).Height(33).MinHeight(33).Style("{StaticResource StateBtnActive}")
+        sidebarButton := pauGridAct.Add("Button").Name("BtnPauseActive").Height(33).MinHeight(33).Style("{StaticResource StateBtnActive}")
+        this._AddSidebarButtonContent(sidebarButton, "暂停", 0xE769)
         pauGridAct.Add("Ellipse").Name("PauseDot").Width(8).Height(8).Fill("#FFFFFFFF").HorizontalAlignment("Right").VerticalAlignment("Top").Margin("0,4,4,0").IsHitTestVisible("False")
         leftTop.Add("TextBlock").Name("TxtPauseKey").Text(FormatHotkeyDisplay(MainSoftData.PauseHotkey)).Opacity("0.6").FontSize(11).Margin("0,0,6,0").HorizontalAlignment("Right").TextAlignment("Right")
-        leftTop.Add("Button").Name("BtnKill").Content(GetLang("终止所有宏")).Height(33).MinHeight(33).Margin("0,8,0,0").Style("{StaticResource RmtSidebarBtn}")
+        sidebarButton := leftTop.Add("Button").Name("BtnKill").Height(33).MinHeight(33).Margin("0,8,0,0").Style("{StaticResource RmtSidebarBtn}")
+        this._AddSidebarButtonContent(sidebarButton, "终止所有宏", 0xE71A)
         leftTop.Add("TextBlock").Name("TxtKillKey").Text(FormatHotkeyDisplay(MainSoftData.KillMacroHotkey)).Opacity("0.6").FontSize(11).Margin("0,0,6,0").HorizontalAlignment("Right").TextAlignment("Right")
-        leftTop.Add("Button").Name("BtnReload").Content(GetLang("重启")).Height(33).MinHeight(33).Margin("0,8,0,0").Style("{StaticResource RmtSidebarBtn}")
+        sidebarButton := leftTop.Add("Button").Name("BtnReload").Height(33).MinHeight(33).Margin("0,8,0,0").Style("{StaticResource RmtSidebarBtn}")
+        this._AddSidebarButtonContent(sidebarButton, "重启", 0xE777)
         if (!A_IsCompiled)
             leftTop.Add("Button").Name("BtnGMUI").Content("GM-UI").Height(33).MinHeight(33).Margin("0,8,0,0").Style("{StaticResource RmtSidebarBtn}")
         leftBottom := left.Add("StackPanel").Grid_Row(1).VerticalAlignment("Bottom")
-        leftBottom.Add("Button").Name("BtnHelp").Content(GetLang("RMT文档")).Height(28).MinHeight(28).Margin("0,2,0,2")
-        leftBottom.Add("Button").Name("BtnSave").Uid("gm:Main.Save").Content(GetLang("应用并保存")).Height(36).MinHeight(36).Margin("0,2,0,0").FontWeight("Bold")
+        sidebarButton := leftBottom.Add("Button").Name("BtnHelp").Height(28).MinHeight(28).Margin("0,2,0,2")
+        this._AddSidebarButtonContent(sidebarButton, "RMT文档", 0xE8A5)
+        sidebarButton := leftBottom.Add("Button").Name("BtnSave").Uid("gm:Main.Save").Height(36).MinHeight(36).Margin("0,2,0,0").FontWeight("Bold")
+        this._AddSidebarButtonContent(sidebarButton, "应用并保存", 0xE74E)
 
         ; ---- 右侧 TabControl ----
         right := main.Add("Grid").Grid_Row(1).Grid_Column(1).Margin("0,2,2,4")
@@ -953,6 +962,13 @@ class MainWin {
                 this._vl.SetCompact(idx, true)
             this._EnsureAiSeeded(idx)
         }
+    }
+
+    _AddSidebarButtonContent(button, label, glyph) {
+        content := button.Add("StackPanel").Orientation("Horizontal").HorizontalAlignment("Center")
+        content.Add("TextBlock").Text(Chr(glyph)).FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets")
+            .FontSize(14).Margin("0,0,7,0").VerticalAlignment("Center")
+        content.Add("TextBlock").Text(GetLang(label)).VerticalAlignment("Center")
     }
 
     LoadLeftBarValues() {
@@ -3204,7 +3220,7 @@ class MainWin {
         text := Trim(this._AiNormalizeNewlines(text, false), "`n")
         if (text == "" && this._AiAttachList(t).Length < 1)
             return
-        if (this._AiIsBusy(t)) {
+        if (this._AiAnyBusy()) {
             Toast.Info(GetLang("正在等待上一条回复…"))
             return
         }
@@ -3249,7 +3265,7 @@ class MainWin {
 
     _AiStartChat(*) {
         t := this._aiChatTab
-        if (t < 1)
+        if (t < 1 || !this._AiIsBusy(t) || this._AiCancelRequested(t))
             return
         try {
             msgs := this._AiBuildApiMessages(t)
@@ -3296,13 +3312,25 @@ class MainWin {
             ; idle：可能尚未 latch，或结果已被另一轮 Take 取走；勿当成「中断」清掉 busy
             return
         }
+        ; Stop polling while synchronous tools or approval dialogs are running.
+        ; The next request installs its own poll timer after the tool batch ends.
+        SetTimer(this.aiChatTick, 0)
         reply := ""
         errMsg := ""
         try reply := AiAssist.TakeChat()
         catch as e
             errMsg := this._AiErrText(e)
-        if (errMsg == "" && this._AiContinueTools(t, reply))
-            return
+        if (errMsg == "") {
+            this._aiExecutingTools := true
+            try {
+                if (this._AiContinueTools(t, reply))
+                    return
+            } catch as e {
+                errMsg := this._AiErrText(e)
+            } finally {
+                this._aiExecutingTools := false
+            }
+        }
         this._AiFinishChat(t, reply, errMsg)
     }
 
@@ -3348,10 +3376,12 @@ class MainWin {
             name := call.Has("name") ? String(call["name"]) : ""
             args := call.Has("arguments") ? String(call["arguments"]) : "{}"
             this._AiShowThinking(t, true, this._AiToolDoingText(name, args))
-            result := AiAssist.ExecTool(name, args)
+            result := this._AiCancelRequested(t) ? "Cancelled by user" : AiAssist.ExecTool(name, args)
             this._AiNoteToolResult(t, name, args, result)
             this._AiHistPushMap(t, Map("role", "tool", "content", result, "tool_call_id", cid))
         }
+        if (this._AiCancelRequested(t))
+            return false
         this._AiShowThinking(t, false, GetLang("正在根据工具结果继续思考"))
         try {
             msgs := this._AiBuildApiMessages(t)
@@ -3430,6 +3460,16 @@ class MainWin {
             this._aiEmptyRetry[t] := false
     }
 
+    _AiAnyBusy() {
+        if (IsObject(this._aiBusy)) {
+            for tab, busy in this._aiBusy {
+                if (busy)
+                    return true
+            }
+        }
+        return false
+    }
+
     _AiIsBusy(t) {
         return IsObject(this._aiBusy) && this._aiBusy.Has(t) && this._aiBusy[t]
     }
@@ -3439,11 +3479,16 @@ class MainWin {
     }
 
     _AiCancelFromUser(t) {
+        if (!this._AiIsBusy(t))
+            return
+        SetTimer(this.aiStartTick, 0)
         if (!IsObject(this._aiCancel))
             this._aiCancel := Map()
         this._aiCancel[t] := true
         this._aiChatTab := t
         AiAssist.CancelChat()
+        if (this.HasOwnProp("_aiExecutingTools") && this._aiExecutingTools)
+            return
         this._AiFinishChat(t, "", "", true)
     }
 
@@ -3692,6 +3737,10 @@ class MainWin {
 
     ; saveCurrent=true 时先落盘当前会话再清空
     AiNewChat(t, saveCurrent := true, showToast := true) {
+        if (this._AiIsBusy(t)) {
+            Toast.Info(GetLang("正在等待上一条回复…"))
+            return
+        }
         t := Integer(t)
         if (t < 1)
             return
@@ -3712,6 +3761,10 @@ class MainWin {
     }
 
     AiLoadSession(t, id) {
+        if (this._AiIsBusy(t)) {
+            Toast.Info(GetLang("正在等待上一条回复…"))
+            return
+        }
         t := Integer(t)
         id := Trim(String(id))
         if (t < 1 || id == "")
@@ -3735,11 +3788,13 @@ class MainWin {
                     continue
                 role := m.Has("role") ? String(m["role"]) : "user"
                 content := m.Has("content") ? String(m["content"]) : ""
-                if (role = "tool" || role = "system" || Trim(content) == "")
+                if (role = "system" || (Trim(content) == "" && !m.Has("tool_calls") && role != "tool"))
                     continue
                 rec := Map("role", role, "content", content)
                 if (m.Has("tool_calls"))
                     rec["tool_calls"] := String(m["tool_calls"])
+                if (m.Has("tool_call_id"))
+                    rec["tool_call_id"] := String(m["tool_call_id"])
                 if (m.Has("reasoning_content") && m["reasoning_content"] != "")
                     rec["reasoning_content"] := String(m["reasoning_content"])
                 msgs.Push(rec)
@@ -3755,8 +3810,10 @@ class MainWin {
         if (!IsObject(this._aiSeededTabs))
             this._aiSeededTabs := Map()
         this._aiSeededTabs[t] := true
-        for m in msgs
-            this._AiAppendMsg(t, m["role"] = "user", m["content"])
+        for m in msgs {
+            if ((m["role"] = "user" || m["role"] = "assistant") && Trim(m["content"]) != "")
+                this._AiAppendMsg(t, m["role"] = "user", m["content"])
+        }
         Toast.Success(GetLang("已打开对话"))
     }
 
@@ -3803,6 +3860,14 @@ class MainWin {
             maxKeep := 24
             if (arr.Length > maxKeep)
                 start := arr.Length - maxKeep + 1
+            ; Keep a whole user turn: a fixed message cutoff can orphan tool
+            ; results from their assistant tool_calls (or split a parallel batch).
+            while (start > 1) {
+                first := arr[start]
+                if (Type(first) = "Map" && first.Has("role") && first["role"] = "user")
+                    break
+                start--
+            }
             i := start
             while (i <= arr.Length) {
                 m := arr[i]
@@ -3987,7 +4052,7 @@ class MainWin {
             xaml .= '<Grid Margin="0,4,0,0">'
                 . '<Grid.ColumnDefinitions>' this._BuildFoldLayoutColDefs() '</Grid.ColumnDefinitions>'
                 . '<StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">'
-                . '<Button Name="FoldTKEdit_' t '_' f '" Style="{StaticResource RmtItemFieldBtn}" Width="120" Margin="0,0,4,0" ToolTip="' GetLang("触发键") '">' this._BuildTKBtnInnerXaml(tkStr, false) '</Button>'
+                . this._TriggerEntries('<Button Name="FoldTKEdit_' t '_' f '" Style="{StaticResource RmtItemFieldBtn}" Width="120" Margin="0,0,4,0" ToolTip="' GetLang("触发键") '">' this._BuildTKBtnInnerXaml(tkStr, false) '</Button>', false, "FoldTKEdit_" t "_" f, tkStr)
                 . '<ComboBox Name="FoldTKType_' t '_' f '" Style="{StaticResource RmtItemCombo}" Width="82" Margin="0" SelectedIndex="' (fold.TKType - 1) '" IsEnabled="' (isUI ? "False" : "True") '" ToolTip="' GetLang("触发类型") '">'
                 . '<ComboBoxItem Content="' GetLang("按下") '"/><ComboBoxItem Content="' GetLang("松开") '"/><ComboBoxItem Content="' GetLang("松止") '"/><ComboBoxItem Content="' GetLang("开关") '"/><ComboBoxItem Content="' GetLang("长按") '"/><ComboBoxItem Content="' GetLang("双击") '"/>'
                 . '</ComboBox></StackPanel></Grid>'
@@ -4007,7 +4072,7 @@ class MainWin {
             lastCol := '<ColumnDefinition Width="*"/>'
         }
         remarkGroupW := 24 + 6 + this._foldFieldW
-        frontGroupW := 12 + 4 + this._foldFrontW + 4 + 24 + 4 + 24
+        frontGroupW := 20 + 6 + this._foldFrontW + 4 + 24 + 4 + 24
         ; 四个带右间距的按钮 + 最右侧删除按钮，防止删除被列宽裁掉。
         toolbarW := 4 * (24 + 4) + 24
         return '<ColumnDefinition Width="' remarkGroupW '"/>' gapCol
@@ -4543,6 +4608,18 @@ class MainWin {
             . '</Style.Triggers></Style></Border.Style>'
     }
 
+    _TriggerEntries(field, virtual, id, text := "") {
+        field := RegExReplace(field, '<TextBlock Text="&#xE92E;"[^>]*/>', "")
+        visibility := virtual ? "{Binding TKGlyphVis}" : (text == "" ? "Visible" : "Collapsed")
+        result := '<Grid Width="124">' field '<StackPanel ' (virtual ? '' : 'Name="' id '_Entries" ') 'Orientation="Horizontal" Visibility="' visibility '">'
+        for entry in [["Keyboard", "&#xE92E;", "按键触发键"], ["Joy", "&#xE7FC;", "手柄触发键"]] {
+            attr := virtual ? 'Tag="' id entry[1] '"' : 'Name="' id '_' entry[1] '"'
+            result .= '<Button ' attr ' Style="{StaticResource RmtItemFieldBtn}" Width="58" Margin="0,0,4,0" ToolTip="' GetLang(entry[3]) '">'
+                . '<TextBlock Text="' entry[2] '" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/></Button>'
+        }
+        return result '</StackPanel></Grid>'
+    }
+
     _BuildTKBtnInnerXaml(tkStr, vlMode, bindingName := "TKStr") {
         kb := '&#xE92E;'
         if (vlMode) {
@@ -4678,17 +4755,17 @@ class MainWin {
         fw := this._foldFrontW
         box := this._FoldFieldBoxAttrs(' IsReadOnly="True" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"')
         iconFont := ' FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"'
-        frontIcon := '<TextBlock Text="&#xE7F4;" Width="12" TextAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource TextMain}"' iconFont ' Margin="0,0,4,0" ToolTip="' GetLang("前台") '"/>'
+        frontIcon := '<TextBlock Text="&#xE7F4;" Width="20" MinWidth="20" TextAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource TextMain}"' iconFont ' Margin="0,0,6,0" ToolTip="' GetLang("窗口绑定") '"/>'
         if (vlMode) {
             return frontIcon
                 . '<TextBox Tag="FoldFront" Text="{Binding FoldFront}" Width="' fw '"' box '/>'
                 . '<Button Tag="FoldFrontBtn" Style="{StaticResource RmtFoldToolBtn}" Content="&#xE70F;" ToolTip="' GetLang("编辑") '"' iconFont ' Margin="4,0,0,0"/>'
-                . '<Button Tag="FoldFrontHelp" Style="{StaticResource RmtFoldToolBtn}" Content="?" ToolTip="' GetLang("前台说明") '" FontSize="11" Margin="4,0,0,0"/>'
+                . '<Button Tag="FoldFrontHelp" Style="{StaticResource RmtFoldToolBtn}" Content="?" ToolTip="' GetLang("窗口绑定说明") '" FontSize="11" Margin="4,0,0,0"/>'
         }
         return frontIcon
             . '<TextBox Name="FoldFront_' t '_' f '" Text="' this._XmlEsc(frontInfo) '" Width="' fw '"' box '/>'
             . '<Button Name="FoldFrontBtn_' t '_' f '" Style="{StaticResource RmtFoldToolBtn}" Content="&#xE70F;" ToolTip="' GetLang("编辑") '"' iconFont ' Margin="4,0,0,0"/>'
-            . '<Button Name="FoldFrontHelp_' t '_' f '" Style="{StaticResource RmtFoldToolBtn}" Content="?" ToolTip="' GetLang("前台说明") '" FontSize="11" Margin="4,0,0,0"/>'
+            . '<Button Name="FoldFrontHelp_' t '_' f '" Style="{StaticResource RmtFoldToolBtn}" Content="?" ToolTip="' GetLang("窗口绑定说明") '" FontSize="11" Margin="4,0,0,0"/>'
     }
 
     _BuildItemRow(t, i) {
@@ -4725,17 +4802,18 @@ class MainWin {
         if (isUI)
             tkTypeIdx := 3
 
-        if (isNormal && tkStr == GetLang("编辑"))
+        if ((isNormal || GetTableSymbol(t) == "Replace") && tkStr == GetLang("编辑"))
             tkStr := ""
         ns := 'xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"'
         rowSel := this._sideTreeSel.Has(t) && this._sideTreeSel[t] == item.ID
+        triggerField := '<Button Name="TKBtn_' t '_' i '" Style="{StaticResource RmtItemFieldBtn}" Width="120" Margin="0,0,4,0" ToolTip="' GetLang((isMenu || isUI) ? "编辑" : (isTiming ? "定时" : "触发键")) '" IsEnabled="' (isSubMacro ? "False" : "True") '">' ((isMenu || isUI) ? this._BuildImageConfigBtnInnerXaml(false, t, i, this._GetItemConfigImagePath(t, item)) : (isTiming ? this._BuildTimingConfigBtnInnerXaml(false, t, i, HasTimingConfig(item)) : this._BuildTKBtnInnerXaml(tkStr, false))) '</Button>'
         xaml := this._BuildItemCardOpen(ns, t, i, item.Forbid || GetItemFoldForbidState(tableItem, i), rowSel)
             . '<Grid.ColumnDefinitions>' this._ItemInnerColDefs() '</Grid.ColumnDefinitions>'
             . '<Border Grid.Column="0" Name="Color_' t '_' i '" Width="12" Height="12" CornerRadius="6" Background="' colorHex '" VerticalAlignment="Center" HorizontalAlignment="Center"/>'
             . this._BuildSeqNoXaml(false, t, i, rowSel)
             . this._BuildItemRemarkFieldXaml(t, i, item.Remark, false)
             . '<DockPanel Grid.Column="4" LastChildFill="True" HorizontalAlignment="Stretch" Visibility="' (isSubMacro ? "Collapsed" : "Visible") '" Margin="' ((isMenu || isUI) ? "45,0,-45,0" : "0") '">'
-            . '<Button Name="TKBtn_' t '_' i '" Style="{StaticResource RmtItemFieldBtn}" Width="120" Margin="0,0,4,0" ToolTip="' GetLang((isMenu || isUI) ? "编辑" : (isTiming ? "定时" : "触发键")) '" IsEnabled="' (isSubMacro ? "False" : "True") '">' ((isMenu || isUI) ? this._BuildImageConfigBtnInnerXaml(false, t, i, this._GetItemConfigImagePath(t, item)) : (isTiming ? this._BuildTimingConfigBtnInnerXaml(false, t, i, HasTimingConfig(item)) : this._BuildTKBtnInnerXaml(tkStr, false))) '</Button>'
+            . ((isNormal || GetTableSymbol(t) == "Replace") ? this._TriggerEntries(triggerField, false, "TKBtn_" t "_" i, tkStr) : triggerField)
             . '</DockPanel>'
             . (isNetwork ? '<Button Grid.Column="5" Name="NetHelp_' t '_' i '" Style="{StaticResource RmtItemFieldBtn}" Width="24" HorizontalAlignment="Left" Margin="0,0,4,0" Content="&#xE946;" ToolTip="' GetLang("网络触发说明") '" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"/>' : '')
             . '<ComboBox Grid.Column="5" Name="TKType_' t '_' i '" Style="{StaticResource RmtItemCombo}" Margin="0" SelectedIndex="' tkTypeIdx '" IsEnabled="' (canEditTKType ? "True" : "False") '" Visibility="' ((isSubMacro || isNetwork || isMenu || isUI || isVoice || isTiming) ? "Collapsed" : "Visible") '" ToolTip="' GetLang("触发类型") '">'
@@ -4910,6 +4988,10 @@ class MainWin {
 
         this._Bind("SeqBtn_" t "_" i, "Click", ObjBindMethod(this, "SelectSideTreeItem", t, i))
         this._Bind("TKBtn_" t "_" i, "Click", editTK.Bind(tableItem, i))
+        if (CheckIsNormalTable(t) || GetTableSymbol(t) == "Replace") {
+            this._Bind("TKBtn_" t "_" i "_Keyboard", "Click", OnTriggerEntry.Bind(tableItem, i, false, "keyboard"))
+            this._Bind("TKBtn_" t "_" i "_Joy", "Click", OnTriggerEntry.Bind(tableItem, i, false, "joy"))
+        }
         ; §23 网络宏：右键同为直接复制单次 URL；其余表保持自定义触发串
         this._Bind("TKBtn_" t "_" i, "MouseRightButtonUp", isNetwork ? ((*) => OnItemNetworkCopyUrl(tableItem, i)) : OnItemCustomEditTriggerStr.Bind(tableItem, i))
         ; §23 网络宏：触发键左侧「?」按钮 → 网络触发说明弹窗（仅网络表行存在该按钮）
@@ -4940,6 +5022,8 @@ class MainWin {
             this._Bind("FoldFrontHelp_" t "_" f, "Click", OnFoldFrontHelp.Bind(tableItem, f))
             this._Bind("FoldBtn_" t "_" f, "Click", OnFoldBtnClick.Bind(tableItem, f))
             this._Bind("FoldTKEdit_" t "_" f, "Click", OnFlodTKEditClick.Bind(tableItem, f))
+            this._Bind("FoldTKEdit_" t "_" f "_Keyboard", "Click", OnTriggerEntry.Bind(tableItem, f, true, "keyboard"))
+            this._Bind("FoldTKEdit_" t "_" f "_Joy", "Click", OnTriggerEntry.Bind(tableItem, f, true, "joy"))
             this._Bind("FoldAddMacro_" t "_" f, "Click", OnItemAddMacroBtnClick.Bind(tableItem, f))
             this._Bind("FoldPasteMacro_" t "_" f, "Click", OnItemPasteMacroBtnClick.Bind(tableItem, f))
             this._Bind("FoldShare_" t "_" f, "Click", OnFoldShareBtnClick.Bind(tableItem, f))
@@ -5009,7 +5093,7 @@ class MainWin {
         if (isUI)
             tkTypeIdx := 3
         this.ui.Update("Remark_" t "_" i, "Text", item.Remark)
-        if (CheckIsNormalTable(t) && tkStr == GetLang("编辑"))
+        if ((CheckIsNormalTable(t) || GetTableSymbol(t) == "Replace") && tkStr == GetLang("编辑"))
             tkStr := ""
         if (isMenu || isUI) {
             imagePath := this._GetItemConfigImagePath(t, item)
@@ -5026,6 +5110,10 @@ class MainWin {
             this.ui.Update("TKBtn_" t "_" i, "FontFamily", "Segoe Fluent Icons, Segoe MDL2 Assets")
         } else {
             this.ui.Update("TKBtn_" t "_" i, "Content", tkStr)
+        }
+        if (CheckIsNormalTable(t) || GetTableSymbol(t) == "Replace") {
+            this.ui.Update("TKBtn_" t "_" i "_Entries", "Visibility", item.TK == "" ? "Visible" : "Collapsed")
+            this.ui.Update("TKBtn_" t "_" i, "FontFamily", MainSoftData.FontType)
         }
         this.ui.Update("TKType_" t "_" i, "SelectedIndex", String(tkTypeIdx))
         this.ui.Update("Loop_" t "_" i, "Text", loopStr)
@@ -5101,7 +5189,7 @@ class MainWin {
             . '<DataTrigger Binding="{Binding ImageConfigVis}" Value="Visible"><Setter Property="Margin" Value="45,0,-45,0"/></DataTrigger>'
             . '<DataTrigger Binding="{Binding TKBtnEnabled}" Value="False"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>'
             . '</Style.Triggers></Style></DockPanel.Style>'
-            . '<Button Tag="TKBtn" IsEnabled="{Binding TKBtnEnabled}" Style="{StaticResource RmtItemFieldBtn}" Width="120" Margin="0,0,4,0" ToolTip="' GetLang("编辑") '">' this._BuildVirtualItemConfigBtnInnerXaml() '</Button>'
+            . this._TriggerEntries('<Button Tag="TKBtn" IsEnabled="{Binding TKBtnEnabled}" Style="{StaticResource RmtItemFieldBtn}" Width="120" Margin="0,0,4,0" ToolTip="' GetLang("编辑") '">' this._BuildVirtualItemConfigBtnInnerXaml() '</Button>', true, "TKBtn")
             . '</DockPanel>'
             . '<Button Grid.Column="5" Tag="NetHelp" Visibility="{Binding NetHelpVis}" Style="{StaticResource RmtItemFieldBtn}" Width="24" HorizontalAlignment="Left" Margin="0,0,4,0" Content="&#xE946;" ToolTip="' GetLang("网络触发说明") '" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"/>'
             . '<ComboBox Grid.Column="5" Tag="TKType" SelectedIndex="{Binding TKType}" IsEnabled="{Binding TKTypeEnabled}" ToolTip="' GetLang("触发类型") '">'
@@ -5136,7 +5224,7 @@ class MainWin {
             . '<Grid Margin="0,4,0,0" Visibility="{Binding ShowTKRowVisibility}">'
             . '<Grid.ColumnDefinitions>' this._BuildFoldLayoutColDefs() '</Grid.ColumnDefinitions>'
             . '<StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">'
-            . '<Button Tag="FoldTKEdit" Style="{StaticResource RmtItemFieldBtn}" Width="120" Margin="0,0,4,0" ToolTip="' GetLang("触发键") '">' this._BuildTKBtnInnerXaml("", true, "FoldTKStr") '</Button>'
+            . this._TriggerEntries('<Button Tag="FoldTKEdit" Style="{StaticResource RmtItemFieldBtn}" Width="120" Margin="0,0,4,0" ToolTip="' GetLang("触发键") '">' this._BuildTKBtnInnerXaml("", true, "FoldTKStr") '</Button>', true, "FoldTKEdit")
             . '<ComboBox Tag="FoldTKType" SelectedIndex="{Binding FoldTKType}" IsEnabled="{Binding FoldTKTypeEnabled}" Style="{StaticResource RmtItemCombo}" Width="82" Margin="0" ToolTip="' GetLang("触发类型") '">'
             . '<ComboBoxItem Content="' GetLang("按下") '"/><ComboBoxItem Content="' GetLang("松开") '"/><ComboBoxItem Content="' GetLang("松止") '"/><ComboBoxItem Content="' GetLang("开关") '"/><ComboBoxItem Content="' GetLang("长按") '"/><ComboBoxItem Content="' GetLang("双击") '"/>'
             . '</ComboBox></StackPanel></Grid>'
@@ -5548,6 +5636,9 @@ class MainWin {
             , true)
 
         ; ---------- 页：宏 ----------
+        audioRows := row(GetLang("开始音效"), '<Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="58"/></Grid.ColumnDefinitions><TextBox Name="StartTipAudioCon" Text="' this._XmlEsc(MainSoftData.StartTipAudio) '" Padding="5,0"/><Button Grid.Column="1" Name="BtnStartTipBrowse" Content="' GetLang("浏览") '" Margin="6,0,0,0" Padding="4,0"/></Grid>')
+            . row(GetLang("结束音效"), '<Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="58"/></Grid.ColumnDefinitions><TextBox Name="EndTipAudioCon" Text="' this._XmlEsc(MainSoftData.EndTipAudio) '" Padding="5,0"/><Button Grid.Column="1" Name="BtnEndTipBrowse" Content="' GetLang("浏览") '" Margin="6,0,0,0" Padding="4,0"/></Grid>')
+            . row(GetLang("终止音效"), '<Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="58"/></Grid.ColumnDefinitions><TextBox Name="StopTipAudioCon" Text="' this._XmlEsc(MainSoftData.StopTipAudio) '" Padding="5,0"/><Button Grid.Column="1" Name="BtnStopTipBrowse" Content="' GetLang("浏览") '" Margin="6,0,0,0" Padding="4,0"/></Grid>')
         macroPage := page("macro", twoCol(
                 card(GetLang("通用"), "&#xE8D4;", tog(GetLang("仅前台运行宏"), "ChkForeground", MainSoftData.CheckForeground, GetLang("窗口不匹配则终止运行的宏"))
                     . tog(GetLang("自动松开修饰键"), "ChkAutoLoosen", MainSoftData.AutoLoosenModifier, GetLang("组合键触发前先松开修饰键"))
@@ -5559,7 +5650,8 @@ class MainWin {
                     . numCompact(GetLang("每次间隔浮动（%）"), "EditPreIntervalFloat", MainSoftData.PreIntervalFloat, GetLang("两次宏执行之间的间隔可随机上下浮动的百分比。"))
                     . numCompact(GetLang("间隔指令浮动（%）"), "EditIntervalFloat", MainSoftData.IntervalFloat, GetLang("间隔指令本身的时长可随机上下浮动的百分比。"))
                     . numCompact(GetLang("坐标 X 浮动 (px)"), "EditCoordXFloat", MainSoftData.CoordXFloat, GetLang("鼠标坐标 X 轴可随机上下偏移的像素值。"))
-                    . numCompact(GetLang("坐标 Y 浮动 (px)"), "EditCoordYFloat", MainSoftData.CoordYFloat, GetLang("鼠标坐标 Y 轴可随机上下偏移的像素值。")), "0", "", "float")))
+                    . numCompact(GetLang("坐标 Y 浮动 (px)"), "EditCoordYFloat", MainSoftData.CoordYFloat, GetLang("鼠标坐标 Y 轴可随机上下偏移的像素值。")), "0", "", "float")
+                    . card(GetLang("音频"), "&#xE767;", audioRows, "0,18,0,0", "", "audio")))
 
         ; ---------- 页：指令录制 ----------
         recordPage := page("record", twoCol(
@@ -5736,6 +5828,12 @@ class MainWin {
         this._Bind("CmbKeyDownDown", "SelectionChanged", ObjBindMethod(this, "OnComboIndex", "KeyDownDownType"))
         this._Bind("CmbRemarkAuto", "SelectionChanged", ObjBindMethod(this, "OnComboIndex", "RemarkAutoType"))
         this._Bind("CmbMacroStop", "SelectionChanged", ObjBindMethod(this, "OnComboIndex", "MacroStopType"))
+        this._Bind("BtnStartTipBrowse", "Click", ObjBindMethod(this, "OnSettingAudioBrowse", "StartTipAudio"))
+        this._Bind("BtnEndTipBrowse", "Click", ObjBindMethod(this, "OnSettingAudioBrowse", "EndTipAudio"))
+        this._Bind("BtnStopTipBrowse", "Click", ObjBindMethod(this, "OnSettingAudioBrowse", "StopTipAudio"))
+        this._Bind("StartTipAudioCon", "LostFocus", ObjBindMethod(this, "OnTextEdit", "StartTipAudio"))
+        this._Bind("EndTipAudioCon", "LostFocus", ObjBindMethod(this, "OnTextEdit", "EndTipAudio"))
+        this._Bind("StopTipAudioCon", "LostFocus", ObjBindMethod(this, "OnTextEdit", "StopTipAudio"))
         ; §10 显示页签勾选
         for sym in ["Normal", "String", "Menu", "UI", "Voice", "Timing", "SubMacro", "Replace", "Network"]
             this._Bind("TabVisible_" sym, "Click", ObjBindMethod(this, "OnTabVisibleCheck", sym))
@@ -5847,7 +5945,7 @@ class MainWin {
 
     MarkSettingDirty(ctrl := "") {
         pageId := ""
-        if (RegExMatch(ctrl, "i)^(Edit(Hold|PreInterval|Interval|Coord)|CmbKeyDown|CmbMacroStop|ChkNoVariable|ChkForeground|ChkContinuous|ChkAutoLoosen)"))
+        if (RegExMatch(ctrl, "i)^(Edit(Hold|PreInterval|Interval|Coord)|CmbKeyDown|CmbMacroStop|ChkNoVariable|ChkForeground|ChkContinuous|ChkAutoLoosen|StartTipAudio|EndTipAudio)"))
             pageId := "macro"
         else if (RegExMatch(ctrl, "i)^(Wheel|UIPanel|CountDown)") )
             pageId := "trigger"
@@ -5886,6 +5984,7 @@ class MainWin {
             {id: "soft", fields: [{key: "IsBootStart", def: false, ctrl: "ChkBootStart", kind: "chk", hook: "boot"}, {key: "IsAdminStart", def: false, ctrl: "ChkAdminStart", kind: "chk", hook: "admin"}, {key: "IsDataReport", def: true, ctrl: "ChkDataReport", kind: "chk"}, {key: "Lang", def: "中文", ctrl: "CmbLang", kind: "cmbText"}, {key: "PreferredMacroEditor", def: 1, ctrl: "CmbPreferredEditor", kind: "cmb"}, {key: "IsModalSubGui", def: true, ctrl: "ChkModalSubGui", kind: "chk"}]},
             {id: "general", fields: [{key: "ScreenShotType", def: 3, ctrl: "CmbScreenShot", kind: "cmb"}, {key: "SearchImageType", def: 1, ctrl: "CmbSearchImage", kind: "cmb"}, {key: "SearchImageAdaptive", def: false, ctrl: "ChkSearchImageAdaptive", kind: "chk"}, {key: "MutiThreadNum", def: -1, ctrl: "EditMutiThreadNum", kind: "num"}, {key: "NetworkPort", def: 16888, ctrl: "EditNetPort", kind: "num"}, {key: "RemarkAutoType", def: 2, ctrl: "CmbRemarkAuto", kind: "cmb"}]},
             {id: "trig", fields: [{key: "CheckForeground", def: false, ctrl: "ChkForeground", kind: "chk"}, {key: "AutoLoosenModifier", def: true, ctrl: "ChkAutoLoosen", kind: "chk"}, {key: "ContinuousTrigger", def: true, ctrl: "ChkContinuous", kind: "chk"}, {key: "MacroStopType", def: 1, ctrl: "CmbMacroStop", kind: "cmb"}, {key: "KeyDownDownType", def: 1, ctrl: "CmbKeyDownDown", kind: "cmb"}, {key: "NoVariableTip", def: false, ctrl: "ChkNoVariable", kind: "chk"}]},
+            {id: "audio", fields: [{key: "StartTipAudio", def: A_WorkingDir "\Audio\Start.wav", ctrl: "StartTipAudioCon", kind: "txt"}, {key: "EndTipAudio", def: A_WorkingDir "\Audio\End.wav", ctrl: "EndTipAudioCon", kind: "txt"}, {key: "StopTipAudio", def: A_WorkingDir "\Audio\End.wav", ctrl: "StopTipAudioCon", kind: "txt"}]},
             {id: "tabs", fields: tabFields},
             {id: "joy", fields: [{key: "TriggerJoyType", def: "Xbox", ctrl: "CmbTriggerJoyType", kind: "cmbText"}, {key: "JoyType", def: "Xbox", ctrl: "CmbJoyType", kind: "cmbText"}, {key: "JoyLtRtAsButton", def: true, ctrl: "ChkJoyLtRtAsButton", kind: "chk"}]},
             {id: "float", fields: [{key: "HoldFloat", def: 0, ctrl: "EditHoldFloat", kind: "num"}, {key: "PreIntervalFloat", def: 0, ctrl: "EditPreIntervalFloat", kind: "num"}, {key: "IntervalFloat", def: 0, ctrl: "EditIntervalFloat", kind: "num"}, {key: "CoordXFloat", def: 0, ctrl: "EditCoordXFloat", kind: "num"}, {key: "CoordYFloat", def: 0, ctrl: "EditCoordYFloat", kind: "num"}]},
@@ -5963,6 +6062,7 @@ class MainWin {
     }
 
     OnSettingModuleReset(modId, state := "", ctrl := "", event := "") {
+        global StartTipAudio, EndTipAudio, StopTipAudio
         if (!IsObject(this._setMods))
             return
         spec := ""
@@ -5980,6 +6080,11 @@ class MainWin {
                 this._ApplySettingFieldDefault(f)
         } finally {
             this._setModLock := false
+        }
+        if (modId == "audio") {
+            StartTipAudio := MainSoftData.StartTipAudio
+            EndTipAudio := MainSoftData.EndTipAudio
+            StopTipAudio := MainSoftData.StopTipAudio
         }
         hint := (spec.fields.Length > 0) ? spec.fields[1].ctrl : ""
         this.MarkSettingDirty(hint)
@@ -6057,6 +6162,23 @@ class MainWin {
         MainSoftData.CMDLogFilePath := selected
         this.ui.Update("CmdTipLogPathCon", "Text", selected)
         this.MarkSettingDirty("CmdTipLogPathCon")
+    }
+
+    OnSettingAudioBrowse(field, *) {
+        global MainSoftData, StartTipAudio, EndTipAudio, StopTipAudio
+        current := MainSoftData.%field%
+        selected := FileSelect(1, current, GetLang("选择提示音"), "音频文件 (*.wav;*.mp3;*.wma;*.aac;*.flac)|*.wav;*.mp3;*.wma;*.aac;*.flac")
+        if (selected == "")
+            return
+        MainSoftData.%field% := selected
+        if (field == "StartTipAudio")
+            StartTipAudio := selected
+        else if (field == "EndTipAudio")
+            EndTipAudio := selected
+        else
+            StopTipAudio := selected
+        this.ui.Update(field "Con", "Text", selected)
+        this.MarkSettingDirty(field "Con")
     }
 
     ; 0 基索引下拉（配置值即索引，如 RecordMouseTrail / CMDLogAutoClear）
@@ -6424,7 +6546,14 @@ class MainWin {
     }
 
     OnTextEdit(fieldName, state, ctrl, event) {
+        global StartTipAudio, EndTipAudio, StopTipAudio
         MainSoftData.%fieldName% := this.ui.Query(ctrl)
+        if (fieldName == "StartTipAudio")
+            StartTipAudio := MainSoftData.StartTipAudio
+        else if (fieldName == "EndTipAudio") {
+            EndTipAudio := MainSoftData.EndTipAudio
+        } else if (fieldName == "StopTipAudio")
+            StopTipAudio := MainSoftData.StopTipAudio
         this.MarkSettingDirty(ctrl)
     }
 

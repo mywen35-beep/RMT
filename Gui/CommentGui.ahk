@@ -152,7 +152,7 @@ class CommentGui {
 
     CheckIfValid() {
         if (Trim(this.ui.Query("ContentCon")) == "") {
-            MsgBox(GetLang("注释内容不能为空"), "", "Owner" this.Hwnd())
+            RmtDialog.Info(GetLang("注释内容不能为空"), "", "Owner" this.Hwnd())
             return false
         }
         return true

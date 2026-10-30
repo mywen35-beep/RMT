@@ -33,6 +33,7 @@ class DeltaMoveGui {
         }
         if (!XamlWin.Open(this.ui, "", XamlWin.Owner(this)))
             this._closed := true
+        ShowMousePreviewButton(this.ui)
         this.ToggleFunc(true)
     }
 
@@ -103,12 +104,12 @@ class DeltaMoveGui {
             .BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
 
         ; 行1：坐标偏移X / 坐标偏移Y（可编辑下拉，支持变量）
-        body.Add("TextBlock").Grid_Row(1).Grid_Column(0).Text(GetLang("坐标偏移X:")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
+        body.Add("TextBlock").Grid_Row(1).Grid_Column(0).Text(GetLang("偏移值X:")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
         body.Add("ComboBox").Grid_Row(1).Grid_Column(1).Name("DeltaXCon").Height(26).MinHeight(26).IsEditable("True")
             .VerticalContentAlignment("Center").FontSize("11")
             .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}")
             .BorderBrush("{DynamicResource InputStroke}").BorderThickness("1")
-        body.Add("TextBlock").Grid_Row(1).Grid_Column(2).Text(GetLang("坐标偏移Y:")).VerticalAlignment("Center").Margin("10,0,0,0").Foreground("{DynamicResource TextMain}").FontSize("12")
+        body.Add("TextBlock").Grid_Row(1).Grid_Column(2).Text(GetLang("偏移值Y:")).VerticalAlignment("Center").Margin("10,0,0,0").Foreground("{DynamicResource TextMain}").FontSize("12")
         body.Add("ComboBox").Grid_Row(1).Grid_Column(3).Name("DeltaYCon").Height(26).MinHeight(26).Margin("10,0,0,0").IsEditable("True")
             .VerticalContentAlignment("Center").FontSize("11")
             .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}")
@@ -216,12 +217,12 @@ class DeltaMoveGui {
     CheckIfValid() {
         cnt := this.ui.Query("CountCon")
         if (IsNumber(cnt) && Integer(cnt) <= 0) {
-            MsgBox(GetLang("偏移次数请输入正整数"))
+            RmtDialog.Info(GetLang("偏移次数请输入正整数"))
             return false
         }
         iv := this.ui.Query("IntervalCon")
         if (IsNumber(iv) && Number(iv) < 0) {
-            MsgBox(GetLang("每次间隔不能为负数"))
+            RmtDialog.Info(GetLang("每次间隔不能为负数"))
             return false
         }
         return true
@@ -231,19 +232,19 @@ class DeltaMoveGui {
         if (!this.CheckIfValid())
             return
         if (!IsNumber(this.ui.Query("DeltaXCon"))) {
-            MsgBox(GetLang("坐标X是变量时，编辑模式下无法执行"))
+            RmtDialog.Info(GetLang("坐标X是变量时，编辑模式下无法执行"))
             return
         }
         if (!IsNumber(this.ui.Query("DeltaYCon"))) {
-            MsgBox(GetLang("坐标Y是变量时，编辑模式下无法执行"))
+            RmtDialog.Info(GetLang("坐标Y是变量时，编辑模式下无法执行"))
             return
         }
         if (!IsNumber(this.ui.Query("CountCon"))) {
-            MsgBox(GetLang("偏移次数是变量时，编辑模式下无法执行"))
+            RmtDialog.Info(GetLang("偏移次数是变量时，编辑模式下无法执行"))
             return
         }
         if (!IsNumber(this.ui.Query("IntervalCon"))) {
-            MsgBox(GetLang("每次间隔是变量时，编辑模式下无法执行"))
+            RmtDialog.Info(GetLang("每次间隔是变量时，编辑模式下无法执行"))
             return
         }
         CommandStr := this.GetCmdStr()

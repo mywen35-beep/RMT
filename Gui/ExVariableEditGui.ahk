@@ -168,7 +168,7 @@ class ExVariableEditGui {
             ExtractStr := StrReplace(ExtractStr, conVal, "", true, &OutputVarCount, 1)
             if (!isContain) {
                 tipStr := Format("{}{}:{}", GetLang("提取内容"), A_Index, GetLang("未在源文本内容中出现，请修改"))
-                MsgBox(tipStr)
+                RmtDialog.Info(tipStr)
                 return false
             }
         }

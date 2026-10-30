@@ -25,7 +25,7 @@ SetCMDSerialData(CMD) {
     }
     catch as e {
         tipStr := Format("{}{} {}`n{}", GetLang("初始化失败: "), CMD, GetLang("错误"), e.Message)
-        MsgBox(tipStr, GetLang("错误"), 0x10)
+        RmtDialog.Info(tipStr, GetLang("错误"), 0x10)
     }
 
     Data.Refresh()

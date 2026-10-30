@@ -295,7 +295,7 @@ class TriggerStrGui {
     CheckConfigValid() {
         len := StrLen(this.Str)
         if (len >= 40) {
-            MsgBox(GetLang("字串长度不能超过40,有异议请联系UP: 浮生若梦的兔子。"))
+            RmtDialog.Info(GetLang("字串长度不能超过40,有异议请联系UP: 浮生若梦的兔子。"))
             return false
         }
 

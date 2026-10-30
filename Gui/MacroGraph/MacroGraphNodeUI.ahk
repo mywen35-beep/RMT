@@ -89,8 +89,8 @@ class MacroGraphNodeUIMixin {
         else if (IsDeltaMoveCmd(d.type)) {
             ; §20 增量移动：X/Y 相对位移 + 偏移次数（可编辑下拉支持变量）
             varList := GetGuiVarArr()
-            this._AddEditableComboRow(body, "DPosXRow_" id, GetLang("坐标偏移X:"), "DPosX_" id, varList, d.posx, true)
-            this._AddEditableComboRow(body, "DPosYRow_" id, GetLang("坐标偏移Y:"), "DPosY_" id, varList, d.posy, true)
+            this._AddEditableComboRow(body, "DPosXRow_" id, GetLang("偏移值X:"), "DPosX_" id, varList, d.posx, true)
+            this._AddEditableComboRow(body, "DPosYRow_" id, GetLang("偏移值Y:"), "DPosY_" id, varList, d.posy, true)
             this._AddEditableComboRow(body, "DCountRow_" id, GetLang("偏移次数："), "DCount_" id, varList, d.HasOwnProp("count") && d.count != "" ? d.count : "1", true)
             this._AddEditableComboRow(body, "DIntervalRow_" id, GetLang("每次间隔："), "DInterval_" id, varList, d.HasOwnProp("interval") && d.interval != "" ? d.interval : "0", true)
         }
@@ -102,19 +102,22 @@ class MacroGraphNodeUIMixin {
             ;   游戏视角：动作=移动且禁用、速度=100且禁用、拟真轨迹取消并禁用、显示移动次数/每次间隔
             ;   拟真轨迹：动作=移动且禁用、移动方式禁用
             actionEnabled := !(isGameView || isHuman)
-            actionIdx := (isGameView || isHuman) ? 0 : this._MMProActionIndex(d.HasOwnProp("actionType") ? d.actionType : 1)
+            actionIdx := (isGameView || isHuman) ? 0 : this._MMProActionIndex(d.HasOwnProp("actionType") ? d.actionType : 1, mmmode)
             varList := GetGuiVarArr()
-            isDrag := actionIdx == 3 && mmmode == 0
+            actionType := d.HasOwnProp("actionType") ? d.actionType : 1
+            isABDrag := actionType == 4 && mmmode == 0
+            isSimpleDrag := actionType == 5 && mmmode == 0
+            isTargetPoint := mmmode == 0 && !isABDrag
             ; 坐标X / 坐标Y：可编辑下拉（既能下拉选变量，也能手动输入数值）
-            this._AddEditableComboRow(body, "MPPosXRow_" id, GetLang(isDrag ? "起始坐标X:" : (mmmode == 1 ? "坐标偏移X:" : "坐标位置X:")), "MPPosX_" id, varList, this._MMProVarText(d, "posVarX"), true)
-            this._AddEditableComboRow(body, "MPPosYRow_" id, GetLang(isDrag ? "起始坐标Y:" : (mmmode == 1 ? "坐标偏移Y:" : "坐标位置Y:")), "MPPosY_" id, varList, this._MMProVarText(d, "posVarY"), true)
-            this._AddEditableComboRow(body, "MPEndXRow_" id, GetLang("终止坐标X:"), "MPEndX_" id, varList, this._MMProVarText(d, "endPosVarX"), isDrag)
-            this._AddEditableComboRow(body, "MPEndYRow_" id, GetLang("终止坐标Y:"), "MPEndY_" id, varList, this._MMProVarText(d, "endPosVarY"), isDrag)
+            this._AddEditableComboRow(body, "MPPosXRow_" id, GetLang(isABDrag ? "起始坐标X:" : (isTargetPoint ? "目标点：" : "偏移值")), "MPPosX_" id, varList, this._MMProVarText(d, "posVarX"), true)
+            this._AddEditableComboRow(body, "MPPosYRow_" id, GetLang(isABDrag || isTargetPoint ? "" : ""), "MPPosY_" id, varList, this._MMProVarText(d, "posVarY"), true)
+            this._AddEditableComboRow(body, "MPEndXRow_" id, GetLang("终止坐标X:"), "MPEndX_" id, varList, this._MMProVarText(d, "endPosVarX"), isABDrag)
+            this._AddEditableComboRow(body, "MPEndYRow_" id, GetLang("终止坐标Y:"), "MPEndY_" id, varList, this._MMProVarText(d, "endPosVarY"), isABDrag)
             ; 移动速度（文本框，支持标签拖拽改值）；游戏视角固定100且禁用
             this._AddFieldRow(body, "MPSpeedRow_" id, GetLang("移动速度："), "MPSpeed_" id, isGameView ? "100" : (d.HasOwnProp("speed") ? d.speed : "90"), true, !isGameView, id, "")
-            ; 鼠标动作下拉（移动 / 移动后单击 / 移动后双击 / 拖拽）
+            ; 鼠标动作下拉：绝对模式增加普通拖拽与 A 到 B 拖拽两种动作。
             this._AddComboRow(body, "MPActionRow_" id, GetLang("鼠标动作："), "MPActionCmb_" id
-                , [GetLang("移动"), GetLang("移动后单击"), GetLang("移动后双击"), GetLang("拖拽")], actionIdx, true, actionEnabled)
+                , (mmmode == 0 ? [GetLang("移动"), GetLang("移动后单击"), GetLang("移动后双击"), GetLang("拖拽"), GetLang("A到B拖拽")] : [GetLang("移动"), GetLang("移动后单击"), GetLang("移动后双击"), GetLang("拖拽")]), this._MMProActionIndex(actionType, mmmode), true, actionEnabled)
             ; 移动方式下拉；拟真轨迹开启时禁用（§20 去「游戏视角」）
             this._AddComboRow(body, "MPModeRow_" id, GetLang("移动方式") "：", "MPModeCmb_" id
                 , [GetLang("绝对移动"), GetLang("相对移动")], this._MoveModeIndex(mmmode), true, !isHuman)
@@ -225,7 +228,7 @@ class MacroGraphNodeUIMixin {
         winRow := body.Add("StackPanel").Name("SWinRow_" id).Orientation("Horizontal").Margin("0,5,0,0")
         if (!c.isWin)
             winRow.Visibility("Collapsed")
-        winRow.Add("TextBlock").Text(GetLang("窗口信息:")).Foreground("{DynamicResource TextMain}").FontSize(this._MGFontSize(12)).Width(LW).VerticalAlignment("Center")
+        winRow.Add("TextBlock").Text(GetLang("窗口绑定:")).Foreground("{DynamicResource TextMain}").FontSize(this._MGFontSize(12)).Width(LW).VerticalAlignment("Center")
         this._MakeTextBox(winRow, "SWin_" id, d.HasOwnProp("winInfo") ? d.winInfo : "", "196")
         winRow.Add("Button").Name("SWinEdit_" id).Content(GetLang("编辑")).FontSize(this._MGFontSize(11)).Height("20").Margin("4,0,0,0").Padding("8,0")
 
@@ -1443,7 +1446,7 @@ class MacroGraphNodeUIMixin {
         row := body.Add("StackPanel").Name(rowName).Orientation("Horizontal").Margin("0,5,0,0")
         if (!visible)
             row.Visibility("Collapsed")
-        row.Add("TextBlock").Text(labelText).Foreground("{DynamicResource TextMain}").FontSize(this._MGFontSize(12)).Width(labelW).VerticalAlignment("Center")
+        row.Add("TextBlock").Name(rowName "Label").Text(labelText).Foreground("{DynamicResource TextMain}").FontSize(this._MGFontSize(12)).Width(labelW).VerticalAlignment("Center")
         box := this._MakeTextBox(row, boxName, boxValue, boxW, nodeId, field)
         ; boxTag 形如 "Min:0,Max:100"：限制 label 拖动改值的取值区间（引擎读取 Tag；未指定时默认 Min=0）
         if (boxTag != "")

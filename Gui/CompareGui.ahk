@@ -335,7 +335,7 @@ class CompareGui {
         if (!IsObject(this.ui))
             return
         if (this.Data.ToggleArr.Length <= 1) {
-            MsgBox(GetLang("至少保留一个条件"), , "Owner" this.Hwnd())
+            RmtDialog.Info(GetLang("至少保留一个条件"), , "Owner" this.Hwnd())
             return
         }
         this.SaveCompareData()

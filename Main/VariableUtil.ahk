@@ -184,17 +184,17 @@ GetGuiVarArr(Mode := 0) {
 
 CheckVarNameIfValid(Name) {
     if (Name == "") {
-        MsgBox(Format(GetLang("结果变量名不规范：变量名不能为空")))
+        RmtDialog.Info(Format(GetLang("结果变量名不规范：变量名不能为空")))
         return false
     }
 
     if (IsNumber(Name)) {
-        MsgBox(Format(GetLang("结果变量名不规范：变量名不能是纯数字")))
+        RmtDialog.Info(Format(GetLang("结果变量名不规范：变量名不能是纯数字")))
         return false
     }
 
     if (InStr(Name, "_")) {
-        MsgBox(Format(GetLang("结果变量名不规范：变量名不能包含下划线")))
+        RmtDialog.Info(Format(GetLang("结果变量名不规范：变量名不能包含下划线")))
         return false
     }
     return true

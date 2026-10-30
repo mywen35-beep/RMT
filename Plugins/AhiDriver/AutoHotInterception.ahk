@@ -9,7 +9,7 @@ class AutoHotInterception {
 		interceptionDllFile := baseDir "\" bitness "\" interceptionDllName
 
 		if (!FileExist(interceptionDllFile)) {
-			MsgBox("Unable to find " interceptionDllFile "`n`nExpected path:`n" interceptionDllFile "`n`nPlease ensure the file exists.")
+			RmtDialog.Info("Unable to find " interceptionDllFile "`n`nExpected path:`n" interceptionDllFile "`n`nPlease ensure the file exists.")
 			ExitApp
 		}
 
@@ -17,7 +17,7 @@ class AutoHotInterception {
 		if (hModule == 0) {
 			this_bitness := A_PtrSize == 8 ? "64-bit" : "32-bit"
 			other_bitness := A_PtrSize == 4 ? "64-bit" : "32-bit"
-			MsgBox("Bitness of " interceptionDllName " does not match bitness of AHK.`nAHK is " this_bitness ", but " interceptionDllName " is " other_bitness ".")
+			RmtDialog.Info("Bitness of " interceptionDllName " does not match bitness of AHK.`nAHK is " this_bitness ", but " interceptionDllName " is " other_bitness ".")
 			ExitApp
 		}
 		DllCall("FreeLibrary", "Ptr", hModule)
@@ -26,7 +26,7 @@ class AutoHotInterception {
 		ahiDllFile := baseDir "\" ahiDllName
 
 		if (!FileExist(ahiDllFile)) {
-			MsgBox("Unable to find " ahiDllFile "`n`nExpected path:`n" ahiDllFile "`n`nPlease ensure the file exists.")
+			RmtDialog.Info("Unable to find " ahiDllFile "`n`nExpected path:`n" ahiDllFile "`n`nPlease ensure the file exists.")
 			ExitApp
 		}
 
@@ -37,11 +37,11 @@ class AutoHotInterception {
 			this.Instance := asm.CreateInstance("AutoHotInterception.Manager")
 		}
 		catch {
-			MsgBox(ahiDllName " failed to load`n`n" hintMessage)
+			RmtDialog.Info(ahiDllName " failed to load`n`n" hintMessage)
 			ExitApp
 		}
 		if (this.Instance.OkCheck() != "OK") {
-			MsgBox(ahiDllName " loaded but check failed!`n`n" hintMessage)
+			RmtDialog.Info(ahiDllName " loaded but check failed!`n`n" hintMessage)
 			ExitApp
 		}
 	}
@@ -109,7 +109,7 @@ class AutoHotInterception {
 		static devType := Map(0, "Keyboard", 1, "Mouse")
 		dev := this.Instance.GetDeviceId(IsMouse, VID, PID, instance)
 		if (dev == 0) {
-			MsgBox("Could not get " devType[isMouse] " with VID " VID ", PID " PID ", Instance " instance)
+			RmtDialog.Info("Could not get " devType[isMouse] " with VID " VID ", PID " PID ", Instance " instance)
 			ExitApp
 		}
 		return dev
@@ -119,7 +119,7 @@ class AutoHotInterception {
 		static devType := Map(0, "Keyboard", 1, "Mouse")
 		dev := this.Instance.GetDeviceIdFromHandle(isMouse, handle, instance)
 		if (dev == 0) {
-			MsgBox("Could not get " devType[isMouse] " with Handle " handle ", Instance " instance)
+			RmtDialog.Info("Could not get " devType[isMouse] " with Handle " handle ", Instance " instance)
 			ExitApp
 		}
 		return dev

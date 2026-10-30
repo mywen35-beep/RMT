@@ -28,6 +28,7 @@ class SearchProGui {
         this.PreviewFollowing := false
         this.PreviewShowing := false
         this._comboGuard := 0
+        this._ImagePathLast := ""
         this.MultiPointData := []
         this.MultiPointSeedData := []
         this.SuperMultiPointSeedData := []
@@ -196,7 +197,7 @@ class SearchProGui {
 
         winPanel := extra.Add("Grid").Name("WinInfoPanel").Height(32).MinHeight(32).Margin("0,0,0,0")
         winPanel.Cols("78", "8", "*", "8", "50")
-        winPanel.Add("TextBlock").Grid_Column(0).Name("WinInfoTipCon").Text(GetLang("窗口信息:")).VerticalAlignment("Center").HorizontalAlignment("Left")
+        winPanel.Add("TextBlock").Grid_Column(0).Name("WinInfoTipCon").Text(GetLang("窗口绑定:")).VerticalAlignment("Center").HorizontalAlignment("Left")
             .Foreground("{DynamicResource TextMain}").FontSize("12")
         winPanel.Add("TextBox").Grid_Column(2).Name("WinInfoCon").Height(28).MinHeight(28)
             .VerticalAlignment("Center").VerticalContentAlignment("Center").Padding("2,0").FontSize("11")
@@ -207,9 +208,9 @@ class SearchProGui {
             .Foreground("{DynamicResource TextMain}").Background("{DynamicResource ControlBg}")
             .BorderBrush("{DynamicResource ControlBorder}").BorderThickness("1")
 
-        typeHost := extra.Add("Grid").Height(136).MinHeight(136).MaxHeight(136).ClipToBounds("True")
-        imgPanel := typeHost.Add("Grid").Name("ImagePanel").Height(136).VerticalAlignment("Top")
-        imgPanel.Rows("32", "32", "72")
+        typeHost := extra.Add("Grid").Name("SearchTypeHost").Height(168).MinHeight(168).MaxHeight(168).ClipToBounds("True")
+        imgPanel := typeHost.Add("Grid").Name("ImagePanel").Height(168).VerticalAlignment("Top")
+        imgPanel.Rows("32", "32", "104")
         imgRow0 := imgPanel.Add("Grid").Grid_Row(0)
         imgRow0.Cols("Auto", "6", "56", "10", "Auto", "*")
         imgRow0.Add("TextBlock").Grid_Column(0).Name("SimilarTipCon").Text(GetLang("相似度(%)：")).VerticalAlignment("Center")
@@ -225,7 +226,7 @@ class SearchProGui {
             .VerticalAlignment("Center").Foreground("{DynamicResource TextMain}")
         colorMatch.Add("CheckBox").Name("ColorMatchCon").Style("{StaticResource ColorMatchSwitch}")
             .VerticalAlignment("Center").IsChecked("False").ToolTip(GetLang("颜色匹配"))
-        imgRow1.Cols("*", "8", "28", "8", "28")
+        imgRow1.Cols("*", "8", "28", "8", "28", "8", "28")
         imgRow1.Add("ComboBox").Grid_Column(0).Name("ImagePathCon").Height(28).MinHeight(28)
             .HorizontalAlignment("Stretch").VerticalAlignment("Center").IsEditable("True").FontSize("11")
             .Foreground("{DynamicResource InputText}").Background("{DynamicResource InputBg}")
@@ -238,15 +239,19 @@ class SearchProGui {
             .FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets").FontSize("13").Content(Chr(0xE8E5))
             .ToolTip(GetLang("选择图片")).Foreground("{DynamicResource TextMain}")
             .Background("{DynamicResource ControlBg}").BorderBrush("{DynamicResource ControlBorder}").BorderThickness("1")
+        imgRow1.Add("Button").Grid_Column(6).Name("ImageClearBtn").Width(28).Height(28).MinHeight(28).Padding("0").Cursor("Hand")
+            .FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets").FontSize("13").Content(Chr(0xE74D))
+            .ToolTip(GetLang("清除")).Foreground("{DynamicResource TextMain}")
+            .Background("{DynamicResource ControlBg}").BorderBrush("{DynamicResource ControlBorder}").BorderThickness("1")
         imgPrev := imgPanel.Add("Border").Grid_Row(2).Name("ImagePreviewHost")
-            .Width(64).Height(64).MinWidth(64).MinHeight(64).MaxWidth(64).MaxHeight(64)
+            .Width(96).Height(80).MinWidth(96).MinHeight(80).MaxWidth(96).MaxHeight(80)
             .HorizontalAlignment("Left").VerticalAlignment("Top").Margin("0,4,0,0").ClipToBounds("True")
             .Background("{DynamicResource ControlBg}").BorderBrush("{DynamicResource ControlBorder}").BorderThickness("1")
         imgPrev.Add("Image").Name("ImageCon").Stretch("Uniform")
             .HorizontalAlignment("Stretch").VerticalAlignment("Stretch")
         imgPanel.Add("Button").Grid_Row(2).Name("ImageProcessBtn").Uid("gm:Search.ImageProcess")
-            .Width(22).Height(22).MinHeight(22).Padding("0").Cursor("Hand")
-            .HorizontalAlignment("Left").VerticalAlignment("Top").Margin("72,4,0,0")
+            .Width(28).Height(28).MinHeight(28).Padding("0").Cursor("Hand")
+            .HorizontalAlignment("Left").VerticalAlignment("Top").Margin("104,4,0,0")
             .FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets").Content(Chr(0xE70F)).FontSize("12").Tag("0")
             .ToolTip(GetLang("图片处理：多点选点、裁剪或重命名模板"))
             .Foreground("{DynamicResource TextMain}").Background("{DynamicResource ControlBg}")
@@ -366,6 +371,8 @@ class SearchProGui {
         this.ui.OnEvent("HexColorCon", "TextChanged", ObjBindMethod(this, "OnHexColorChange"))
         this.ui.OnEvent("ImageShotBtn", "Click", ObjBindMethod(this, "OnImageShotBtnClick"))
         this.ui.OnEvent("ImageSelectBtn", "Click", ObjBindMethod(this, "OnClickSetPicBtn"))
+        this.ui.OnEvent("ImageClearBtn", "Click", ObjBindMethod(this, "OnClickClearPicBtn"))
+        this.ui.OnEvent("ImagePathCon", "TextChanged", ObjBindMethod(this, "OnImagePathChanged"))
         this.ui.OnEvent("ImageProcessBtn", "Click", ObjBindMethod(this, "OnClickImageProcessBtn"))
         this.ui.OnEvent("BtnWinEdit", "Click", ObjBindMethod(this, "OnClickWinEditBtn"))
         this.ui.OnEvent("BtnEditFoundMacro", "Click", ObjBindMethod(this, "OnEditFoundMacroBtnClick"))
@@ -663,7 +670,7 @@ class SearchProGui {
 
     CheckIfDataValid() {
         if (!ObjHasOwnProp(this.Data, "SearchImagePath")) {
-            MsgBox(GetLang("这条指令不完整，请删除"))
+            RmtDialog.Info(GetLang("这条指令不完整，请删除"))
             return false
         }
         return true
@@ -681,37 +688,37 @@ class SearchProGui {
 
         if (IsNumber(sx) && IsNumber(sy) && IsNumber(ex) && IsNumber(ey)) {
             if (Number(sx) > Number(ex) || Number(sy) > Number(ey)) {
-                MsgBox(GetLang("起始坐标不能大于终止坐标"))
+                RmtDialog.Info(GetLang("起始坐标不能大于终止坐标"))
                 return false
             }
         }
 
         countText := this.ui.Query("SearchCountCon")
         if (countText != GetLang("无限") && (!IsNumber(countText) || Number(countText) <= 0)) {
-            MsgBox(GetLang("搜索次数请输入大于0的数字"))
+            RmtDialog.Info(GetLang("搜索次数请输入大于0的数字"))
             return false
         }
 
         imgPath := this.ui.Query("ImagePathCon")
         if (isImage && imgPath == "") {
-            MsgBox(GetLang("请设置搜索图片"))
+            RmtDialog.Info(GetLang("请设置搜索图片"))
             return false
         }
         if (isImage && IsNumber(sx) && IsNumber(sy) && IsNumber(ex) && IsNumber(ey) && imgPath != "" && FileExist(imgPath)) {
             size := GetImageSize(imgPath)
             if (size[1] > Number(ex) - Number(sx) || size[2] > Number(ey) - Number(sy)) {
-                MsgBox(GetLang("搜索范围不能小于图片大小"))
+                RmtDialog.Info(GetLang("搜索范围不能小于图片大小"))
                 return false
             }
         }
         if (isText && IsNumber(sx) && IsNumber(sy) && IsNumber(ex) && IsNumber(ey)) {
             if (Number(sx) == Number(ex) || Number(sy) == Number(ey)) {
-                MsgBox(GetLang("搜索文本时：搜索范围中起始坐标不能和终止坐标相同"))
+                RmtDialog.Info(GetLang("搜索文本时：搜索范围中起始坐标不能和终止坐标相同"))
                 return false
             }
         }
         if (isWin && this.ui.Query("WinInfoCon") == "") {
-            MsgBox(GetLang("目标窗口信息不能为空"))
+            RmtDialog.Info(GetLang("窗口绑定不能为空"))
             return false
         }
         if (this._IsChecked("ResultToggleCon") && !CheckVarNameIfValid(this.ui.Query("ResultSaveNameCon")))
@@ -722,7 +729,7 @@ class SearchProGui {
         if (ma != 1 && !isWin) {
             spd := this.ui.Query("SpeedCon")
             if (!IsNumber(spd) || Number(spd) < 0 || Number(spd) > 100) {
-                MsgBox(GetLang("移动速度请输入0~100的数字"))
+                RmtDialog.Info(GetLang("移动速度请输入0~100的数字"))
                 return false
             }
         }
@@ -826,6 +833,9 @@ class SearchProGui {
         isWin := curType == 4 || curType == 5 || curType == 6
         isInfinite := this.ui.Query("SearchCountCon") == GetLang("无限")
         this.SetConArrState(this.ImageVariArr, false, isImage)
+        this.ui.Update("SearchTypeHost", "Height", isImage ? "168" : "64")
+        this.ui.Update("SearchTypeHost", "MinHeight", isImage ? "168" : "64")
+        this.ui.Update("SearchTypeHost", "MaxHeight", isImage ? "168" : "64")
         this.ui.Update("ColorMatchHost", "Visibility", isImage && SearchImageDefaultType() == 1 ? "Visible" : "Collapsed")
         this.SetConArrState(this.ColorArr, false, isColor)
         this.SetConArrState(this.TextArr, false, isText)
@@ -901,7 +911,7 @@ class SearchProGui {
             , GetLang("tip2：文本搜索：支持正则表达式，推荐32*32px以上和多文本，单字符识别不准")
             , GetLang("tip3：SC截图后如果调整大小，搜索范围需要手动选取")
             , GetLang("tip4：窗口搜索时：搜索范围需要手动选取"))
-        MsgBox(str, GetLang("搜索类型说明"))
+        RmtDialog.Info(str, GetLang("搜索类型说明"))
     }
 
     OnClickWinEditBtn(*) {
@@ -924,7 +934,7 @@ class SearchProGui {
 
     OnClickSetPicBtn(*) {
         curPath := this.ui.Query("ImagePathCon")
-        path := FileSelect(1, curPath, GetLang("选择图片"), "PNG Files (*.png)")
+        path := FileSelect(1, curPath, GetLang("选择图片"), "Image Files (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp)")
         if (path == "")
             return
         path := StoreSearchImage(path)
@@ -948,6 +958,29 @@ class SearchProGui {
         else {
             TogSelectArea(true, this.OnScreenShotGetArea.Bind(this))
         }
+    }
+
+    OnClickClearPicBtn(*) {
+        if (!IsObject(this.ui))
+            return
+        this._ResetImageProcessForNewImage()
+        this.Data.SearchImagePath := ""
+        this.ui.Update("ImagePathCon", "Text", "")
+        this._SetImage("")
+    }
+
+    OnImagePathChanged(*) {
+        if (!IsObject(this.ui) || !IsObject(this.Data))
+            return
+        path := String(this.ui.Query("ImagePathCon"))
+        if (path == this._ImagePathLast)
+            return
+        this._ImagePathLast := path
+        if (path != this.Data.SearchImagePath) {
+            this._ResetImageProcessForNewImage()
+            this.Data.SearchImagePath := path
+        }
+        this._SetImage(path != "" && FileExist(path) ? path : "")
     }
 
     CheckClipboard(*) {

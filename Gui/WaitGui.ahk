@@ -119,7 +119,7 @@ class WaitGui {
 
         ; 窗口面板
         wp := pStack.Add("StackPanel").Name("WinPanel").Orientation("Horizontal").Visibility("Collapsed")
-        wp.Add("TextBlock").Text(GetLang("窗口信息：")).VerticalAlignment("Center")
+        wp.Add("TextBlock").Text(GetLang("窗口绑定：")).VerticalAlignment("Center")
         wp.Add("TextBox").Name("WinInfoCon").Width(220).Height(24).MinHeight(24).Margin("4,0,0,0")
             .Background("{DynamicResource InputBg}").Foreground("{DynamicResource InputText}")
             .BorderBrush("{DynamicResource InputStroke}").BorderThickness("1").VerticalContentAlignment("Center").Padding("4,0")
@@ -234,7 +234,7 @@ class WaitGui {
         batch.Push({ControlName: "VarValCon", PropertyName: "Text", Value: this.Data.Param2})
         batch.Push({ControlName: "KeyCon", PropertyName: "Text", Value: this.Data.Param1})
         batch.Push({ControlName: "ProcCon", PropertyName: "Text", Value: this.Data.Param1})
-        batch.Push({ControlName: "WinInfoCon", PropertyName: "Text", Value: this.Data.Param1})
+        batch.Push({ControlName: "WinInfoCon", PropertyName: "Text", Value: this.Data.Param1 == "" && (this.Data.WaitType < 10 || this.Data.WaitType > 15) ? "{宏设置窗口绑定}" : this.Data.Param1})
         batch.Push({ControlName: "FilePathCon", PropertyName: "Text", Value: this.Data.Param1})
         batch.Push({ControlName: "DateValCon", PropertyName: "Text", Value: this.Data.Param1})
         this.ui.BatchUpdate(batch)
@@ -322,33 +322,33 @@ class WaitGui {
                     return false
             case 2, 3:    ; 按键
                 if (this.ui.Query("KeyCon") == "") {
-                    MsgBox(GetLang("请输入等待的按键"))
+                    RmtDialog.Info(GetLang("请输入等待的按键"))
                     return false
                 }
             case 8, 9:    ; 进程
                 if (this.ui.Query("ProcCon") == "") {
-                    MsgBox(GetLang("请输入进程名"))
+                    RmtDialog.Info(GetLang("请输入进程名"))
                     return false
                 }
             case 10, 11, 12, 13, 14, 15:    ; 窗口
                 if (this.ui.Query("WinInfoCon") == "") {
-                    MsgBox(GetLang("目标窗口信息不能为空"))
+                    RmtDialog.Info(GetLang("窗口绑定不能为空"))
                     return false
                 }
             case 16, 17, 18:    ; 文件
                 if (this.ui.Query("FilePathCon") == "") {
-                    MsgBox(GetLang("请输入文件路径"))
+                    RmtDialog.Info(GetLang("请输入文件路径"))
                     return false
                 }
             case 19:    ; 日期
                 if (this.ui.Query("DateValCon") == "") {
-                    MsgBox(GetLang("请输入日期值"))
+                    RmtDialog.Info(GetLang("请输入日期值"))
                     return false
                 }
         }
         interval := this.ui.Query("IntervalCon")
         if (!IsNumber(interval) || Number(interval) <= 0) {
-            MsgBox(GetLang("检测间隔请输入大于0的数字（毫秒）"))
+            RmtDialog.Info(GetLang("检测间隔请输入大于0的数字（毫秒）"))
             return false
         }
         return true

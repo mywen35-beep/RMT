@@ -232,7 +232,7 @@ class IntervalGui {
         timeText := this.ui.Query("TimeVarCon1")
         if (IsNumber(timeText)) {
             if (IsFloat(timeText) || timeText < 0) {
-                MsgBox(GetLang("请输入大于0的整数"))
+                RmtDialog.Info(GetLang("请输入大于0的整数"))
                 return
             }
         }
@@ -241,14 +241,14 @@ class IntervalGui {
             timeText := this.ui.Query("TimeVarCon2")
             if (IsNumber(timeText)) {
                 if (IsFloat(timeText) || timeText < 0) {
-                    MsgBox(GetLang("请输入大于0的整数"))
+                    RmtDialog.Info(GetLang("请输入大于0的整数"))
                     return
                 }
             }
 
             if (IsNumber(this.ui.Query("TimeVarCon1")) && IsNumber(this.ui.Query("TimeVarCon2"))) {
                 if (this.ui.Query("TimeVarCon1") >= this.ui.Query("TimeVarCon2")) {
-                    MsgBox(GetLang("时间A 需要小于 时间B"))
+                    RmtDialog.Info(GetLang("时间A 需要小于 时间B"))
                     return
                 }
             }

@@ -95,7 +95,7 @@ ShowOpenCvInstallPrompt(reason) {
         return
 
     try {
-        MsgBox(Format("OpenCV 插件不可用，抓图/搜图等功能将无法使用：`n`n{}", reason), "RMT 提示", 48)
+        RmtDialog.Info(Format("OpenCV 插件不可用，抓图/搜图等功能将无法使用：`n`n{}", reason), "RMT 提示", 48)
     }
 }
 

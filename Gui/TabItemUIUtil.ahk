@@ -38,7 +38,7 @@ OnItemAddMacroBtnClick(tableItem, foldIndex, *) {
         if (fold) {
             Count := GetFoldItemCount(tableItem, fold)
             if (Count >= 8) {
-                MsgBox(GetLang("轮盘最多只能添加8个"), GetLang("提示"))
+                RmtDialog.Info(GetLang("轮盘最多只能添加8个"), GetLang("提示"))
                 return
             }
         }
@@ -184,7 +184,7 @@ OnItemCustomEditTriggerStr(tableItem, index, *) {
 ; 原「自定义触发串」InputBox 逻辑（保留，走菜单项）
 OnItemCustomEditTriggerStrInput(tableItem, index, *) {
     item := tableItem.Items[index]
-    CustomTK := InputBox(GetLang("请输入自定义触发按键："), "修改", "w300 h100", item.TK)
+    CustomTK := RmtDialog.Input(GetLang("请输入自定义触发按键："), "修改", item.TK)
     if CustomTK.Result = "Cancel"
         return
     item.TK := CustomTK.Value
@@ -208,7 +208,8 @@ OnItemVoiceTriggerSetting(tableItem, index, *) {
 }
 
 ;编辑按键宏触发键
-OnItemEditTriggerKey(tableItem, index, *) {
+OnItemEditTriggerKey(tableItem, index, mode := "", *) {
+    mode := mode == "joy" || mode == "keyboard" ? mode : ""
     MyMainWin.ReadTabValues(tableItem)
     item := tableItem.Items[index]
     triggerKey := item.TK
@@ -225,7 +226,7 @@ OnItemEditTriggerKey(tableItem, index, *) {
     MyTriggerKeyGui.SaveBtnAction := OnSaveSetting
     MyTriggerKeyGui.SureBtnAction := SureAction
     MyTriggerKeyGui.UnorderedTrigger := item.UnorderedTrigger
-    MyTriggerKeyGui.ShowGui(triggerKey, item.HoldTime, false)
+    MyTriggerKeyGui.ShowGui(triggerKey, item.HoldTime, false, mode)
 }
 
 ;编辑定时器
@@ -348,7 +349,7 @@ OnItemForbidToggle(tableItem, index, *) {
 
 OnItemMoveUp(tableItem, index, *) {
     if (index == 1) {
-        MsgBox(GetLang("上面没有元素，无法上移！！！"))
+        RmtDialog.Info(GetLang("上面没有元素，无法上移！！！"))
         return
     }
     MyMainWin.ReadTabValues(tableItem)
@@ -366,7 +367,7 @@ OnItemMoveUp(tableItem, index, *) {
 OnItemMoveDown(tableItem, index, *) {
     lastIndex := tableItem.Items.Length
     if (lastIndex == index) {
-        MsgBox(GetLang("下面没有元素，无法下移！！！"))
+        RmtDialog.Info(GetLang("下面没有元素，无法下移！！！"))
         return
     }
     MyMainWin.ReadTabValues(tableItem)
@@ -381,11 +382,11 @@ OnItemMoveDown(tableItem, index, *) {
 }
 
 OnFoldFrontHelp(tableItem, foldIndex, *) {
-    str1 := GetLang("前台用来给本模块绑定目标窗口。")
-    str2 := GetLang("设置后：模块触发键只在该窗口处于前台时生效。")
+    str1 := GetLang("窗口绑定用来指定本模块的目标窗口。")
+    str2 := GetLang("选择「所有窗口」时不限制窗口；选择「句柄」或「窗口信息」时，模块触发键只在匹配窗口处于前台时生效。")
     str3 := GetLang("勾选「设置 - 仅前台运行宏」后，前台窗口不匹配则终止正在运行的宏。")
-    str4 := GetLang("界面宏的面板会附着到匹配的窗口。留空则不限制窗口。")
-    RmtDialog.Info(Format("{}`n{}`n{}`n{}", str1, str2, str3, str4), GetLang("前台说明"))
+    str4 := GetLang("界面宏的面板会附着到匹配的窗口。宏设置和宏指令可以引用父级窗口绑定，修改父级后自动跟随。")
+    RmtDialog.Info(Format("{}`n{}`n{}`n{}", str1, str2, str3, str4), GetLang("窗口绑定说明"))
 }
 
 OnFoldFrontInfoEdit(tableItem, foldIndex, *) {
@@ -461,7 +462,8 @@ FoldSaveDebounceFlush() {
     FoldSavePending := Map()
 }
 
-OnFlodTKEditClick(tableItem, foldIndex, *) {
+OnFlodTKEditClick(tableItem, foldIndex, mode := "", *) {
+    mode := mode == "joy" || mode == "keyboard" ? mode : ""
     fold := tableItem.Folds[foldIndex]
     MyMainWin.ReadTabValues(tableItem)
     SureAction(sureTriggerKey, timeValue, unorderedTrigger) {
@@ -476,7 +478,7 @@ OnFlodTKEditClick(tableItem, foldIndex, *) {
     MyTriggerKeyGui.SaveBtnAction := OnSaveSetting
     MyTriggerKeyGui.SureBtnAction := SureAction
     MyTriggerKeyGui.UnorderedTrigger := fold.UnorderedTrigger
-    MyTriggerKeyGui.ShowGui(fold.TK, fold.HoldTime, false)
+    MyTriggerKeyGui.ShowGui(fold.TK, fold.HoldTime, false, mode)
 }
 
 ; §2 模块禁用切换：按钮态（非勾选框）；复用开关热键同链路
@@ -935,4 +937,12 @@ NetworkApplyNetSetting(ui, closeDlg) {
     NetworkSetNetDialogError(ui, "")
     Toast.Success(GetLang("已保存，监听端口: ") MainSoftData.NetworkPort)
     closeDlg(GetLang("保存"))
+}
+
+; 显式入口统一路由，避免将 XAML 事件参数误作编辑模式。
+OnTriggerEntry(tableItem, index, isFold, mode, *) {
+    if (isFold)
+        OnFlodTKEditClick(tableItem, index, mode)
+    else
+        OnItemEditTriggerKey(tableItem, index, mode)
 }

@@ -1217,7 +1217,7 @@ class AiChatStore {
             ; 用户/助手只要有正文就保留；tool 结果一并落盘，便于完整回放
             if (role = "system")
                 continue
-            if (Trim(content) == "" && !m.Has("tool_calls") && !m.Has("reasoning_content") && !m.Has("reasoning"))
+            if (role != "tool" && Trim(content) == "" && !m.Has("tool_calls") && !m.Has("reasoning_content") && !m.Has("reasoning"))
                 continue
             rec := Map("role", role, "content", content)
             if (m.Has("tool_calls"))

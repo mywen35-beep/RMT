@@ -3,10 +3,12 @@
 class JoyMacro {
 
     class MacroInfo {
-        __New(action, actionUp, processName) {
+        __New(action, actionUp, processName, originalKey := "") {
             this.actionFunc := action
             this.actionUpFunc := actionUp
             this.processName := processName
+            this.originalKey := originalKey
+            this.keepOriginal := originalKey != ""
         }
 
         Action() {
@@ -18,14 +20,21 @@ class JoyMacro {
 
             action := this.actionFunc
             action()
+            if (this.keepOriginal)
+                JoyMacro.PassThroughKey(this.originalKey, 1)
         }
 
         ActionUp() {
-            if (this.actionUpFunc == "")
+            if (this.actionUpFunc == "") {
+                if (this.keepOriginal)
+                    JoyMacro.PassThroughKey(this.originalKey, 0)
                 return
+            }
             ; 松开时不检查窗口条件（确保松止能停下）
             action := this.actionUpFunc
             action()
+            if (this.keepOriginal)
+                JoyMacro.PassThroughKey(this.originalKey, 0)
         }
     }
 
@@ -35,6 +44,8 @@ class JoyMacro {
         this.interval := 50
         this.joyFloat := 5
         this.axisMaxValue := 100
+        this.JoyIndexArr := []
+        this.diActive := Map()
 
         this.timerAction := this.CheckMacro.Bind(this)
 
@@ -60,6 +71,12 @@ class JoyMacro {
     }
 
     AddMacro(key, action, processName, actionUp := "") {
+        keepOriginal := SubStr(key, 1, 1) == "~"
+        if (keepOriginal)
+            key := LTrim(key, "~")
+        key := JoyMacro.NormalizeTriggerKey(key)
+        originalKey := keepOriginal ? key : ""
+        JoyDebugLog("AddMacro key=" key " mapped=" (MySoftData.JoyXboxToAhkMap.Has(key) ? MySoftData.JoyXboxToAhkMap[key] : "<missing>"), "trigger")
         ; 统一到 GameInput 的 XInput 兼容布局：强制用 Xbox 映射，不再按 JoyType 切换
         ; 到 PS5 布局（JoyXboxToAhkMap 与 JoyPS5ToAhkMap 左侧物理键名相同，
         ; 仅右侧内部目标不同；GameInput 把 DS4 也归一为 XInput，故 Xbox 映射对所有类型都对）。
@@ -76,25 +93,49 @@ class JoyMacro {
                 }
 
                 comboKey := ahkKey1 " & " ahkKey2
-                macro := JoyMacro.MacroInfo(action, actionUp, processName)
+                macro := JoyMacro.MacroInfo(action, actionUp, processName, originalKey)
                 this.ComboMacroMap.Set(comboKey, macro)
                 this.Enable()
                 return
             }
         }
 
-        macro := JoyMacro.MacroInfo(action, actionUp, processName)
+        macro := JoyMacro.MacroInfo(action, actionUp, processName, originalKey)
         ahkKey := joyToAhkMap[key]
         this.MacroMap.Set(ahkKey, macro)
         this.Enable()
     }
 
+    ; 兼容旧配置中误保存的短名 A/B/...，统一成 JoyA/JoyB/...。
+    static NormalizeTriggerKey(key) {
+        if (InStr(key, " & ")) {
+            parts := StrSplit(key, " & ")
+            return JoyMacro.NormalizeTriggerKey(parts[1]) " & " JoyMacro.NormalizeTriggerKey(parts[2])
+        }
+        if (InStr(key, "Joy"))
+            return key
+        try converted := JoyShortToInternal(key)
+        catch
+            converted := ""
+        return converted != "" ? converted : key
+    }
+
     Enable() {
         if (this.MacroMap.Count == 0 && this.ComboMacroMap.Count == 0)
             return
+        ; 保留 1.2.2 的 DirectInput 设备枚举：很多手柄不会出现在
+        ; GameInput/XInput，但 AHK 的 1Joy1/1Joy2 状态仍然可读。
+        this.JoyIndexArr := []
+        loop 10 {
+            idx := A_Index
+            try {
+                name := GetKeyState(idx "JoyName")
+                if (name != "" && !InStr(name, "ViGEm") && !InStr(name, "vXbox") && !InStr(name, "Nefarius"))
+                    this.JoyIndexArr.Push(idx)
+            }
+        }
         ; 手柄类型由用户通过 GUI 下拉框设置，此处不再自动覆盖。
-        ; 不再用 GetKeyState("NJoyName") 枚举 DI 设备——设备有无交给每 tick 的
-        ; XInputState()(GameInput) 自然判定，无设备时读不到任何按下即不触发。
+        ; GameInput/XInput 仍作为 DirectInput 不可用时的补充读取路径。
         try GI_EnsureWrapper()
         catch as e
             JoyDebugLog("JoyMacro.Enable: GameInput 不可用: " e.Message)
@@ -129,8 +170,39 @@ class JoyMacro {
     CheckBtnMacro(joyBtnSymbol) {
         ; 统一单路径：按钮从 GameInput 读（wButtons 位），不再走 DirectInput。
         ; 仅在能映射到 XInput 位时触发（JoyN / DPad 键都已含在 xboxJoyBtnMap）。
-        if (this.xboxJoyBtnMap.Has(joyBtnSymbol))
-            this.CheckXboxBtnOrPOVMacro(joyBtnSymbol)
+        ; Xbox 手柄必须先走 XInput DLL。DirectInput 对 Xbox 经常存在设备名但
+        ; 按键状态始终为 0 的情况，先读它会让宏看起来像“完全没有触发”。
+        if (this.xboxJoyBtnMap.Has(joyBtnSymbol)) {
+            if (this.CheckXboxBtnOrPOVMacro(joyBtnSymbol))
+                return
+        }
+        ; 1.2.2 兼容路径：DirectInput/AHK JoyN 是最直接的物理按键来源。
+        ; 先走它，避免 GameInput/XInput 不报告设备时整条触发链失效。
+        for idx in this.JoyIndexArr {
+            try pressed := GetKeyState(idx joyBtnSymbol, "P")
+            catch
+                continue
+            prevKey := joyBtnSymbol "|DI|" idx
+            prev := this.prevXboxState.Has(prevKey) ? this.prevXboxState[prevKey] : 0
+            if (pressed && !prev) {
+                this.prevXboxState[prevKey] := 1
+                this.diActive[joyBtnSymbol] := true
+                this.MacroMap.Get(joyBtnSymbol).Action()
+                return
+            }
+            if (pressed && prev)
+                this.diActive[joyBtnSymbol] := true
+            if (!pressed && prev) {
+                this.prevXboxState[prevKey] := 0
+                this.diActive[joyBtnSymbol] := false
+                this.MacroMap.Get(joyBtnSymbol).ActionUp()
+                return
+            }
+        }
+        ; 只有 DirectInput 确认该键正在按下时才抑制 XInput；
+        ; 其它情况下继续遍历全部 XInput 0~3 槽位。
+        if (this.diActive.Has(joyBtnSymbol) && this.diActive[joyBtnSymbol])
+            return
     }
 
     CheckComboMacro(comboKey) {
@@ -149,12 +221,14 @@ class JoyMacro {
             try State := this.XInputState(idx)
             catch
                 continue
-            if (State == 0) {
+            if !IsObject(State) {
                 ; 设备暂不可读（未就绪/断连）时也要复位边沿状态，否则该槽位会永远停在「已按下」，
                 ; 表现为组合键只生效一次、之后怎么按都没反应。
                 prevKey0 := comboKey "|Xbox|" idx
-                if (this.prevXboxState.Has(prevKey0) && this.prevXboxState[prevKey0])
+                if (this.prevXboxState.Has(prevKey0) && this.prevXboxState[prevKey0]) {
                     this.prevXboxState[prevKey0] := 0
+                    this.ComboMacroMap.Get(comboKey).ActionUp()
+                }
                 continue
             }
 
@@ -187,14 +261,46 @@ class JoyMacro {
             if (pressed1 && pressed2) {
                 if (!prev) {
                     this.prevXboxState[prevKey] := 1
-                    this.ComboMacroMap.Get(comboKey).Action()
+                    macro := this.ComboMacroMap.Get(comboKey)
+                    macro.Action()
                     return
                 }
             }
             else if (prev) {
                 ; 任一键松开（或本帧未同时按下）必须复位，否则 prev 永远为 1 → 组合键只能用一次
                 this.prevXboxState[prevKey] := 0
+                macro := this.ComboMacroMap.Get(comboKey)
+                macro.ActionUp()
             }
+        }
+    }
+
+    ; 将触发手柄的原始状态复制到 RMT 的虚拟手柄。这样即使触发宏，
+    ; 游戏仍能看到该按键本来的按下/松开行为。
+    static PassThroughKey(key, state) {
+        key := RegExReplace(key, "^~", "")
+        if (InStr(key, " & ")) {
+            for part in StrSplit(key, " & ")
+                JoyMacro.PassThroughKey(part, state)
+            return
+        }
+        name := SubStr(key, 4)
+        static xboxMap := Map("A", "A", "B", "B", "X", "X", "Y", "Y", "LB", "LB", "RB", "RB",
+            "LS", "LS", "RS", "RS", "Back", "Back", "Start", "Start", "Home", "Xbox", "Pad", "A")
+        static ds4Map := Map("A", "Cross", "B", "Circle", "X", "Square", "Y", "Triangle", "LB", "L1", "RB", "R1",
+            "LS", "LS", "RS", "RS", "Back", "Share", "Start", "Options", "Home", "Ps", "Pad", "TouchPad")
+        btnMap := MainSoftData.JoyType == "DS4" ? ds4Map : xboxMap
+        static dpadMap := Map("DpadUp", "Up", "DpadRight", "Right", "DpadDown", "Down", "DpadLeft", "Left")
+        if (dpadMap.Has(name))
+            MyViGJoySetState("Dpad", state ? dpadMap[name] : "None", 0)
+        else if (btnMap.Has(name))
+            MyViGJoySetState("Btn", btnMap[name], state)
+        else if (name == "LT" || name == "RT")
+            MyViGJoySetState("Axis", name, state ? 255 : 0)
+        else if (RegExMatch(name, "^Axis(LX|LY|RX|RY)(Min|Max)$", &m)) {
+            axis := m[1]
+            target := state ? (m[2] == "Min" ? 0 : 100) : 50
+            MyViGJoySetState("Axis", axis, target)
         }
     }
 
@@ -213,18 +319,20 @@ class JoyMacro {
     CheckXboxBtnOrPOVMacro(joySymbol) {
         isXboxHasBtn := this.xboxJoyBtnMap.Has(joySymbol)
         if (!isXboxHasBtn)
-            return
+            return false
 
         ; 反回环已下移到读取源头(GI_CollectStates 过滤 PID=0x028E 的 ViGEm 设备)：
         ; ViGEm 永不进入本读取数组，JoyMacro 读到的只有物理手柄 → 此处直接按边沿触发即可。
         ; (曾用的因果位掩码 IsViGEmOutputtingBit/__ViGEmOutButtons 已删除——它在 ViGEm 输出
         ;  同键位时会误伤物理手柄的同键按下。)
+        found := false
         loop 4 {
             idx := A_Index - 1
             try state := this.XInputState(idx)
             catch
                 continue
-            if (state != 0) {
+            if IsObject(state) {
+                found := true
                 bitSymbol := this.xboxJoyBtnMap.Get(joySymbol)
                 pressed := (state.wButtons >> bitSymbol) & 1
                 prevKey := joySymbol "|Xbox|" idx
@@ -233,14 +341,21 @@ class JoyMacro {
                 if (pressed && !prev) {
                     this.prevXboxState[prevKey] := 1
                     this.MacroMap.Get(joySymbol).Action()
-                    return
+                    return true
                 }
                 if (!pressed && prev) {
                     this.prevXboxState[prevKey] := 0
                     this.MacroMap.Get(joySymbol).ActionUp()
                 }
+            } else {
+                prevKey := joySymbol "|Xbox|" idx
+                if (this.prevXboxState.Has(prevKey) && this.prevXboxState[prevKey]) {
+                    this.prevXboxState[prevKey] := 0
+                    this.MacroMap.Get(joySymbol).ActionUp()
+                }
             }
         }
+        return found
     }
 
     CheckXboxAxisMacro(joyAxisSymbol) {
@@ -250,8 +365,14 @@ class JoyMacro {
         loop 4 {
             idx := A_Index - 1
             value := this.GetXboxAxisValue(joyAxisSymbol, idx)
-            if (value == 0)
+            if (value == 0) {
+                prevKey := joyAxisSymbol "|Xbox|" idx
+                if (this.prevXboxState.Has(prevKey) && this.prevXboxState[prevKey]) {
+                    this.prevXboxState[prevKey] := 0
+                    this.MacroMap.Get(joyAxisSymbol).ActionUp()
+                }
                 continue
+            }
 
             pressed := (value >= valueSection[1] && value <= valueSection[2])
             prevKey := joyAxisSymbol "|Xbox|" idx
@@ -291,7 +412,7 @@ class JoyMacro {
         try State := this.XInputState(userIndex)
         catch
             return 0
-        if (State == 0)
+        if !IsObject(State)
             return 0
 
         if (joyAxisSymbol == "JoyZMin") {
@@ -323,15 +444,48 @@ class JoyMacro {
         return 0
     }
 
-    ; 手柄状态读取：只走 GameInput（同进程复用 RecordJoyUtil 的 wrapper，
-    ; 每次读最新 reading 快照，天然事件驱动）。不再退回旧 XInput1_4。
+    ; 手柄状态读取：优先走 GameInput（同进程复用 RecordJoyUtil 的 wrapper），
+    ; 对不产生 GameInput reading 的 XInput 手柄回退到系统 XInput DLL。
     ; UserIndex 在 GameInput 下无槽位概念，单手柄取 device[0]，多手柄按设备序映射。
-    ; 读取失败(GameInput 未就绪/加载异常)时异常上抛，由调用点按"读不到即不触发"处理。
+    ; 两种读取源都失败时按“读不到即不触发”处理。
     XInputState(UserIndex) {
-        GI_EnsureWrapper()   ; 幂等懒加载 GameInput wrapper；触发首次读取即自初始化
-        states := GI_CollectStates()
-        if (states.Length == 0)
-            return 0
+        ; Xbox 手柄以系统 XInput DLL 为首选来源。GameInput 在部分驱动上
+        ; 不产生 reading，不能让它的空结果阻断 XInput 0~3 槽位读取。
+        try {
+            xi := JoyXInputEx(UserIndex)
+            if IsObject(xi)
+                return {
+                    dwPacketNumber: 0,
+                    wButtons: xi.wButtons,
+                    bLeftTrigger: xi.lt,
+                    bRightTrigger: xi.rt,
+                    sThumbLX: Round(xi.lx * 327.67),
+                    sThumbLY: Round(xi.ly * 327.67),
+                    sThumbRX: Round(xi.rx * 327.67),
+                    sThumbRY: Round(xi.ry * 327.67)
+                }
+        }
+        catch {
+        }
+        states := []
+        try {
+            GI_EnsureWrapper()   ; 幂等懒加载 GameInput wrapper；触发首次读取即自初始化
+            states := GI_CollectStates()
+        } catch {
+            ; GameInput 不可用时直接使用下面的 XInput 回退。
+        }
+        if (states.Length == 0) {
+            ; 部分 XInput 手柄不会产生 GameInput reading（日志表现为
+            ; Snapshot GI end n=0），但仍可通过系统 XInput 接口读取。
+            ; 这里保留 XInput 兼容回退，确保基础按键触发可用。
+            try {
+                ahk := this.AhkState(UserIndex)
+                if IsObject(ahk)
+                    return ahk
+            }
+            catch
+                return 0
+        }
         ; 越界槽位(UerIndex>=设备数)直接返回 0，不再回退读 device[0]——
         ; 否则多手柄/槽位循环时第 2+ 台会重复读到第 1 台，造成重复计数/误触发
         if (UserIndex >= states.Length)
@@ -346,6 +500,48 @@ class JoyMacro {
             sThumbLY:       st.sThumbLY,
             sThumbRX:       st.sThumbRX,
             sThumbRY:       st.sThumbRY
+        }
+    }
+
+    ; DirectInput/AHK 回退：部分手柄只在 AHK 的 JoyN 设备枚举中可见。
+    AhkState(UserIndex) {
+        idx := UserIndex + 1
+        try name := GetKeyState(idx "JoyName")
+        catch
+            return 0
+        ; 某些 DirectInput 设备 JoyName 为空，但 Joy1/Joy2 状态仍可读；
+        ; 只有明确识别为虚拟手柄时才过滤，不能因名称为空丢弃整台设备。
+        if (InStr(name, "ViGEm") || InStr(name, "vXbox") || InStr(name, "Nefarius"))
+            return 0
+        static logged := Map()
+        if (!logged.Has(idx)) {
+            logged[idx] := true
+            JoyDebugLog("AHK fallback device idx=" idx " name=" name, "trigger")
+        }
+        bits := 0
+        static btnBits := Map("Joy1", 12, "Joy2", 13, "Joy3", 14, "Joy4", 15, "Joy5", 8, "Joy6", 9,
+            "Joy7", 5, "Joy8", 4, "Joy9", 6, "Joy10", 7, "Joy13", 10, "Joy14", 5)
+        for key, bit in btnBits {
+            try {
+                if (GetKeyState(idx key))
+                    bits |= (1 << bit)
+            }
+        }
+        try pov := Integer(GetKeyState(idx "JoyPOV"))
+        catch
+            pov := 65535
+        static povBits := Map(0, 0, 9000, 3, 18000, 1, 27000, 2)
+        if (povBits.Has(pov))
+            bits |= (1 << povBits[pov])
+        return {
+            dwPacketNumber: 0,
+            wButtons: bits,
+            bLeftTrigger: 0,
+            bRightTrigger: 0,
+            sThumbLX: 0,
+            sThumbLY: 0,
+            sThumbRX: 0,
+            sThumbRY: 0
         }
     }
 

@@ -422,12 +422,14 @@ public class VirtualListHost
         if (_lb == null || _items.Count == 0 || _initialRelayoutQueued)
             return;
         _initialRelayoutQueued = true;
-        _lb.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle, new System.Action(() =>
+        _lb.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new System.Action(() =>
         {
             _initialRelayoutQueued = false;
             if (_lb == null || !_lb.IsLoaded || _items.Count == 0)
                 return;
-            Relayout();
+            _lb.InvalidateMeasure();
+            _lb.UpdateLayout();
+            UpdateSticky();
         }));
     }
 

@@ -297,7 +297,7 @@ class InputGui {
         }
         timeout := this.ui.Query("TimeoutCon")
         if (timeout != "" && (!IsNumber(timeout) || Number(timeout) < 0)) {
-            MsgBox(GetLang("超时请输入大于等于0的数字（毫秒）"))
+            RmtDialog.Info(GetLang("超时请输入大于等于0的数字（毫秒）"))
             return false
         }
         return true
@@ -318,7 +318,7 @@ class InputGui {
             if (Res != "") {
                 tip1 := Format(GetLang("变量：{}"), this.Data.SaveName)
                 tip2 := Format(GetLang("值：{}"), Res)
-                MsgBox(tip1 "`n" tip2)
+                RmtDialog.Info(tip1 "`n" tip2)
             }
         }
     }

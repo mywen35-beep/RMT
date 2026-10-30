@@ -62,7 +62,7 @@ class TableMgrGui {
     }
 
     _Add() {
-        result := InputBox(GetLang("请输入新表名称："), GetLang("新增表"), "w300 h100", "")
+        result := RmtDialog.Input(GetLang("请输入新表名称："), GetLang("新增表"), "")
         if (result.Result == "Cancel" || Trim(result.Value) == "")
             return
         name := Trim(result.Value)
@@ -104,7 +104,7 @@ class TableMgrGui {
         t := this._Selected()
         if (!t)
             return
-        result := InputBox(GetLang("请输入新表名称："), GetLang("重命名表"), "w300 h100", t.Name)
+        result := RmtDialog.Input(GetLang("请输入新表名称："), GetLang("重命名表"), t.Name)
         if (result.Result == "Cancel" || Trim(result.Value) == "")
             return
         RenameTable(t.ID, Trim(result.Value))
@@ -119,8 +119,8 @@ class TableMgrGui {
         t := this._Selected()
         if (!t)
             return
-        result := MsgBox(Format(GetLang("确定删除表「{1}」及其全部 {2} 条宏吗？"), t.Name, t.Items.Length), GetLang("删除表"), 1)
-        if (result == "Cancel")
+        result := RmtDialog.Confirm(Format(GetLang("确定删除表「{1}」及其全部 {2} 条宏吗？"), t.Name, t.Items.Length), GetLang("删除表"))
+        if (!result)
             return
         RemoveTable(t.ID)
         this._ReloadList()

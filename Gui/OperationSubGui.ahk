@@ -264,7 +264,7 @@ class OperationSubGui {
             return
         expr := this.ui.Query("ExpressionCon")
         if (expr == "") {
-            MsgBox(GetLang("表达式不能为空"))
+            RmtDialog.Info(GetLang("表达式不能为空"))
             return
         }
 
@@ -308,17 +308,17 @@ class OperationSubGui {
             ; 计算包含变量的表达式
             try {
                 result := EvaluateExpression(testExpr)
-                MsgBox(Format("{}：{}{}", GetLang("假定所有变量均为10，计算结果"), result, "`n" GetLang("提示：实际运行时会使用真实的变量值")))
+                RmtDialog.Info(Format("{}：{}{}", GetLang("假定所有变量均为10，计算结果"), result, "`n" GetLang("提示：实际运行时会使用真实的变量值")))
             } catch Error as e {
-                MsgBox(Format(GetLang("表达式语法错误：{}"), e.Message))
+                RmtDialog.Info(Format(GetLang("表达式语法错误：{}"), e.Message))
             }
         } else {
             ; 没有变量，直接计算
             try {
                 result := EvaluateExpression(expr)
-                MsgBox(Format(GetLang("计算结果：{}"), result))
+                RmtDialog.Info(Format(GetLang("计算结果：{}"), result))
             } catch Error as e {
-                MsgBox(Format(GetLang("表达式语法错误：{}"), e.Message))
+                RmtDialog.Info(Format(GetLang("表达式语法错误：{}"), e.Message))
             }
         }
     }
@@ -367,7 +367,7 @@ class OperationSubGui {
             try {
                 EvaluateExpression(testExpr)
             } catch Error as e {
-                MsgBox(Format(GetLang("表达式语法错误：{}"), e.Message))
+                RmtDialog.Info(Format(GetLang("表达式语法错误：{}"), e.Message))
                 return
             }
         }
@@ -393,17 +393,17 @@ class OperationSubGui {
                 ; 校验1：变量内容不能为空（包括只有空格的情况）
                 varContentTrim := Trim(varContentRaw)
                 if (varContentTrim = "") {
-                    MsgBox(GetLang("表达式错误：变量内容不能为空"))
+                    RmtDialog.Info(GetLang("表达式错误：变量内容不能为空"))
                     return false
                 }
                 ; 校验2：变量内容（去空格后）不能包含{}
                 if InStr(varContentTrim, "{") || InStr(varContentTrim, "}") {
-                    MsgBox(GetLang("表达式错误：变量内容不能包含{}"))
+                    RmtDialog.Info(GetLang("表达式错误：变量内容不能包含{}"))
                     return false
                 }
                 ; 校验3：变量内容不能包含任何空白符（包括空格/制表符等）
                 if RegExMatch(varContentRaw, "\s") {
-                    MsgBox(GetLang("表达式错误：变量内容不能包含空白符"))
+                    RmtDialog.Info(GetLang("表达式错误：变量内容不能包含空白符"))
                     return false
                 }
 
@@ -428,7 +428,7 @@ class OperationSubGui {
                 break
             fname := StrLower(fnMatch[1])
             if (fname != "abs" && fname != "max" && fname != "min" && fname != "round" && fname != "ceil" && fname != "floor") {
-                MsgBox(Format(GetLang("表达式错误：不支持的函数 {}"), fnMatch[1]))
+                RmtDialog.Info(Format(GetLang("表达式错误：不支持的函数 {}"), fnMatch[1]))
                 return false
             }
             pos := fnMatch.Pos + fnMatch.Len
@@ -436,7 +436,7 @@ class OperationSubGui {
 
         validPattern := "^(?:\{[^{}]+\}|-?\d+\.\d+|-?\d+|[+\-*/%^()⌊⌋,]|[a-zA-Z_])+$"
         if !RegExMatch(cleanExpr, validPattern) {
-            MsgBox(GetLang("表达式包含非法字符或格式错误"))
+            RmtDialog.Info(GetLang("表达式包含非法字符或格式错误"))
             return false
         }
 
@@ -453,20 +453,20 @@ class OperationSubGui {
             else if char = "⌋"
                 floorClose++
             if closeCount > openCount {
-                MsgBox(GetLang("表达式错误：括号不匹配"))
+                RmtDialog.Info(GetLang("表达式错误：括号不匹配"))
                 return false
             }
             if floorClose > floorOpen {
-                MsgBox(GetLang("表达式错误：取整括号不匹配"))
+                RmtDialog.Info(GetLang("表达式错误：取整括号不匹配"))
                 return false
             }
         }
         if openCount != closeCount {
-            MsgBox(GetLang("表达式错误：括号不匹配"))
+            RmtDialog.Info(GetLang("表达式错误：括号不匹配"))
             return false
         }
         if floorOpen != floorClose {
-            MsgBox(GetLang("表达式错误：取整括号不匹配"))
+            RmtDialog.Info(GetLang("表达式错误：取整括号不匹配"))
             return false
         }
 
@@ -476,11 +476,11 @@ class OperationSubGui {
         invalidStart := "+*/%^," ; 负号(-)、括号、函数名、⌊ 允许开头
         invalidEnd := "+-*/%^⌊," ; 运算符与 ⌊、逗号不允许结尾
         if (InStr(invalidStart, firstChar)) {
-            MsgBox(GetLang("表达式错误：不能以运算符开头"))
+            RmtDialog.Info(GetLang("表达式错误：不能以运算符开头"))
             return false
         }
         if (InStr(invalidEnd, lastChar)) {
-            MsgBox(GetLang("表达式错误：不能以运算符结尾"))
+            RmtDialog.Info(GetLang("表达式错误：不能以运算符结尾"))
             return false
         }
 
@@ -492,14 +492,14 @@ class OperationSubGui {
             matched := opMatch[0]
             ; 允许 +-、-+、--（负数或正数前缀）
             if (matched != "+-" && matched != "-+" && matched != "--") {
-                MsgBox(GetLang("表达式错误：存在连续运算符") matched)
+                RmtDialog.Info(GetLang("表达式错误：存在连续运算符") matched)
                 return false
             }
         }
 
         ; ========== 步骤6：校验空括号 ==========
         if RegExMatch(cleanExpr, "\(\)") {
-            MsgBox(GetLang("表达式错误：空括号"))
+            RmtDialog.Info(GetLang("表达式错误：空括号"))
             return false
         }
 
@@ -507,7 +507,7 @@ class OperationSubGui {
         ; 检查括号内是否为空或仅有空格/运算符
         if RegExMatch(cleanExpr, "\([+\-*/%^]*\)", &emptyParenMatch) {
             if (emptyParenMatch[0] != "()") {
-                MsgBox(GetLang("表达式错误：括号内内容无效"))
+                RmtDialog.Info(GetLang("表达式错误：括号内内容无效"))
                 return false
             }
         }
@@ -515,7 +515,7 @@ class OperationSubGui {
         ; ========== 步骤8：校验除零风险 ==========
         ; 检查 /0 或 /(表达式) 的情况
         if RegExMatch(cleanExpr, "/0(?![\d.])") {
-            MsgBox(GetLang("表达式错误：除数不能为零"))
+            RmtDialog.Info(GetLang("表达式错误：除数不能为零"))
             return false
         }
         ; 检查 /(数字) 且数字为0的情况（简单检测）
@@ -523,7 +523,7 @@ class OperationSubGui {
             parenContent := divParen[1]
             ; 如果括号内是明确的0
             if (parenContent == "0" || parenContent == "+0" || parenContent == "-0") {
-                MsgBox(GetLang("表达式错误：除数不能为零"))
+                RmtDialog.Info(GetLang("表达式错误：除数不能为零"))
                 return false
             }
         }
@@ -534,7 +534,7 @@ class OperationSubGui {
         ; 正则解释：\( + (-数字) + \) + \^ + (数字开头) + \. + (非零数字 + 任意数字)
         ; 这样 (-2)^3.0 不会匹配，但 (-2)^0.5 会匹配
         if RegExMatch(cleanExpr, "\(-[^)]*\)\^\d*\.[1-9]\d*") {
-            MsgBox(GetLang("表达式错误：不支持负数的非整数次方运算"))
+            RmtDialog.Info(GetLang("表达式错误：不支持负数的非整数次方运算"))
             return false
         }
 

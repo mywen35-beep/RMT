@@ -307,7 +307,7 @@ class SettingMgrGui {
     }
 
     OnReNameBtnClick(state, ctrl, event) {
-        newFileName := InputBox(GetLang("请输入新的配置名："), GetLang("重命名"), "w300 h100")
+        newFileName := RmtDialog.Input(GetLang("请输入新的配置名："), GetLang("重命名"), "")
         if newFileName.Result = "Cancel" || newFileName.Value = ""
             return
 
@@ -332,7 +332,7 @@ class SettingMgrGui {
 
         SettingDir := A_WorkingDir "\Setting\" MySoftData.CurSettingName
         this.OnRepairSetting(SettingDir)
-        MsgBox(GetLang("重命名成功"))
+        RmtDialog.Info(GetLang("重命名成功"))
         SafeReload()
     }
 
@@ -403,7 +403,7 @@ class SettingMgrGui {
         SettingDir := A_WorkingDir "\Setting\" MySoftData.CurSettingName
         hasWork := this.OnRepairSetting(SettingDir)
         if (hasWork) {
-            MsgBox("已校对")
+            RmtDialog.Info("已校对")
             CfgWrite(true, SettingFile, SettingSection, "IsReload")
             SafeReload()
         }
@@ -412,7 +412,7 @@ class SettingMgrGui {
                 Format("{}`n{}`n{}`n{}", GetLang("未发现需要修复的内容"), GetLang("重要须知："), GetLang("- 针对覆盖配置文件后，搜索图片的配置路径矫正"),
                 GetLang("- 低版本配置到高版本时，进行兼容适配升级"))
             )
-            MsgBox(tipStr)
+            RmtDialog.Info(tipStr)
         }
     }
 
@@ -505,12 +505,12 @@ class SettingMgrGui {
     OnDelBtnClick(state, ctrl, event) {
         settingName := this._GetSelectedSetting(state)
         if (settingName == MySoftData.CurSettingName) {
-            MsgBox(GetLang("不可删除当前配置"))
+            RmtDialog.Info(GetLang("不可删除当前配置"))
             return
         }
 
-        result := MsgBox(Format(GetLang("是否删除{}配置"), settingName), GetLang("提示"), 1)
-        if (result == "Cancel")
+        result := RmtDialog.Confirm(Format(GetLang("是否删除{}配置"), settingName), GetLang("提示"))
+        if (!result)
             return
 
         if (DirExist(A_WorkingDir "\Setting\" settingName))
@@ -525,12 +525,12 @@ class SettingMgrGui {
         SettingArrStr := RTrim(SettingArrStr, "π")
         MainSoftData.SettingArrStr := SettingArrStr
         CfgWrite(MainSoftData.SettingArrStr, SettingFile, SettingSection, "SettingArrStr")
-        MsgBox(GetLang("删除配置: ") settingName)
+        RmtDialog.Info(GetLang("删除配置: ") settingName)
         this.Refresh()
     }
 
     OnAddBtnClick(state, ctrl, event) {
-        newFileName := InputBox(GetLang("请输入新的配置名："), GetLang("新增配置"), "w300 h100")
+        newFileName := RmtDialog.Input(GetLang("请输入新的配置名："), GetLang("新增配置"), "")
         if newFileName.Result = "Cancel" || newFileName.Value = ""
             return
 
@@ -543,12 +543,12 @@ class SettingMgrGui {
 
         MainSoftData.SettingArrStr .= "π" newFileName.Value
         CfgWrite(MainSoftData.SettingArrStr, SettingFile, SettingSection, "SettingArrStr")
-        MsgBox(GetLang("成功新增配置：") newFileName.Value)
+        RmtDialog.Info(GetLang("成功新增配置：") newFileName.Value)
         SafeReload()
     }
 
     OnCopyBtnClick(state := unset, ctrl := unset, event := unset) {
-        newFileName := InputBox(GetLang("请输入新的配置名："), GetLang("复制配置"), "w300 h100")
+        newFileName := RmtDialog.Input(GetLang("请输入新的配置名："), GetLang("复制配置"), "")
         if newFileName.Result = "Cancel" || newFileName.Value = ""
             return
 
@@ -562,7 +562,7 @@ class SettingMgrGui {
         DestPath := A_WorkingDir "\Setting\" newFileName.Value
         DirCopy(SourcePath, DestPath, 1)
         this.OnRepairSetting(DestPath)
-        MsgBox(Format(GetLang("成功复制<{}>配置到<{}>中"), MySoftData.CurSettingName, newFileName.Value))
+        RmtDialog.Info(Format(GetLang("成功复制<{}>配置到<{}>中"), MySoftData.CurSettingName, newFileName.Value))
 
         ; 只落盘：源（当前）配置未被触碰，不切换 CurSettingName、不写 IsReload、不重启，仅刷新配置列表
         this.Refresh()
@@ -582,13 +582,13 @@ class SettingMgrGui {
     CheckIfExistAndValid(FileName) {
         isVaild := this.IsValidFolderName(FileName)
         if (!isVaild) {
-            MsgBox(GetLang("配置名不符合文件目录命名规则，请修改"))
+            RmtDialog.Info(GetLang("配置名不符合文件目录命名规则，请修改"))
             return false
         }
 
         for settingName in this.SettingList {
             if (FileName == settingName) {
-                MsgBox(GetLang("配置名已存在"))
+                RmtDialog.Info(GetLang("配置名已存在"))
                 return false
             }
         }

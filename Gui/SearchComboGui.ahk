@@ -483,7 +483,7 @@ class SearchComboGui {
             . '<ComboBox Name="' this._TN(n, "Type") '" Grid.Column="0" Width="110" Height="28" MinHeight="28" VerticalAlignment="Center" VerticalContentAlignment="Center" FontSize="' fs '">' typeItems '</ComboBox>'
             . '<Grid Name="' this._TN(n, "WinInfoRow") '" Grid.Column="2" Grid.ColumnSpan="5" VerticalAlignment="Center">'
             . '<Grid.ColumnDefinitions><ColumnDefinition Width="72"/><ColumnDefinition Width="8"/><ColumnDefinition Width="140"/><ColumnDefinition Width="8"/><ColumnDefinition Width="28"/></Grid.ColumnDefinitions>'
-            . '<TextBlock Grid.Column="0" Text="' GetLang("窗口信息:") '" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="{DynamicResource TextMain}" FontSize="' fs '"/>'
+            . '<TextBlock Grid.Column="0" Text="' GetLang("窗口绑定:") '" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="{DynamicResource TextMain}" FontSize="' fs '"/>'
             . '<TextBox Name="' this._TN(n, "WinInfo") '" Grid.Column="2" Width="140" Height="28" MinHeight="28" FontSize="' fs '"'
             . ' Background="{DynamicResource InputBg}" Foreground="{DynamicResource InputText}" BorderBrush="{DynamicResource InputStroke}" BorderThickness="1" VerticalContentAlignment="Center" Padding="4,0"/>'
             . '<Button Name="' this._TN(n, "WinInfoEditBtn") '" Grid.Column="4" Width="28" Height="28" MinHeight="28" Padding="0" Cursor="Hand"'
@@ -540,9 +540,9 @@ class SearchComboGui {
             . this._ThemeHoverBtnStyle()
             . '</Button></Grid></Border>'
             . '<TextBlock Name="' this._TN(n, "ImagePathTip") '" Grid.Row="3" Grid.Column="0" Text="' GetLang("图片路径：") '" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="{DynamicResource TextMain}" FontSize="' fs '"/>'
-            . '<Grid Name="' this._TN(n, "ImagePathRow") '" Grid.Row="3" Grid.Column="2" Width="264" HorizontalAlignment="Left">'
+            . '<Grid Name="' this._TN(n, "ImagePathRow") '" Grid.Row="3" Grid.Column="2" Width="300" HorizontalAlignment="Left">'
             . '<Grid.ColumnDefinitions>'
-            . '<ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="28"/><ColumnDefinition Width="8"/><ColumnDefinition Width="28"/>'
+            . '<ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="28"/><ColumnDefinition Width="8"/><ColumnDefinition Width="28"/><ColumnDefinition Width="8"/><ColumnDefinition Width="28"/>'
             . '</Grid.ColumnDefinitions>'
             . '<ComboBox Name="' this._TN(n, "ImagePath") '" Grid.Column="0" Height="28" MinHeight="28" VerticalAlignment="Center" HorizontalAlignment="Stretch" IsEditable="True" FontSize="' fs '"'
             . ' Foreground="{DynamicResource InputText}" Background="{DynamicResource InputBg}" BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1"/>'
@@ -553,6 +553,10 @@ class SearchComboGui {
             . '<Button Name="' this._TN(n, "ImageSelectBtn") '" Grid.Column="4" Width="28" Height="28" MinHeight="28" Padding="0" Cursor="Hand"'
             . ' FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="' fs '" Content="' Chr(0xE8E5) '"'
             . ' ToolTip="' GetLang("选择图片") '" Foreground="{DynamicResource TextMain}"'
+            . ' Background="{DynamicResource ControlBg}" BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1"/>'
+            . '<Button Name="' this._TN(n, "ImageClearBtn") '" Grid.Column="6" Width="28" Height="28" MinHeight="28" Padding="0" Cursor="Hand"'
+            . ' FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="' fs '" Content="' Chr(0xE74D) '"'
+            . ' ToolTip="' GetLang("清除") '" Foreground="{DynamicResource TextMain}"'
             . ' Background="{DynamicResource ControlBg}" BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1"/>'
             . '</Grid>'
             . '<TextBlock Name="' this._TN(n, "ColorTipLabel") '" Grid.Row="3" Grid.Column="0" Text="' GetLang("搜索颜色：") '" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="{DynamicResource TextMain}" FontSize="' fs '"/>'
@@ -644,6 +648,8 @@ class SearchComboGui {
         this._Bind(this._TN(n, "EndPosY"), "LostFocus", ObjBindMethod(this, "RefreshPreviewArea"))
         this._Bind(this._TN(n, "ScreenshotBtn"), "Click", ObjBindMethod(this, "OnScreenShotBtnClick", n))
         this._Bind(this._TN(n, "ImageSelectBtn"), "Click", ObjBindMethod(this, "OnClickSetPicBtn", n))
+        this._Bind(this._TN(n, "ImageClearBtn"), "Click", ObjBindMethod(this, "OnClickClearPicBtn", n))
+        this._Bind(this._TN(n, "ImagePath"), "TextChanged", ObjBindMethod(this, "OnImagePathChanged", n))
         this._Bind(this._TN(n, "ProcessBtn"), "Click", ObjBindMethod(this, "OnClickProcessBtn", n))
     }
 
@@ -829,7 +835,7 @@ class SearchComboGui {
         if (!IsObject(this.ui))
             return
         if (this.TargetList.Length <= 1) {
-            MsgBox(GetLang("至少保留一个搜索目标"))
+            RmtDialog.Info(GetLang("至少保留一个搜索目标"))
             return
         }
         this.SaveSearchData()
@@ -954,7 +960,7 @@ class SearchComboGui {
 
     CheckIfDataValid() {
         if (this.TargetList.Length == 0) {
-            MsgBox(GetLang("这条指令不完整，请删除"))
+            RmtDialog.Info(GetLang("这条指令不完整，请删除"))
             return false
         }
         return true
@@ -974,13 +980,13 @@ class SearchComboGui {
             && IsNumber(this.ui.Query(tn "EndPosY"))) {
                 if (Number(this.ui.Query(tn "StartPosX")) > Number(this.ui.Query(tn "EndPosX")) || Number(this.ui.Query(tn "StartPosY")) >
                 Number(this.ui.Query(tn "EndPosY"))) {
-                    MsgBox(Format(GetLang("目标{}：起始坐标不能大于终止坐标"), n))
+                    RmtDialog.Info(Format(GetLang("目标{}：起始坐标不能大于终止坐标"), n))
                     return false
                 }
             }
 
             if (isImage && this.ui.Query(tn "ImagePath") == "") {
-                MsgBox(Format(GetLang("目标{}：请设置搜索图片"), n))
+                RmtDialog.Info(Format(GetLang("目标{}：请设置搜索图片"), n))
                 return false
             }
             if (isImage) {
@@ -992,7 +998,7 @@ class SearchComboGui {
                     searchHeight := this.ui.Query(tn "EndPosY") - this.ui.Query(tn "StartPosY")
                     size := GetImageSize(imgPath)
                     if (size[1] > searchWidth || size[2] > searchHeight) {
-                        MsgBox(Format(GetLang("目标{}：搜索范围不能小于图片大小"), n))
+                        RmtDialog.Info(Format(GetLang("目标{}：搜索范围不能小于图片大小"), n))
                         return false
                     }
                 }
@@ -1003,14 +1009,14 @@ class SearchComboGui {
                 && IsNumber(this.ui.Query(tn "EndPosX")) && IsNumber(this.ui.Query(tn "EndPosY"))) {
                     if (this.ui.Query(tn "StartPosX") == this.ui.Query(tn "EndPosX") ||
                     this.ui.Query(tn "StartPosY") == this.ui.Query(tn "EndPosY")) {
-                        MsgBox(Format(GetLang("目标{}：搜索文本时搜索范围中起始坐标不能和终止坐标相同"), n))
+                        RmtDialog.Info(Format(GetLang("目标{}：搜索文本时搜索范围中起始坐标不能和终止坐标相同"), n))
                         return false
                     }
                 }
             }
 
             if (isWin && this.ui.Query(tn "WinInfo") == "") {
-                MsgBox(Format(GetLang("目标{}：目标窗口信息不能为空"), n))
+                RmtDialog.Info(Format(GetLang("目标{}：目标窗口信息不能为空"), n))
                 return false
             }
         }
@@ -1019,7 +1025,7 @@ class SearchComboGui {
 
         }
         else if (!IsNumber(this.ui.Query("SearchCountCon")) || Number(this.ui.Query("SearchCountCon")) <= 0) {
-            MsgBox(GetLang("搜索次数请输入大于0的数字"))
+            RmtDialog.Info(GetLang("搜索次数请输入大于0的数字"))
             return false
         }
 
@@ -1027,7 +1033,7 @@ class SearchComboGui {
         if (this.ui.Query("SatisfyCountCon") != GetLang("所有")) {
             sv := this.ui.Query("SatisfyCountCon")
             if (!IsNumber(sv) || Number(sv) < 1) {
-                MsgBox(GetLang("满足个数请输入大于0的数字，或选择「所有」"))
+                RmtDialog.Info(GetLang("满足个数请输入大于0的数字，或选择「所有」"))
                 return false
             }
         }
@@ -1039,7 +1045,7 @@ class SearchComboGui {
 
         if (this.ui.Query("MouseActionTypeCon>SelectedIndex") + 1 != 1) {
             if (!IsNumber(this.ui.Query("SpeedCon")) || this.ui.Query("SpeedCon") < 0 || this.ui.Query("SpeedCon") > 100) {
-                MsgBox(GetLang("移动速度请输入0~100的数字"))
+                RmtDialog.Info(GetLang("移动速度请输入0~100的数字"))
                 return false
             }
         }
@@ -1106,7 +1112,7 @@ class SearchComboGui {
             GetLang("1.左键拖拽改变位置"),
             GetLang("2.上下左右方向键微调位置"),
             GetLang("3.左键双击或回车键关闭取色器，同时确定点位信息"))
-        MsgBox(str, GetLang("定位取色器操作说明"))
+        RmtDialog.Info(str, GetLang("定位取色器操作说明"))
     }
 
     OnClickSureBtn(state, ctrl, event) {
@@ -1123,7 +1129,7 @@ class SearchComboGui {
         this.CurTarget := n
         tn := this._TN(n, "")
         curPath := this.ui.Query(tn "ImagePath")
-        path := FileSelect(1, curPath, GetLang("选择图片"), "PNG Files (*.png)")
+        path := FileSelect(1, curPath, GetLang("选择图片"), "Image Files (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp)")
         if (path != "") {
             path := StoreSearchImage(path)
             this._ResetTargetProcess(n)
@@ -1131,6 +1137,29 @@ class SearchComboGui {
             this.TargetList[n].SearchImagePath := path
             this.ui.Update(tn "ImagePath", "Text", path)
         }
+    }
+
+    OnClickClearPicBtn(n, *) {
+        if (!IsObject(this.ui) || n < 1 || n > this.TargetList.Length)
+            return
+        this.CurTarget := n
+        this._ResetTargetProcess(n)
+        this.TargetList[n].SearchImagePath := ""
+        this.ui.Update(this._TN(n, "ImagePath"), "Text", "")
+        this._SetImage(n, "")
+    }
+
+    OnImagePathChanged(n, *) {
+        if (!IsObject(this.ui) || n < 1 || n > this.TargetList.Length)
+            return
+        path := String(this.ui.Query(this._TN(n, "ImagePath")))
+        t := this.TargetList[n]
+        oldPath := ObjHasOwnProp(t, "SearchImagePath") ? String(t.SearchImagePath) : ""
+        if (path == oldPath)
+            return
+        this._ResetTargetProcess(n)
+        t.SearchImagePath := path
+        this._SetImage(n, path != "" && FileExist(path) ? path : "")
     }
 
     OnScreenShotBtnClick(n, *) {

@@ -140,7 +140,7 @@ class ExVariableGui {
 
         winRow := param.Add("Grid").Name("WinInfoRow").Grid_Row(1).Grid_ColumnSpan(8).Visibility("Hidden")
         winRow.Cols("96", "*", "8", "70")
-        this._AddLabel(winRow, GetLang("窗口信息：")).Grid_Column(0)
+        this._AddLabel(winRow, GetLang("窗口绑定：")).Grid_Column(0)
         this._StyleBox(winRow.Add("TextBox").Name("WinInfoCon").Grid_Column(1))
         this._AddEditBtn(winRow, "BtnWinEdit").Grid_Column(3)
 
@@ -394,13 +394,13 @@ class ExVariableGui {
 
     CheckIfValid() {
         if (this._TypeValue() == 3 && this.ui.Query("WinInfoCon") == "") {
-            MsgBox(GetLang("目标窗口信息不能为空"))
+            RmtDialog.Info(GetLang("窗口绑定不能为空"))
             return false
         }
 
         if (!InStr(this.ui.Query("ExtractStrCon"), "&x") && !InStr(this.ui.Query("ExtractStrCon"), "&c")) {
             if (this.ui.Query("ExtractStrCon") != "") {
-                MsgBox(GetLang("提取文本：不包含&x 或 &c 无法提取内容到变量中"))
+                RmtDialog.Info(GetLang("提取文本：不包含&x 或 &c 无法提取内容到变量中"))
                 return false
             }
         }
@@ -412,11 +412,11 @@ class ExVariableGui {
             if (isOn) {
                 varText := this.ui.Query("Var" A_Index)
                 if (IsNumber(varText)) {
-                    MsgBox(Format(GetLang("{}. 变量名不规范：变量名不能是纯数字"), A_Index))
+                    RmtDialog.Info(Format(GetLang("{}. 变量名不规范：变量名不能是纯数字"), A_Index))
                     return false
                 }
                 if (InStr(varText, "_")) {
-                    MsgBox(Format(GetLang("{}. 变量名不规范：变量名不能包含下划线"), A_Index))
+                    RmtDialog.Info(Format(GetLang("{}. 变量名不规范：变量名不能包含下划线"), A_Index))
                     return false
                 }
             }
@@ -428,7 +428,7 @@ class ExVariableGui {
             ExtractStr := StrReplace(ExtractStr, "&x", "", true, &XCount)
             ExtractStr := StrReplace(ExtractStr, "&c", "", true, &YCount)
             if (XCount + YCount < ActiveLength) {
-                MsgBox(Format(GetLang("提取文本中包含的&x和&c个数少于结果保存变量中勾选的个数")))
+                RmtDialog.Info(Format(GetLang("提取文本中包含的&x和&c个数少于结果保存变量中勾选的个数")))
                 return false
             }
         }
@@ -518,14 +518,14 @@ class ExVariableGui {
         }
 
         if (NameArr.Length == 0) {
-            MsgBox(GetLang("变量提取失败"))
+            RmtDialog.Info(GetLang("变量提取失败"))
         }
         else {
             tipStr := GetLang("已提取以下变量") "`n"
             loop NameArr.Length {
                 tipStr .= NameArr[A_Index] " = " ValueArr[A_Index] "`n"
             }
-            MsgBox(tipStr)
+            RmtDialog.Info(tipStr)
         }
     }
 

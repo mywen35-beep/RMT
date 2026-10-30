@@ -441,7 +441,7 @@ class TimingGui {
 
     OnEndHelpClick(state := unset, ctrl := unset, event := unset) {
         ; 无 Icon，避免系统提示音；内容两行显示
-        MsgBox(GetLang("勾选后，到达结束时间将不再触发此定时宏；") "`n" GetLang("若宏正在运行也会被停止。"), GetLang("结束时间："))
+        RmtDialog.Info(GetLang("勾选后，到达结束时间将不再触发此定时宏；") "`n" GetLang("若宏正在运行也会被停止。"), GetLang("结束时间："))
     }
 
     _ShowDateTimePicker(which, currentText) {
@@ -668,27 +668,27 @@ class TimingGui {
     CheckIfValid() {
         startRaw := this._ParseTimeText(this._startText)
         if (startRaw == "") {
-            MsgBox(GetLang("请输入正确的开始时间（yyyy-MM-dd HH:mm:ss）"))
+            RmtDialog.Info(GetLang("请输入正确的开始时间（yyyy-MM-dd HH:mm:ss）"))
             return false
         }
         if (this._endEnabled) {
             endRaw := this._ParseTimeText(this._endText)
             if (endRaw == "") {
-                MsgBox(GetLang("请输入正确的结束时间（yyyy-MM-dd HH:mm:ss）"))
+                RmtDialog.Info(GetLang("请输入正确的结束时间（yyyy-MM-dd HH:mm:ss）"))
                 return false
             }
             if (endRaw <= startRaw) {
-                MsgBox(GetLang("勾选结束时间后，结束时间必须大于开始时间！！！"))
+                RmtDialog.Info(GetLang("勾选结束时间后，结束时间必须大于开始时间！！！"))
                 return false
             }
         }
         if (this._typeIndex == 3) {
             if (!IsNumber(this._intervalText) || this._intervalText + 0 <= 0) {
-                MsgBox(GetLang("每次间隔需要输入大于零的数字！！！"))
+                RmtDialog.Info(GetLang("每次间隔需要输入大于零的数字！！！"))
                 return false
             }
             if (InStr(String(this._intervalText), ".")) {
-                MsgBox(GetLang("每次间隔时间只能是整数！！"))
+                RmtDialog.Info(GetLang("每次间隔时间只能是整数！！"))
                 return false
             }
         }

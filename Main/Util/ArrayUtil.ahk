@@ -147,7 +147,7 @@ GetCmdArray(Data, tableItem, index, variTip := true) {
             if (variTip && MainSoftData.NoVariableTip) {
                 str1 := Format(GetLang("数组：{}  长度：{}"), Data.Name, ResArr.Length)
                 str2 := Format("无法获取第{}的值", Value)
-                MsgBox(str1 "`n" str2)
+                RmtDialog.Info(str1 "`n" str2)
             }
             return ""
         }
@@ -157,7 +157,7 @@ GetCmdArray(Data, tableItem, index, variTip := true) {
     if (Data.MainIndex != 0 && !IsObject(ResArr)) {
         if (variTip && MainSoftData.NoVariableTip) {
             str1 := Format(GetLang("数组：{}  第{}个值不是数组"), Data.Name, Value)
-            MsgBox(str1)
+            RmtDialog.Info(str1)
         }
         return ""
     }
@@ -248,7 +248,7 @@ ArrayGetIndexValue(Data, tableItem, index) {
             tip2 := Format(GetLang("数组：{}  子数组{}  长度：{}"), Data.Name, MainIndex, SourceArr.Length)
             str1 := MainIndex == 0 ? tip1 : tip2
             str2 := Format("无法获取第{}的值", GetIndex)
-            MsgBox(str1 "`n" str2)
+            RmtDialog.Info(str1 "`n" str2)
         }
         return ""
     }
@@ -276,7 +276,7 @@ ArrayModifyIndexValue(Data, tableItem, index) {
             tip2 := Format(GetLang("数组：{}  子数组{}  长度：{}"), Data.Name, MainIndex, SourceArr.Length)
             str1 := MainIndex == 0 ? tip1 : tip2
             str2 := Format("无法修改第{}的值", SetIndex)
-            MsgBox(str1 "`n" str2)
+            RmtDialog.Info(str1 "`n" str2)
         }
         return ""
     }
@@ -315,7 +315,7 @@ ArrayInsertIndexValue(Data, tableItem, index) {
             tip2 := Format(GetLang("数组：{}  子数组{}  长度：{}"), Data.Name, SubIndex, SourceArr.Length)
             str1 := SubIndex == 0 ? tip1 : tip2
             str2 := Format("无法在第{}位置插入数据", InsertIndex)
-            MsgBox(str1 "`n" str2)
+            RmtDialog.Info(str1 "`n" str2)
         }
         return ""
     }
@@ -377,7 +377,7 @@ ArrayRemoveAtIndex(Data, tableItem, index) {
             tip2 := Format(GetLang("数组：{}  子数组{}  长度：{}"), Data.Name, MainIndex, SourceArr.Length)
             str1 := MainIndex == 0 ? tip1 : tip2
             str2 := Format("无法移除第{}位置的数据", RemoveIndex)
-            MsgBox(str1 "`n" str2)
+            RmtDialog.Info(str1 "`n" str2)
         }
         return
     }
@@ -400,7 +400,7 @@ ArrayPopValue(Data, tableItem, index) {
             tip2 := Format(GetLang("数组：{}  子数组{}  长度：{}"), Data.Name, MainIndex, SourceArr.Length)
             str1 := MainIndex == 0 ? tip1 : tip2
             str2 := Format("无法移除末尾的数据")
-            MsgBox(str1 "`n" str2)
+            RmtDialog.Info(str1 "`n" str2)
         }
         return
     }

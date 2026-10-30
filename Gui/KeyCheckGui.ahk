@@ -344,7 +344,7 @@ class KeyCheckGui {
 
         varName := Trim(this.ui.Query("VarNameCon"))
         if (varName == "") {
-            MsgBox(GetLang("请输入变量名！"))
+            RmtDialog.Info(GetLang("请输入变量名！"))
             return false
         }
 

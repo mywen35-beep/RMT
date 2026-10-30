@@ -493,7 +493,7 @@ class CompareProGui {
             case GetLang("向下插入分支"):
             {
                 if (isFinally) {
-                    MsgBox(GetLang("不可向最后的分支插入"))
+                    RmtDialog.Info(GetLang("不可向最后的分支插入"))
                     return
                 }
                 this.LVRowArr.InsertAt(this.CurItme + 1, this._DefaultBranchRow())

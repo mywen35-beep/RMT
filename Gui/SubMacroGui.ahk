@@ -266,7 +266,7 @@ class SubMacroGui {
         if (itemArr != "") {
             idx := this._SelIndex("DropDownIndexCombo") + 1
             if (idx > itemArr.Length || idx == 0) {
-                MsgBox(GetLang("配置无效，序号不正确"))
+                RmtDialog.Info(GetLang("配置无效，序号不正确"))
                 return false
             }
         }

@@ -16,6 +16,15 @@ class MenuWheelGui {
         this.swipeTriggered := false
         this._buildGen := 0          ; 世代計數：每次新建輪盤遞增，舊的異步等待自動失效
         this._hkIds := []
+        global MyHotReloadBus
+        if (IsSet(MyHotReloadBus) && IsObject(MyHotReloadBus))
+            MyHotReloadBus.Subscribe(ObjBindMethod(this, "OnHotReloadConfigChanged"))
+    }
+
+    OnHotReloadConfigChanged(tableIndex, itemIndex) {
+        tableItem := GetTableBySymbol("Menu")
+        if (this.isOpen && (tableIndex == 0 || (tableItem && tableItem.Index == tableIndex)))
+            this.Close()
     }
 
     ShowGui(MenuIndex) {
@@ -31,19 +40,22 @@ class MenuWheelGui {
         tableItem := GetTableBySymbol("Menu")
         if (!tableItem)
             return
+        this.Close()
+        if (!tableItem.Folds.Has(MenuIndex))
+            return
         fold := tableItem.Folds[MenuIndex]
-        if (!fold)
+        if (!fold || fold.ForbidState)
             return
         foldItems := GetFoldItems(tableItem, fold)
-        if (foldItems.Length == 0)
+        visibleIndices := []
+        for index, item in foldItems {
+            if (!ParseBoolInt(item.Forbid))
+                visibleIndices.Push(index)
+        }
+        if (visibleIndices.Length == 0)
             return
 
-        itemCount := foldItems.Length
-
-        if (this.isOpen) {          ; 已有轮盘？先自清
-            this.closed := true
-            this._Cleanup()         ; 关闭旧窗 + sectors:=[] + 重置状态
-        }
+        itemCount := visibleIndices.Length
 
         ; 先进入打开状态，避免等待 hwnd 期间软键盘/热键无法工作
         this.closed := false
@@ -72,13 +84,14 @@ class MenuWheelGui {
 
         items := []
         loop itemCount {
-            item := foldItems[A_Index]
+            originalIndex := visibleIndices[A_Index]
+            item := foldItems[originalIndex]
             remark := item.Remark
             btnName := remark != "" ? remark : "菜单" A_Index
 
             icoPath := item.IcoPath
 
-            arcNr := A_Index
+            arcNr := originalIndex
             h := MenuWheelGui._MakeCallback(this, arcNr, MenuIndex)
 
             items.Push({

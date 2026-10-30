@@ -2838,7 +2838,7 @@ class MacroEditGui {
                     MacroStr := StrSplit(MacroStr, Chr(0x2B50), 2)[2]
                 MyCMDTipGui.Hide()
                 OnTriggerSepcialItemMacro(MacroStr)
-                MsgBox(GetLang("调试运行结束"), "", "Owner" this.Gui.Hwnd)
+                RmtDialog.Info(GetLang("调试运行结束"), "", "Owner" this.Gui.Hwnd)
             }
             case this._ContinueLabel():
             {
@@ -2934,7 +2934,7 @@ class MacroEditGui {
             }
             case "Debug":
                 if (SubStr(cleanItemText, 1, 2) == "🚫") {
-                    MsgBox(GetLang("跳过指令不可设置为调试起点"), "", "Owner" this.Gui.Hwnd)
+                    RmtDialog.Info(GetLang("跳过指令不可设置为调试起点"), "", "Owner" this.Gui.Hwnd)
                     return
                 }
                 IsToDebug := !CmdIsDebug(cleanItemText)
@@ -2951,11 +2951,11 @@ class MacroEditGui {
                     return
                 ; 断点开关：🚫 禁用项 / ⎖ 配置行不可设断点（弹提示，不生效）
                 if (SubStr(cleanItemText, 1, 2) == "🚫") {
-                    MsgBox(GetLang("跳过指令不可设置断点"), "", "Owner" this.Gui.Hwnd)
+                    RmtDialog.Info(GetLang("跳过指令不可设置断点"), "", "Owner" this.Gui.Hwnd)
                     return
                 }
                 if (SubStr(cleanItemText, 1, 1) == "⎖") {
-                    MsgBox(GetLang("该行不可设置断点"), "", "Owner" this.Gui.Hwnd)
+                    RmtDialog.Info(GetLang("该行不可设置断点"), "", "Owner" this.Gui.Hwnd)
                     return
                 }
                 if (!this.CurItemID)
@@ -4242,7 +4242,7 @@ class MacroEditGui {
         if (targets.Length == 0) {
             if (skipDebug > 0) {
                 if (single)
-                    MsgBox(GetLang("调试起点不能跳过"), "", "Owner" this.Gui.Hwnd)
+                    RmtDialog.Info(GetLang("调试起点不能跳过"), "", "Owner" this.Gui.Hwnd)
                 else
                     Toast.Show(GetLang("调试起点不能跳过"))
             }
@@ -4270,7 +4270,7 @@ class MacroEditGui {
         this._NotifyMacroChanged()
         if (skipDebug > 0) {
             if (single)
-                MsgBox(GetLang("调试起点不能跳过"), "", "Owner" this.Gui.Hwnd)
+                RmtDialog.Info(GetLang("调试起点不能跳过"), "", "Owner" this.Gui.Hwnd)
             else
                 Toast.Show(GetLang("调试起点不能跳过"))
         }
@@ -4325,17 +4325,17 @@ class MacroEditGui {
 
     OnPreMoveCmd() {
         if (this._IsImmovableNode(this.MacroTreeViewCon.GetText(this.CurItemID))) {
-            MsgBox(GetLang("该节点不能移动"))
+            RmtDialog.Info(GetLang("该节点不能移动"))
             return
         }
         PreItemID := this.MacroTreeViewCon.GetPrev(this.CurItemID)
         if (PreItemID == 0) {
-            MsgBox(GetLang("已经是第一个指令了，无法上移"))
+            RmtDialog.Info(GetLang("已经是第一个指令了，无法上移"))
             return
         }
         PreText := this.MacroTreeViewCon.GetText(PreItemID)
         if (PreText == "" || this._IsImmovableNode(PreText)) {
-            MsgBox(GetLang("不可与特殊指令进行交换"))
+            RmtDialog.Info(GetLang("不可与特殊指令进行交换"))
             return
         }
         this.OnSwitchCmd(PreItemID, this.CurItemID)
@@ -4343,17 +4343,17 @@ class MacroEditGui {
 
     OnNextMoveCmd() {
         if (this._IsImmovableNode(this.MacroTreeViewCon.GetText(this.CurItemID))) {
-            MsgBox(GetLang("该节点不能移动"))
+            RmtDialog.Info(GetLang("该节点不能移动"))
             return
         }
         NextItemID := this.MacroTreeViewCon.GetNext(this.CurItemID)
         if (NextItemID == 0) {
-            MsgBox(GetLang("已经是最后的指令了，无法下移"))
+            RmtDialog.Info(GetLang("已经是最后的指令了，无法下移"))
             return
         }
         NextText := this.MacroTreeViewCon.GetText(NextItemID)
         if (NextText == "" || this._IsImmovableNode(NextText)) {
-            MsgBox(GetLang("不可与特殊指令进行交换"))
+            RmtDialog.Info(GetLang("不可与特殊指令进行交换"))
             return
         }
         this.OnSwitchCmd(this.CurItemID, NextItemID)
@@ -4361,7 +4361,7 @@ class MacroEditGui {
 
     OnSwitchCmd(ItemAID, ItemBID) {
         if (this._IsImmovableNode(this.MacroTreeViewCon.GetText(ItemAID)) || this._IsImmovableNode(this.MacroTreeViewCon.GetText(ItemBID))) {
-            MsgBox(GetLang("不可与特殊指令进行交换"))
+            RmtDialog.Info(GetLang("不可与特殊指令进行交换"))
             return
         }
         this._PushUndo()
@@ -5080,7 +5080,7 @@ class MacroEditGui {
         else if (cmd == GetLang("如果Pro")) {
             if (ItemNumber > Data.VariNameArr.Length) {
                 if (macroStr == "")
-                    MsgBox("最后的分支不能删除，已清空分支指令")
+                    RmtDialog.Info("最后的分支不能删除，已清空分支指令")
                 Data.DefaultMacro := Trim(macroStr)
             }
             else {

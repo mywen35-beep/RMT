@@ -410,7 +410,7 @@ class VariableGui {
         if (!IsObject(this.ui))
             return
         if (this.Data.ToggleArr.Length <= 1) {
-            MsgBox(GetLang("至少保留一个变量"))
+            RmtDialog.Info(GetLang("至少保留一个变量"))
             return
         }
         this.SaveVariableData()
@@ -507,7 +507,7 @@ class VariableGui {
         str14 := GetLang("当前分：当前分钟（形如46）")
         str15 := GetLang("当前秒：当前秒（形如58）")
         str := Format("{}`n{}`n{}`n{}`n{}`n{}`n{}`n{}`n{}`n{}`n{}`n{}`n{}`n{}`n{}`n{}", str1, str2, str3, str4, str5, str6, str7, str7b, str8, str9, str10, str11, str12, str13, str14, str15)
-        MsgBox(str, GetLang("系统变量说明"), "Owner" this.Hwnd())
+        RmtDialog.Info(str, GetLang("系统变量说明"), "Owner" this.Hwnd())
     }
 
     OnClickSureBtn(state, ctrl, event) {

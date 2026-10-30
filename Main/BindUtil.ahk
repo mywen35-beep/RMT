@@ -270,15 +270,20 @@ OnKillAllMacro(*) {
     MySoftData.MacroRunningCount := 0
     UpdateMacroRunningCount(0, 0)
 
+    shouldPlayStopTip := false
     for tableItem in MySoftData.TableInfo {
         for index, item in tableItem.Items {
             if (item.ColorState == 1 || item.ColorState == 2) {
+                if (item.StopTipSound == 2)
+                    shouldPlayStopTip := true
                 MyStopMacro(tableItem, index)
             }
         }
     }
 
     KillSingleTableMacro(MySoftData.SpecialTableItem)
+    if (shouldPlayStopTip)
+        PlayTipSound(3)
 
     tipStr := GetLang("终止所有宏")
     if (MySoftData.CMDTip)
@@ -430,9 +435,9 @@ OnClickModalSubGuiHelpBtn(*) {
 }
 
 OnClickCheckForegroundHelpBtn(*) {
-    str1 := GetLang("开启后：宏运行时会检查该项配置的前台窗口；若当前前台窗口不匹配，则终止该宏。")
+    str1 := GetLang("开启后：宏运行时会检查所属模块的窗口绑定；若当前前台窗口不匹配，则终止该宏。")
     str2 := GetLang("关闭后：不校验前台窗口，宏按原逻辑继续执行。")
-    str3 := GetLang("提示：需在对应宏项中配置「前台」信息后才会生效；未配置前台信息的宏不受此选项影响。")
+    str3 := GetLang("提示：模块窗口绑定选择「所有窗口」时不限制窗口，也不会因前台窗口变化终止宏。")
 
     str := Format("{}`n{}`n{}", str1, str2, str3)
     RmtDialog.Info(str, GetLang("仅前台运行宏说明"))
@@ -604,7 +609,9 @@ BindMenuHotKey() {
         frontInfo := fold.FrontInfo
         realFrontStr := GetParamsWinInfoStr(frontInfo)
 
-        if (realFrontStr != "") {
+        if (IsMouseWindowBinding(frontInfo))
+            HotIf(WindowBindingMouseActive)
+        else if (realFrontStr != "") {
             HotIfWinActive(realFrontStr)
         }
 
@@ -643,7 +650,7 @@ BindMenuHotKey() {
             }
         }
 
-        if (realFrontStr != "") {
+        if (IsMouseWindowBinding(frontInfo) || realFrontStr != "") {
             HotIfWinActive
         }
     }
@@ -669,7 +676,9 @@ BindUIPanelHotKey() {
         frontInfo := fold.FrontInfo
         realFrontStr := GetParamsWinInfoStr(frontInfo)
 
-        if (realFrontStr != "")
+        if (IsMouseWindowBinding(frontInfo))
+            HotIf(WindowBindingMouseActive)
+        else if (realFrontStr != "")
             HotIfWinActive(realFrontStr)
 
         if (isJoyKey) {
@@ -691,7 +700,7 @@ BindUIPanelHotKey() {
             }
         }
 
-        if (realFrontStr != "")
+        if (IsMouseWindowBinding(frontInfo) || realFrontStr != "")
             HotIfWinActive
     }
 }
@@ -703,6 +712,8 @@ ResetJoyMacroMaps() {
     MyJoyMacro.ComboMacroMap := Map()
     ; 同步清空边缘触发状态，避免旧宏残留 prev=1 导致重绑后首个按键边沿丢失
     MyJoyMacro.prevXboxState := Map()
+    if (MyJoyMacro.HasProp("diActive"))
+        MyJoyMacro.diActive := Map()
 }
 
 BindTabHotKey() {
@@ -759,7 +770,9 @@ BindTabHotKey() {
 
             registerMsg .= "rawKey: '" rawKey "' → key: '" key "' (isCombo=" cache.isCombo ")`n"
 
-            if (cache.realFrontStr != "") {
+            if (IsMouseWindowBinding(cache.frontInfo))
+                HotIf(WindowBindingMouseActive)
+            else if (cache.realFrontStr != "") {
                 HotIfWinActive(cache.realFrontStr)
             }
 
@@ -805,7 +818,7 @@ BindTabHotKey() {
                 }
             }
 
-            if (cache.realFrontStr != "") {
+            if (IsMouseWindowBinding(cache.frontInfo) || cache.realFrontStr != "") {
                 HotIfWinActive
             }
         }

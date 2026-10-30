@@ -333,7 +333,9 @@ class JoyGui {
     }
 
     _PlaceStick(id, x, y, size, knob) {
-        pad := 4
+        ; 摇杆拖到最大半径时，旋钮会越过外圈边缘；预留完整的安全边距，
+        ; 避免 Grid/Canvas 在左右和上下方向裁掉旋钮。
+        pad := 9
         hostSize := size + pad * 2
         wellR := Integer((size - knob) / 2)
         maxR := wellR + 5
@@ -1350,17 +1352,17 @@ class JoyGui {
 
     CheckIfValid() {
         if (this.AxisMap.Count == 0 && this.CheckedArr.Length == 0) {
-            MsgBox(GetLang("请选择手柄按键或摇杆！"))
+            RmtDialog.Info(GetLang("请选择手柄按键或摇杆！"))
             return false
         }
         if (this.CheckedArr.Length > 0) {
             if (!IsInteger(this.ui.Query("KeyCountCon")) || Integer(this.ui.Query("KeyCountCon")) <= 0) {
-                MsgBox(GetLang("按键次数必须为大于零的整数！"))
+                RmtDialog.Info(GetLang("按键次数必须为大于零的整数！"))
                 return false
             }
             if (this._KeyTypeIndex() == 3) {
                 if (IsFloat(this.ui.Query("HoldTimeCon")) || this.ui.Query("HoldTimeCon") < 0) {
-                    MsgBox(GetLang("按键时间请输入大于0的整数"))
+                    RmtDialog.Info(GetLang("按键时间请输入大于0的整数"))
                     return false
                 }
             }
@@ -1510,6 +1512,8 @@ class JoyGui {
         if (!this._UiAlive())
             return
         try XamlWin.OnLoadTheme(this.ui)
+        ; 打开编辑器后保留手柄自动选择。JoyPickerHook 自己负责边沿检测，
+        ; 因此按住按键不会重复写入编辑状态。
         try JoyPickerHook.Attach(this)
         this._loading := false
         try this._ShowCommandStr()

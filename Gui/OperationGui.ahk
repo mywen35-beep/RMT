@@ -356,7 +356,7 @@ class OperationGui {
         if (!IsObject(this.ui))
             return
         if (this.Data.ToggleArr.Length <= 1) {
-            MsgBox(GetLang("至少保留一个运算"))
+            RmtDialog.Info(GetLang("至少保留一个运算"))
             return
         }
         this.SaveOperationData()

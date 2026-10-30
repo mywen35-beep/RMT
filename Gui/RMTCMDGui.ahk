@@ -426,14 +426,14 @@ class RMTCMDGui {
                 "- 以管理员身份运行本软件，否则该指令无效。"), GetLang("- 务必后续执行对应的启用指令，否则输入设备将保持禁用状态！"), GetLang("是否确认禁用？"))
             title := cmd == GetLang("禁用鼠标") ? GetLang("禁用鼠标（需管理员权限）")
                 : (cmd == GetLang("禁用键盘") ? GetLang("禁用键盘（需管理员权限）") : GetLang("禁用键鼠（需管理员权限）"))
-            if (MsgBox(tipStr, title, "4") == "No")
+            if (!RmtDialog.Confirm(tipStr, title))
                 return false
         }
 
         if (cmd == GetLang("启用键鼠") || cmd == GetLang("启用鼠标") || cmd == GetLang("启用键盘")) {
             title := cmd == GetLang("启用鼠标") ? GetLang("启用鼠标（需管理员权限）")
                 : (cmd == GetLang("启用键盘") ? GetLang("启用键盘（需管理员权限）") : GetLang("启用键鼠（需管理员权限）"))
-            MsgBox(GetLang("- 必须 以管理员身份运行本软件，否则该指令无效。"), title)
+            RmtDialog.Info(GetLang("- 必须 以管理员身份运行本软件，否则该指令无效。"), title)
         }
         return true
     }

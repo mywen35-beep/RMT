@@ -182,10 +182,21 @@ class ImageProcessGui {
             .Foreground("{DynamicResource TextMain}").Background("{DynamicResource ControlBg}")
             .BorderBrush("{DynamicResource ControlBorder}").BorderThickness("1")
 
+        bar.Add("Button").Name("BtnFitView").Content(GetLang("适应"))
+            .Width(58).Height(24).MinHeight(24).Margin("0,0,8,0").Padding("8,0")
+            .FontSize("11").Cursor("Hand").VerticalAlignment("Center")
+            .ToolTip(GetLang("恢复预览适应窗口"))
+            .Foreground("{DynamicResource TextMain}").Background("{DynamicResource ControlBg}")
+            .BorderBrush("{DynamicResource ControlBorder}").BorderThickness("1")
+
         bar.Add("Border").Width("1").Height("20").Margin("4,0,8,0").Background("{DynamicResource ControlBorder}")
 
         bar.Add("TextBlock").Name("HintCon").Text(GetLang("滚轮缩放；关闭工具后拖动预览可平移")).FontSize("11")
             .VerticalAlignment("Center").Margin("12,0,0,0")
+            .Foreground("{DynamicResource TextSub}")
+
+        bar.Add("TextBlock").Name("ZoomCon").Text("100%")
+            .FontSize("11").VerticalAlignment("Center").Margin("8,0,0,0")
             .Foreground("{DynamicResource TextSub}")
 
         ; ---- 双画布 ----
@@ -413,6 +424,7 @@ class ImageProcessGui {
         this.ui.OnEvent("BtnModeMultiPoint", "Click", ObjBindMethod(this, "OnMatchMode", "multi"))
         this.ui.OnEvent("BtnModeSuperMultiPoint", "Click", ObjBindMethod(this, "OnMatchMode", "super"))
         this.ui.OnEvent("BtnHelp", "Click", ObjBindMethod(this, "OnHelp"))
+        this.ui.OnEvent("BtnFitView", "Click", ObjBindMethod(this, "OnFitView"))
         this.ui.OnEvent("BtnMultiSeedTool", "Click", ObjBindMethod(this, "OnPointTool", "seed"))
         this.ui.OnEvent("BtnMultiPointTool", "Click", ObjBindMethod(this, "OnPointTool", "point"))
         this.ui.OnEvent("BtnSuperSeedTool", "Click", ObjBindMethod(this, "OnPointTool", "seed"))
@@ -451,6 +463,16 @@ class ImageProcessGui {
             , GetLang("多点：选取基准点后可自动补点，也可手动添加或移除匹配点。最多选择256个点。")
             , GetLang("超多点：选取基准色并设置容差；忽略蒙版中的涂抹区域不参与匹配。"))
         RmtDialog.Info(text, GetLang("图片处理说明"))
+    }
+
+    OnFitView(*) {
+        if (!IsObject(this.ui))
+            return
+        this.Zoom := 0
+        this.ViewX := 0
+        this.ViewY := 0
+        this._ApplyPreviewTransform()
+        this._Render()
     }
 
     ; 框架不派发 MouseWheel，用 AHK 热键在对话框内接管滚轮
@@ -676,6 +698,7 @@ class ImageProcessGui {
         this.OrigW := info.ow, this.OrigH := info.oh
         this._rendering := true
         this._renderedZoom := this.Zoom
+        try this.ui.Update("ZoomCon", "Text", Round(this.Zoom * 100) "%")
         this._renderedViewX := renderViewX
         this._renderedViewY := renderViewY
         leftPointOverlayPath := this._CreateModePointOverlay("L")

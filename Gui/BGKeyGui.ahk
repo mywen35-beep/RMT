@@ -83,7 +83,7 @@ class BGKeyGui {
             .HorizontalAlignment("Center").VerticalAlignment("Center").Margin("0,2,0,4")
 
         front := top.Add("StackPanel").Orientation("Horizontal").VerticalAlignment("Center")
-        front.Add("TextBlock").Text(GetLang("窗口信息:")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
+        front.Add("TextBlock").Text(GetLang("窗口绑定:")).VerticalAlignment("Center").Foreground("{DynamicResource TextMain}").FontSize("12")
             .ToolTip(this._BGHelpText())
         front.Add("TextBox").Name("FrontCon").Width(200).Height(26).MinHeight(26).Margin("4,0,0,0")
             .Background("{DynamicResource InputBg}").Foreground("{DynamicResource InputText}")
@@ -351,7 +351,7 @@ class BGKeyGui {
 
     CheckIfValid() {
         if (this.ui.Query("FrontCon") == "" || this.ui.Query("FrontCon") == "⎖⎖⎖") {
-            MsgBox(GetLang("请编辑窗口信息"))
+            RmtDialog.Info(GetLang("请编辑窗口绑定"))
             return false
         }
 
@@ -361,7 +361,7 @@ class BGKeyGui {
         }
 
         if (!IsInteger(this.ui.Query("KeyCountCon")) || Integer(this.ui.Query("KeyCountCon")) <= 0) {
-            MsgBox(GetLang("按键次数必须为大于零的整数！"))
+            RmtDialog.Info(GetLang("按键次数必须为大于零的整数！"))
             return false
         }
 
