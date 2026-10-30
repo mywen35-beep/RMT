@@ -33,36 +33,26 @@ jobs:
         with:
           node-version: "20"
 
-      # choco 的 autohotkey 包只装运行时（编译器是官方安装器里的可选组件，choco 静默参数没带），
-      # 所以：运行时用 choco，编译器用官方 Ahk2Exe 的 zip。两者本来就可以分处不同目录。
+      # 运行时和编译器都使用官方 release 归档，避免依赖 Chocolatey 的包索引和安装器状态。
       - name: 安装 AutoHotkey v2 与 Ahk2Exe
         run: |
           $ErrorActionPreference = 'Stop'
           $ahkVer = '2.0.31'
           $a2xVer = 'Ahk2Exe1.1.37.02a2'
 
-          # 1) runtime (v2 base binaries) via choco
-          Write-Host "choco install autohotkey --version=$ahkVer"
-          choco install autohotkey --version=$ahkVer -y --no-progress
-          $code = $LASTEXITCODE
-          Write-Host "choco exit code: $code"
-          # 3010 means installed but a reboot is required; treat as success
-          if ($code -ne 0 -and $code -ne 3010) { throw "choco install autohotkey failed: exit $code" }
-
-          $root = Join-Path $env:ProgramFiles 'AutoHotkey'
-          if (-not (Test-Path -LiteralPath $root)) { throw "AutoHotkey not installed: $root" }
-          Write-Host "install dir: $root"
-          Get-ChildItem -LiteralPath $root -ErrorAction SilentlyContinue |
-            ForEach-Object { Write-Host "  $($_.Name)" }
-
-          # v2 bases live under the v2 subfolder; find them instead of hardcoding the layout
-          $ahk64 = (Get-ChildItem -LiteralPath $root -Recurse -Filter 'AutoHotkey64.exe' -ErrorAction SilentlyContinue |
+          # 1) runtime (v2 base binaries) from the official release zip
+          $ahkZip = Join-Path $env:RUNNER_TEMP "autohotkey-$ahkVer.zip"
+          $ahkDir = Join-Path $env:RUNNER_TEMP 'autohotkey'
+          Write-Host "download: AutoHotkey v$ahkVer"
+          Invoke-WebRequest -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v$ahkVer/AutoHotkey_$ahkVer.zip" `
+            -OutFile $ahkZip -UseBasicParsing -TimeoutSec 300
+          Expand-Archive -LiteralPath $ahkZip -DestinationPath $ahkDir -Force
+          $ahk64 = (Get-ChildItem -LiteralPath $ahkDir -Recurse -Filter 'AutoHotkey64.exe' |
                     Select-Object -First 1).FullName
-          $ahk32 = (Get-ChildItem -LiteralPath $root -Recurse -Filter 'AutoHotkey32.exe' -ErrorAction SilentlyContinue |
+          $ahk32 = (Get-ChildItem -LiteralPath $ahkDir -Recurse -Filter 'AutoHotkey32.exe' |
                     Select-Object -First 1).FullName
-          if (-not $ahk64) { throw "AutoHotkey64.exe not found under $root" }
-          if (-not $ahk32) { throw "AutoHotkey32.exe not found under $root" }
-
+          if (-not $ahk64) { throw "AutoHotkey64.exe not found under $ahkDir" }
+          if (-not $ahk32) { throw "AutoHotkey32.exe not found under $ahkDir" }
           # 2) compiler via the official Ahk2Exe zip
           $a2xZip = Join-Path $env:RUNNER_TEMP 'ahk2exe.zip'
           Write-Host "download: Ahk2Exe $a2xVer"
