@@ -51,14 +51,14 @@ class MacroGraphGui {
         this._sessionId := 0          ; 每次打开自增；用于忽略旧窗口迟到的异步关闭事件，避免覆盖写空
 
         ; 若梦兔全部指令（移动、移动Pro、增量移动）
-        this.CmdList := GetLangArr(["间隔", "时间", "按键", "手柄", "搜索", "搜索Pro", "搜索Combo", "移动", "移动Pro", "增量移动", "输入", "输出", "循环", "宏操作",
+        this.CmdList := GetLangArr(["间隔", "时间", "按键", "手柄", "搜索", "搜索Pro", "搜索Combo", "组合搜索", "搜索Multi", "移动", "鼠标移动", "移动Pro", "鼠标移动Pro", "增量移动", "输入", "输出", "循环", "宏操作",
             "变量", "变量提取", "如果", "如果Pro", "运算", "运行", "运行Pro", "文件读写", "Excel", "文本处理", "数组", "RMT指令", "后台鼠标",
             "后台按键", "窗口管理", "按键检测", "手柄检测", "等待", "等待确定", "倒计时", "注释", "抓图", "跳转"])
 
         ; 各指令对应图标（顺序与 CmdList 一一对应，复用 MacroEditGui 的图标资源）
         this.CmdIconArr := ["Images\Soft\Interval.png", "Images\Soft\Time.png", "Images\Soft\Key.png", "Images\Soft\Joy.png",
-            "Images\Soft\Search.png", "Images\Soft\SearchPro.png", "Images\Soft\SearchCombo.png",
-            "Images\Soft\Move.png", "Images\Soft\MovePro.png", "Images\Soft\DeltaMove.png",
+            "Images\Soft\Search.png", "Images\Soft\SearchPro.png", "Images\Soft\SearchCombo.png", "Images\Soft\SearchCombo.png", "Images\Soft\SearchCombo.png",
+            "Images\Soft\Move.png", "Images\Soft\Move.png", "Images\Soft\MovePro.png", "Images\Soft\MovePro.png", "Images\Soft\DeltaMove.png",
             "Images\Soft\Input.png", "Images\Soft\Output.png",
             "Images\Soft\Loop.png", "Images\Soft\MacroAction.png",
             "Images\Soft\Var.png", "Images\Soft\Extract.png",
@@ -506,9 +506,9 @@ class MacroGraphGui {
             SaveMacroCMDData(data)
             return this._MakeNode(CorrectRemark(serial, "0 0"))
         }
-        if (cmdName == GetLang("搜索") || cmdName == GetLang("搜索Pro") || cmdName == GetLang("搜索Combo")) {
+        if (cmdName == GetLang("搜索") || cmdName == GetLang("搜索Pro") || cmdName == GetLang("搜索Combo") || cmdName == GetLang("组合搜索") || cmdName == GetLang("搜索Multi")) {
             ; 搜索/搜索Pro/搜索Combo 走 INI 持久化（参数存 SearchFile.toml，CurCMD 仅为序列码引用，与执行引擎一致）
-            serial := GetCMDSerialStr(cmdName == GetLang("搜索Combo") ? "搜索Combo" : (cmdName == GetLang("搜索Pro") ? "搜索Pro" : "搜索"))
+            serial := GetCMDSerialStr((cmdName == GetLang("搜索Combo") || cmdName == GetLang("组合搜索") || cmdName == GetLang("搜索Multi")) ? "搜索Combo" : (cmdName == GetLang("搜索Pro") ? "搜索Pro" : "搜索"))
             data := SearchData()
             data.SerialStr := serial
             SaveMacroCMDData(data)

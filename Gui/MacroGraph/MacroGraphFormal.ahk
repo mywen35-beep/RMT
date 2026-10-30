@@ -298,6 +298,8 @@ class MacroGraphFormalMixin {
             this._FillIfProBody(id, d, body)
         else if (d.type == GetLang("等待确定"))
             this._FillWaitConfirmBody(id, d, body)
+        else if (d.type == GetLang("等待"))
+            this._FillWaitBody(id, d, body)
         else if (d.type == GetLang("倒计时"))
             this._FillCountDownBody(id, d, body)
         else if (d.type == GetLang("时间"))
@@ -310,6 +312,26 @@ class MacroGraphFormalMixin {
         body.Add("TextBlock").Text(GetLang("类型：") GetLang(typeKey)).Foreground("{DynamicResource TextMain}").FontSize(this._MGFontSize(12)).Margin("0,6,0,0")
         if (prompt != "")
             body.Add("TextBlock").Text(prompt).Foreground("{DynamicResource TextMain}").FontSize(this._MGFontSize(11)).TextWrapping("Wrap").Margin("0,4,0,0")
+    }
+
+    ; 等待节点摘要：完整参数仍由 WaitGui 编辑，节点上展示当前类型和关键参数，
+    ; 避免形式化节点只显示“临时节点”而无法确认配置是否落库。
+    _FillWaitBody(id, d, body) {
+        waitType := d.HasOwnProp("waitType") ? d.waitType : 1
+        typeNames := GetLangArr(["等待变量值", "等待按键按下", "等待按键松开", "等待屏幕变化", "等待鼠标移动",
+            "等待鼠标停止移动", "等待剪切板变化", "等待进程存在", "等待进程关闭", "等待窗口存在",
+            "等待窗口激活", "等待窗口屏幕变化", "等待窗口大小变化", "等待窗口关闭", "等待窗口最小化",
+            "等待文件存在", "等待文件删除", "等待文件变化", "等待日期"])
+        idx := IsNumber(waitType) ? Integer(waitType) - 1 : 0
+        if (idx < 0 || idx >= typeNames.Length)
+            idx := 0
+        this._AddComboRow(body, "WaitTypeRow_" id, GetLang("等待类型："), "WaitTypeCmb_" id, typeNames, idx, true, false)
+        interval := d.HasOwnProp("waitInterval") ? d.waitInterval : 500
+        this._AddFieldRow(body, "WaitIntervalRow_" id, GetLang("检测间隔(ms)："), "WaitInterval_" id, interval, true, false, "", "", "", this._FormalLW(), this._FormalCW())
+        p1 := d.HasOwnProp("waitParam1") ? d.waitParam1 : ""
+        p2 := d.HasOwnProp("waitParam2") ? d.waitParam2 : ""
+        if (p1 != "")
+            body.Add("TextBlock").Text(GetLang("参数：") p1 (p2 != "" ? " / " p2 : "")).Foreground("{DynamicResource TextSub}").FontSize(this._MGFontSize(11)).TextWrapping("Wrap").Margin("0,4,0,0")
     }
 
     _FillCountDownBody(id, d, body) {
