@@ -207,7 +207,7 @@ class MacroGraphNodeUIMixin {
             this._FillFormalNodeBody(id, d, body)
         }
         else {
-            body.Add("TextBlock").Text(GetLang("临时节点")).Foreground("#FF9E9E").FontSize(this._MGFontSize(12))
+            body.Add("TextBlock").Text(GetLang("临时节点")).Foreground("{DynamicResource ActionHoverStroke}").FontSize(this._MGFontSize(12))
             body.Add("TextBlock").Text(d.raw).Foreground("{DynamicResource TextMain}").FontSize(this._MGFontSize(11)).TextWrapping("Wrap")
         }
     }

@@ -212,16 +212,16 @@ class MacroGraphGui {
         win := XAML_Generator("Window")
         win.SetProp("xmlns", "http://schemas.microsoft.com/winfx/2006/xaml/presentation")
         win.SetProp("xmlns:x", "http://schemas.microsoft.com/winfx/2006/xaml")
-        ; 画布/窗口背景固定深色（不随浅色主题变白）
-        win.Title(GetLang("节点编辑器")).Width(1100).Height(700).WindowStartupLocation("CenterScreen").WindowState("Maximized").Background("#FF1E1E1E")
+        ; 窗口背景交给主题资源；否则浅色主题会出现深色外框 + 浅色节点的断层。
+        win.Title(GetLang("节点编辑器")).Width(1100).Height(700).WindowStartupLocation("CenterScreen").WindowState("Maximized").Background("{DynamicResource BgColor}")
         iconPath := StrReplace(A_WorkingDir "\Images\Soft\rabit.ico", "\", "/")
         if (FileExist(iconPath))
             win.Icon(iconPath)
 
         root := win.Add("Grid")
         this.graph := root.NodeGraph("RMTGraph")
-        ; 画布底固定深色（与节点 DropdownBg 分离，避免浅色主题把整片画布刷白）
-        this.graph.bdr.Name("MG_GraphChrome").Background("#FF1E1E1E").BorderBrush("{DynamicResource ControlBorder}")
+        ; 画布底使用主题窗口色，网格/连线仍由 GraphLine/GraphConn 资源区分。
+        this.graph.bdr.Name("MG_GraphChrome").Background("{DynamicResource BgColor}").BorderBrush("{DynamicResource ControlBorder}")
         this._HookGraphIfProPaths()
 
         ; 右上角：逻辑树（分支子图可不显示）；内容链接存储，关闭时自动保存，无需保存按钮
@@ -321,16 +321,16 @@ class MacroGraphGui {
         SetTimer(this._readyTimer, 50)
     }
 
-    ; 套用 AppTheme：节点/网格/按钮跟主题；仅窗口与画布底固定深色
+    ; 套用 AppTheme：窗口、画布、节点、网格、连线和按钮统一跟随当前主题。
     _ApplyTheme() {
         if (!IsObject(this.ui))
             return
         themeName := MainSoftData.HasProp("Theme") ? MainSoftData.Theme : "RMT_Light"
         try ApplyXamlTheme(this.ui, themeName)
-        darkBg := "#FF1E1E1E"
-        try this.ui.Update("Window", "Background", darkBg)
-        try this.ui.Update("Resource", "BgColor", darkBg)
-        try this.ui.Update("MG_GraphChrome", "Background", darkBg)
+        ; ApplyXamlTheme 已把 BgColor 与图形节点资源写入宿主；这里仅刷新画布引用，
+        ; 避免旧版本宿主缓存固定背景值。
+        try this.ui.Update("Window", "Background", "{DynamicResource BgColor}")
+        try this.ui.Update("MG_GraphChrome", "Background", "{DynamicResource BgColor}")
         ; 网格/连线走主题「图形节点」组(GraphLine/GraphConn)；节点体走 DropdownBg、TitleBar*、Input* 等
     }
 
